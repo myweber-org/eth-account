@@ -389,3 +389,97 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['id', 'value'])
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: If True, remove duplicate rows
+        fill_missing: Strategy for filling missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Dropped rows with missing values")
+    elif fill_missing in ['mean', 'median', 'mode']:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_missing == 'median':
+                    fill_value = cleaned_df[column].median()
+                else:  # mode
+                    fill_value = cleaned_df[column].mode()[0]
+                
+                cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+                print(f"Filled missing values in '{column}' with {fill_missing}: {fill_value}")
+    
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].round(4)
+    
+    print(f"Dataset cleaned: {len(cleaned_df)} rows, {len(cleaned_df.columns)} columns")
+    return cleaned_df
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers in a column using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to check for outliers
+    
+    Returns:
+        Series of boolean values indicating outliers
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    return outliers
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        Series with normalized values
+    """
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            return (df[column] - min_val) / (max_val - min_val)
+        else:
+            return df[column]
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val != 0:
+            return (df[column] - mean_val) / std_val
+        else:
+            return df[column]
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
