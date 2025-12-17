@@ -274,4 +274,33 @@ def example_usage():
 
 if __name__ == "__main__":
     result = example_usage()
-    print(result.head())
+    print(result.head())import pandas as pd
+
+def remove_duplicates(input_file, output_file, subset_columns=None):
+    """
+    Remove duplicate rows from a CSV file.
+    
+    Args:
+        input_file (str): Path to input CSV file
+        output_file (str): Path to save cleaned CSV file
+        subset_columns (list, optional): Columns to consider for duplicate detection
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        if subset_columns:
+            df_cleaned = df.drop_duplicates(subset=subset_columns, keep='first')
+        else:
+            df_cleaned = df.drop_duplicates(keep='first')
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Removed {len(df) - len(df_cleaned)} duplicate rows")
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found")
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+
+if __name__ == "__main__":
+    remove_duplicates('raw_data.csv', 'cleaned_data.csv', ['id', 'email'])
