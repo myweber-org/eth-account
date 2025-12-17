@@ -1,32 +1,55 @@
+import pandas as pd
 
-import numpy as np
-
-def remove_outliers_iqr(data, column):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Remove outliers from a specified column in a dataset using the Interquartile Range (IQR) method.
+    Remove duplicate rows from a DataFrame.
     
-    Parameters:
-    data (numpy.ndarray): The dataset.
-    column (int): The index of the column to clean.
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
     
     Returns:
-    numpy.ndarray: The dataset with outliers removed from the specified column.
+        pd.DataFrame: DataFrame with duplicates removed.
     """
-    if not isinstance(data, np.ndarray):
-        raise ValueError("Input data must be a numpy array.")
+    if df.empty:
+        return df
     
-    if column >= data.shape[1] or column < 0:
-        raise ValueError("Column index out of bounds.")
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to numeric and filling NaN.
     
-    col_data = data[:, column]
-    Q1 = np.percentile(col_data, 25)
-    Q3 = np.percentile(col_data, 75)
-    IQR = Q3 - Q1
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to clean.
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    Returns:
+        pd.DataFrame: DataFrame with cleaned numeric columns.
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+            df[col] = df[col].fillna(df[col].mean())
+    return df
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate DataFrame contains required columns.
     
-    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
-    cleaned_data = data[mask]
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
     
-    return cleaned_data
+    Returns:
+        bool: True if all required columns are present.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
