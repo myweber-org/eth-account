@@ -483,3 +483,47 @@ def normalize_column(df, column, method='minmax'):
             return df[column]
     else:
         raise ValueError("Method must be 'minmax' or 'zscore'")
+import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove rows with null values and standardize column names.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Standardize column names: lower case and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate that the dataframe contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', None, 'David'],
+        'Age': [25, 30, 35, None],
+        'City': ['NYC', 'LA', 'Chicago', 'Miami']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, ['name', 'age', 'city'])
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
