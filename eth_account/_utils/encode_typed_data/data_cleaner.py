@@ -1,229 +1,71 @@
-import numpy as np
-import pandas as pd
 
-def remove_outliers_iqr(data, column, factor=1.5):
-    """
-    Remove outliers using the Interquartile Range method.
-    
-    Parameters:
-    data (pd.DataFrame): Input dataframe
-    column (str): Column name to process
-    factor (float): Multiplier for IQR (default 1.5)
-    
-    Returns:
-    pd.DataFrame: Dataframe with outliers removed
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in dataframe")
-    
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data.copy()
+import csv
+import os
 
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling to range [0, 1].
-    
-    Parameters:
-    data (pd.DataFrame): Input dataframe
-    column (str): Column name to normalize
-    
-    Returns:
-    pd.Series: Normalized values
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in dataframe")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return pd.Series([0.5] * len(data), index=data.index)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
+def load_csv(file_path):
+    """Load CSV file and return data as list of dictionaries."""
+    data = []
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+    return data
 
-def clean_dataset(df, numeric_columns=None, outlier_factor=1.5):
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Parameters:
-    df (pd.DataFrame): Input dataframe
-    numeric_columns (list): List of numeric columns to process
-    outlier_factor (float): IQR factor for outlier detection
-    
-    Returns:
-    pd.DataFrame: Cleaned dataframe
-    """
-    if df.empty:
-        return df
-    
-    cleaned_df = df.copy()
-    
-    if numeric_columns is None:
-        numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            # Remove outliers
-            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_factor)
-            
-            # Normalize
-            cleaned_df[f"{col}_normalized"] = normalize_minmax(cleaned_df, col)
-    
-    return cleaned_df.reset_index(drop=True)
+def clean_numeric_fields(data, fields):
+    """Remove non-numeric characters from specified fields."""
+    cleaned_data = []
+    for row in data:
+        cleaned_row = row.copy()
+        for field in fields:
+            if field in cleaned_row:
+                value = cleaned_row[field]
+                if isinstance(value, str):
+                    cleaned_row[field] = ''.join(char for char in value if char.isdigit() or char == '.')
+        cleaned_data.append(cleaned_row)
+    return cleaned_data
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate dataframe structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): Dataframe to validate
-    required_columns (list): List of required column names
-    
-    Returns:
-    tuple: (is_valid, error_message)
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "DataFrame is valid"
+def remove_empty_rows(data, required_fields):
+    """Remove rows where any required field is empty."""
+    filtered_data = []
+    for row in data:
+        if all(row.get(field) not in [None, ''] for field in required_fields):
+            filtered_data.append(row)
+    return filtered_data
 
-# Example usage demonstration
-if __name__ == "__main__":
-    # Create sample data
-    np.random.seed(42)
-    sample_data = pd.DataFrame({
-        'temperature': np.random.normal(25, 5, 100),
-        'humidity': np.random.uniform(30, 90, 100),
-        'pressure': np.random.normal(1013, 10, 100)
-    })
+def save_csv(data, file_path):
+    """Save data to CSV file."""
+    if not data:
+        print("No data to save.")
+        return False
     
-    # Add some outliers
-    sample_data.loc[95, 'temperature'] = 100
-    sample_data.loc[96, 'humidity'] = 150
-    
-    print("Original data shape:", sample_data.shape)
-    print("Original data summary:")
-    print(sample_data.describe())
-    
-    # Clean the data
-    cleaned_data = clean_dataset(sample_data, ['temperature', 'humidity', 'pressure'])
-    
-    print("\nCleaned data shape:", cleaned_data.shape)
-    print("Cleaned data summary:")
-    print(cleaned_data.describe())
-    
-    # Validate the cleaned data
-    is_valid, message = validate_dataframe(cleaned_data)
-    print(f"\nData validation: {is_valid} - {message}")
-import numpy as np
-import pandas as pd
+    try:
+        with open(file_path, 'w', newline='', encoding='utf-8') as file:
+            fieldnames = data[0].keys()
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error saving CSV: {e}")
+        return False
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+def process_csv(input_path, output_path, numeric_fields=None, required_fields=None):
+    """Main function to process CSV file."""
+    if numeric_fields is None:
+        numeric_fields = []
+    if required_fields is None:
+        required_fields = []
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    data = load_csv(input_path)
+    if not data:
+        return False
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    data = clean_numeric_fields(data, numeric_fields)
+    data = remove_empty_rows(data, required_fields)
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_summary_stats(df, column):
-    """
-    Calculate summary statistics for a column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
-    
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
-
-def clean_dataset(df, numeric_columns=None):
-    """
-    Clean a dataset by removing outliers from all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for column in numeric_columns:
-        if column in df.columns:
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            except Exception as e:
-                print(f"Warning: Could not clean column '{column}': {e}")
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'id': range(1, 101),
-        'value': np.random.normal(100, 15, 100)
-    }
-    
-    # Add some outliers
-    sample_data['value'][0] = 500
-    sample_data['value'][1] = -200
-    
-    df = pd.DataFrame(sample_data)
-    print("Original dataset shape:", df.shape)
-    print("Original summary stats:", calculate_summary_stats(df, 'value'))
-    
-    cleaned_df = clean_dataset(df, ['value'])
-    print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("Cleaned summary stats:", calculate_summary_stats(cleaned_df, 'value'))
+    return save_csv(data, output_path)
