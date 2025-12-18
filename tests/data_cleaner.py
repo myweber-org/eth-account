@@ -198,3 +198,99 @@ def normalize_column(df, column, method='minmax'):
         raise ValueError("Method must be 'minmax' or 'zscore'")
     
     return df_copy
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+    
+    def remove_duplicates(self, subset: Optional[list] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset)
+        return self
+    
+    def fill_missing_numeric(self, strategy: str = 'mean', fill_value: float = 0) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            for col in numeric_cols:
+                self.df[col] = self.df[col].fillna(self.df[col].mean())
+        elif strategy == 'median':
+            for col in numeric_cols:
+                self.df[col] = self.df[col].fillna(self.df[col].median())
+        elif strategy == 'constant':
+            for col in numeric_cols:
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self
+    
+    def fill_missing_categorical(self, strategy: str = 'mode', fill_value: str = 'Unknown') -> 'DataCleaner':
+        categorical_cols = self.df.select_dtypes(include=['object', 'category']).columns
+        
+        if strategy == 'mode':
+            for col in categorical_cols:
+                if not self.df[col].mode().empty:
+                    self.df[col] = self.df[col].fillna(self.df[col].mode()[0])
+        elif strategy == 'constant':
+            for col in categorical_cols:
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self
+    
+    def remove_outliers_iqr(self, columns: list, multiplier: float = 1.5) -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self
+    
+    def standardize_numeric(self, columns: list) -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
+                mean = self.df[col].mean()
+                std = self.df[col].std()
+                if std > 0:
+                    self.df[col] = (self.df[col] - mean) / std
+        
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_cleaning_report(self) -> dict:
+        cleaned_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': cleaned_shape[0],
+            'cleaned_columns': cleaned_shape[1],
+            'rows_removed': self.original_shape[0] - cleaned_shape[0],
+            'missing_values_remaining': self.df.isnull().sum().sum()
+        }
+
+def clean_csv_file(input_path: str, output_path: str, **kwargs) -> dict:
+    df = pd.read_csv(input_path)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates()
+    cleaner.fill_missing_numeric(strategy=kwargs.get('numeric_strategy', 'mean'))
+    cleaner.fill_missing_categorical(strategy=kwargs.get('categorical_strategy', 'mode'))
+    
+    if 'outlier_columns' in kwargs:
+        cleaner.remove_outliers_iqr(kwargs['outlier_columns'])
+    
+    if 'standardize_columns' in kwargs:
+        cleaner.standardize_numeric(kwargs['standardize_columns'])
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    cleaned_df.to_csv(output_path, index=False)
+    
+    return cleaner.get_cleaning_report()
