@@ -190,3 +190,38 @@ if __name__ == "__main__":
     validated = validate_email_column(cleaned, 'email')
     print("DataFrame with email validation:")
     print(validated)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def normalize_column(series, method='zscore'):
+    if method == 'zscore':
+        return (series - series.mean()) / series.std()
+    elif method == 'minmax':
+        return (series - series.min()) / (series.max() - series.min())
+    else:
+        raise ValueError("Method must be 'zscore' or 'minmax'")
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    elif method == 'zscore':
+        z_scores = np.abs(stats.zscore(df[column]))
+        return df[z_scores < threshold]
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+
+def handle_missing_values(df, strategy='mean'):
+    if strategy == 'mean':
+        return df.fillna(df.mean())
+    elif strategy == 'median':
+        return df.fillna(df.median())
+    elif strategy == 'drop':
+        return df.dropna()
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
