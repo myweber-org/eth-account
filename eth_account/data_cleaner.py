@@ -205,4 +205,167 @@ if __name__ == "__main__":
     print("\nData Summary:")
     summary = get_data_summary(cleaned)
     print(f"Shape: {summary['shape']}")
-    print(f"Missing values: {summary['missing_values']}")
+    print(f"Missing values: {summary['missing_values']}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        data: Array-like data
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        Boolean mask where True indicates outliers
+    """
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    return (data < lower_bound) | (data > upper_bound)
+
+def remove_outliers(df, columns, threshold=1.5):
+    """
+    Remove outliers from specified columns in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of column names to process
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    df_clean = df.copy()
+    outlier_mask = pd.Series([False] * len(df))
+    
+    for col in columns:
+        if col in df.columns:
+            col_mask = detect_outliers_iqr(df[col].values, threshold)
+            outlier_mask = outlier_mask | col_mask
+    
+    return df_clean[~outlier_mask].reset_index(drop=True)
+
+def normalize_minmax(data):
+    """
+    Normalize data using min-max scaling to [0, 1] range.
+    
+    Args:
+        data: Array-like data
+    
+    Returns:
+        Normalized data
+    """
+    data_array = np.array(data)
+    min_val = np.min(data_array)
+    max_val = np.max(data_array)
+    
+    if max_val == min_val:
+        return np.zeros_like(data_array)
+    
+    return (data_array - min_val) / (max_val - min_val)
+
+def standardize_zscore(data):
+    """
+    Standardize data using z-score normalization.
+    
+    Args:
+        data: Array-like data
+    
+    Returns:
+        Standardized data with mean=0, std=1
+    """
+    data_array = np.array(data)
+    mean_val = np.mean(data_array)
+    std_val = np.std(data_array)
+    
+    if std_val == 0:
+        return np.zeros_like(data_array)
+    
+    return (data_array - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns, outlier_threshold=1.5, normalize=True):
+    """
+    Complete data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        numeric_columns: List of numeric column names to process
+        outlier_threshold: IQR multiplier for outlier detection
+        normalize: Whether to apply min-max normalization
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    
+    df_clean = df.copy()
+    
+    if numeric_columns:
+        df_clean = remove_outliers(df_clean, numeric_columns, outlier_threshold)
+        
+        for col in numeric_columns:
+            if col in df_clean.columns:
+                if normalize:
+                    df_clean[col] = normalize_minmax(df_clean[col])
+                else:
+                    df_clean[col] = standardize_zscore(df_clean[col])
+    
+    return df_clean
+
+def get_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        Dictionary of summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if len(numeric_cols) == 0:
+        return {}
+    
+    summary = {}
+    for col in numeric_cols:
+        summary[col] = {
+            'mean': float(df[col].mean()),
+            'median': float(df[col].median()),
+            'std': float(df[col].std()),
+            'min': float(df[col].min()),
+            'max': float(df[col].max()),
+            'q1': float(df[col].quantile(0.25)),
+            'q3': float(df[col].quantile(0.75)),
+            'skewness': float(stats.skew(df[col].dropna())),
+            'kurtosis': float(stats.kurtosis(df[col].dropna()))
+        }
+    
+    return summary
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': np.random.normal(50, 15, 1000),
+        'feature2': np.random.exponential(10, 1000),
+        'feature3': np.random.uniform(0, 100, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    print("Original dataset shape:", df_sample.shape)
+    
+    numeric_cols = ['feature1', 'feature2', 'feature3']
+    df_cleaned = clean_dataset(df_sample, numeric_cols)
+    print("Cleaned dataset shape:", df_cleaned.shape)
+    
+    stats_summary = get_summary_statistics(df_cleaned)
+    print("\nSummary statistics for cleaned data:")
+    for col, stats_dict in stats_summary.items():
+        print(f"\n{col}:")
+        for stat_name, value in stats_dict.items():
+            print(f"  {stat_name}: {value:.4f}")
