@@ -106,3 +106,100 @@ if __name__ == "__main__":
         print(f"Data validation passed: {validation['is_valid']}")
         if not validation['is_valid']:
             print(f"Validation issues: {validation['issues']}")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if self.file_path.exists():
+            self.df = pd.read_csv(self.file_path)
+            return True
+        return False
+    
+    def remove_duplicates(self):
+        if self.df is not None:
+            initial_rows = len(self.df)
+            self.df = self.df.drop_duplicates()
+            removed = initial_rows - len(self.df)
+            return removed
+        return 0
+    
+    def fill_missing_values(self, strategy='mean', fill_value=None):
+        if self.df is not None:
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            
+            if strategy == 'mean':
+                for col in numeric_cols:
+                    self.df[col] = self.df[col].fillna(self.df[col].mean())
+            elif strategy == 'median':
+                for col in numeric_cols:
+                    self.df[col] = self.df[col].fillna(self.df[col].median())
+            elif strategy == 'custom' and fill_value is not None:
+                self.df = self.df.fillna(fill_value)
+            
+            return len(numeric_cols)
+        return 0
+    
+    def remove_outliers(self, threshold=3):
+        if self.df is not None:
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            initial_rows = len(self.df)
+            
+            for col in numeric_cols:
+                z_scores = np.abs((self.df[col] - self.df[col].mean()) / self.df[col].std())
+                self.df = self.df[z_scores < threshold]
+            
+            removed = initial_rows - len(self.df)
+            return removed
+        return 0
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is not None:
+            if output_path is None:
+                output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+            
+            self.df.to_csv(output_path, index=False)
+            return str(output_path)
+        return None
+    
+    def get_summary(self):
+        if self.df is not None:
+            summary = {
+                'rows': len(self.df),
+                'columns': len(self.df.columns),
+                'missing_values': self.df.isnull().sum().sum(),
+                'data_types': self.df.dtypes.to_dict()
+            }
+            return summary
+        return None
+
+def process_csv_file(input_file, output_dir='cleaned_data'):
+    cleaner = DataCleaner(input_file)
+    
+    if not cleaner.load_data():
+        print(f"Error: File {input_file} not found")
+        return None
+    
+    print(f"Loaded data: {len(cleaner.df)} rows, {len(cleaner.df.columns)} columns")
+    
+    duplicates_removed = cleaner.remove_duplicates()
+    print(f"Removed {duplicates_removed} duplicate rows")
+    
+    cols_filled = cleaner.fill_missing_values(strategy='mean')
+    print(f"Filled missing values in {cols_filled} numeric columns")
+    
+    outliers_removed = cleaner.remove_outliers()
+    print(f"Removed {outliers_removed} outlier rows")
+    
+    output_path = cleaner.save_cleaned_data()
+    print(f"Saved cleaned data to: {output_path}")
+    
+    summary = cleaner.get_summary()
+    print(f"Final dataset: {summary['rows']} rows, {summary['columns']} columns")
+    
+    return output_path
