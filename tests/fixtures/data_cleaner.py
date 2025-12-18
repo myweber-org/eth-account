@@ -348,3 +348,90 @@ if __name__ == "__main__":
         
     except Exception as e:
         print(f"Error during data cleaning: {e}")
+import pandas as pd
+import numpy as np
+import logging
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    initial_count = len(df)
+    df_cleaned = df.drop_duplicates(subset=subset, keep='first')
+    removed_count = initial_count - len(df_cleaned)
+    logging.info(f"Removed {removed_count} duplicate rows.")
+    return df_cleaned
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                fill_value = 0
+            
+            missing_count = df[col].isnull().sum()
+            df_filled[col].fillna(fill_value, inplace=True)
+            logging.info(f"Filled {missing_count} missing values in column '{col}' with {strategy}.")
+    
+    return df_filled
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
+    
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+        else:
+            df[column] = 0
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val != 0:
+            df[column] = (df[column] - mean_val) / std_val
+        else:
+            df[column] = 0
+    
+    logging.info(f"Normalized column '{column}' using {method} method.")
+    return df
+
+def clean_dataframe(df, operations):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    """
+    df_cleaned = df.copy()
+    
+    for operation in operations:
+        if operation['type'] == 'remove_duplicates':
+            df_cleaned = remove_duplicates(df_cleaned, subset=operation.get('subset'))
+        elif operation['type'] == 'handle_missing':
+            df_cleaned = handle_missing_values(
+                df_cleaned, 
+                strategy=operation.get('strategy', 'mean'),
+                columns=operation.get('columns')
+            )
+        elif operation['type'] == 'normalize':
+            df_cleaned = normalize_column(
+                df_cleaned,
+                column=operation['column'],
+                method=operation.get('method', 'minmax')
+            )
+    
+    return df_cleaned
