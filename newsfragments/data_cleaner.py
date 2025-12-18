@@ -135,4 +135,54 @@ def clean_numeric_columns(df, columns):
     for col in columns:
         if col in cleaned_df.columns:
             cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-    return cleaned_df
+    return cleaned_dfimport numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (list or array-like): The dataset.
+    column (int or str): The column index or name to process.
+    
+    Returns:
+    tuple: (cleaned_data, outliers_removed)
+    """
+    if isinstance(column, str):
+        raise ValueError("Column name handling requires pandas DataFrame. Use integer index for lists/arrays.")
+    
+    data_array = np.array(data)
+    column_data = data_array[:, column].astype(float)
+    
+    Q1 = np.percentile(column_data, 25)
+    Q3 = np.percentile(column_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    cleaned_data = data_array[mask]
+    outliers = data_array[~mask]
+    
+    return cleaned_data, outliers
+
+def example_usage():
+    sample_data = [
+        [1, 150.5],
+        [2, 200.2],
+        [3, 50.1],
+        [4, 300.9],
+        [5, 180.3],
+        [6, 1000.0],
+        [7, 190.7]
+    ]
+    
+    cleaned, removed = remove_outliers_iqr(sample_data, column=1)
+    print(f"Original data points: {len(sample_data)}")
+    print(f"Cleaned data points: {len(cleaned)}")
+    print(f"Outliers removed: {len(removed)}")
+    print(f"Outliers: {removed}")
+
+if __name__ == "__main__":
+    example_usage()
