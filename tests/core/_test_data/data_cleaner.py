@@ -468,4 +468,63 @@ def validate_dataframe(df, required_columns=None):
             print(f"Error: Missing required columns: {missing_cols}")
             return False
     
+    return Trueimport pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with no nulls or duplicates.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = df.copy()
+    
+    cleaned_df = cleaned_df.dropna()
+    
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_clean_dataset(df):
+    """
+    Validate that a DataFrame has no null values or duplicate rows.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        bool: True if DataFrame is clean, False otherwise.
+    """
+    if df.isnull().sum().sum() > 0:
+        return False
+    
+    if df.duplicated().sum() > 0:
+        return False
+    
     return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, None, 4, 1],
+        'B': [5, 6, 7, None, 5],
+        'C': [8, 9, 10, 11, 8]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nNull values:", df.isnull().sum().sum())
+    print("Duplicates:", df.duplicated().sum())
+    
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nValidation:", validate_clean_dataset(cleaned))
