@@ -689,3 +689,162 @@ def validate_dataframe(df, required_columns=None):
 #     print("\nCleaned DataFrame (mean fill):")
 #     cleaned = clean_dataset(df, columns_to_check=['id', 'name'], fill_na_method='mean')
 #     print(cleaned)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_column(dataframe, column, method='minmax'):
+    """
+    Normalize a column in the DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        DataFrame with normalized column added as '{column}_normalized'
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if method == 'minmax':
+        min_val = dataframe[column].min()
+        max_val = dataframe[column].max()
+        if max_val == min_val:
+            normalized = 0.5
+        else:
+            normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = dataframe[column].mean()
+        std_val = dataframe[column].std()
+        if std_val == 0:
+            normalized = 0
+        else:
+            normalized = (dataframe[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    result_df = dataframe.copy()
+    result_df[f'{column}_normalized'] = normalized
+    
+    return result_df
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with skewed distributions.
+    
+    Args:
+        dataframe: pandas DataFrame
+        threshold: Absolute skewness threshold for detection
+    
+    Returns:
+        Dictionary with column names and their skewness values
+    """
+    skewed_columns = {}
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = stats.skew(dataframe[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_columns[col] = skewness
+    
+    return skewed_columns
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_multiplier=1.5, normalize_method='minmax'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: pandas DataFrame to clean
+        numeric_columns: List of numeric columns to process (defaults to all numeric)
+        outlier_multiplier: Multiplier for IQR outlier detection
+        normalize_method: Normalization method to apply
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    # Remove outliers from each numeric column
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column, outlier_multiplier)
+    
+    # Normalize numeric columns
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = normalize_column(cleaned_df, column, normalize_method)
+    
+    # Report skewed columns
+    skewed = detect_skewed_columns(cleaned_df)
+    if skewed:
+        print(f"Detected skewed columns: {skewed}")
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None, allow_nan_ratio=0.1):
+    """
+    Validate DataFrame structure and data quality.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: List of required column names
+        allow_nan_ratio: Maximum allowed ratio of NaN values per column
+    
+    Returns:
+        Tuple of (is_valid, issues_list)
+    """
+    issues = []
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            issues.append(f"Missing required columns: {missing_columns}")
+    
+    # Check for excessive NaN values
+    for column in dataframe.columns:
+        nan_ratio = dataframe[column].isna().mean()
+        if nan_ratio > allow_nan_ratio:
+            issues.append(f"Column '{column}' has {nan_ratio:.1%} NaN values")
+    
+    # Check for infinite values in numeric columns
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    for column in numeric_cols:
+        if np.any(np.isinf(dataframe[column])):
+            issues.append(f"Column '{column}' contains infinite values")
+    
+    is_valid = len(issues) == 0
+    
+    return is_valid, issues
