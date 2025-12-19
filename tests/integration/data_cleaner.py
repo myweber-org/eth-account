@@ -467,4 +467,77 @@ if __name__ == "__main__":
     
     print("\nCleaned data shape:", cleaned.shape)
     print("\nCleaned statistics for feature1:")
-    print(get_statistics(cleaned, 'feature1'))
+    print(get_statistics(cleaned, 'feature1'))import pandas as pd
+import numpy as np
+import argparse
+import os
+
+def load_csv(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded {len(df)} rows from {file_path}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File {file_path} not found.")
+        return None
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        return None
+
+def clean_data(df):
+    if df is None or df.empty:
+        return df
+    
+    original_rows = len(df)
+    
+    df = df.drop_duplicates()
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_columns:
+        if df[col].isnull().sum() > 0:
+            df[col] = df[col].fillna(df[col].median())
+    
+    text_columns = df.select_dtypes(include=['object']).columns
+    for col in text_columns:
+        df[col] = df[col].fillna('Unknown')
+        df[col] = df[col].str.strip()
+    
+    df = df.dropna(how='all')
+    
+    cleaned_rows = len(df)
+    print(f"Cleaning complete. Removed {original_rows - cleaned_rows} rows.")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    if df is None or df.empty:
+        print("No data to save.")
+        return False
+    
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return False
+
+def main():
+    parser = argparse.ArgumentParser(description='Clean CSV data file')
+    parser.add_argument('input_file', help='Path to input CSV file')
+    parser.add_argument('-o', '--output', help='Path for output CSV file', default='cleaned_data.csv')
+    
+    args = parser.parse_args()
+    
+    if not os.path.exists(args.input_file):
+        print(f"Input file {args.input_file} does not exist.")
+        return
+    
+    df = load_csv(args.input_file)
+    
+    if df is not None:
+        cleaned_df = clean_data(df)
+        save_cleaned_data(cleaned_df, args.output)
+
+if __name__ == "__main__":
+    main()
