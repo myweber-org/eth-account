@@ -487,4 +487,79 @@ if __name__ == "__main__":
     ]
     cleaned_objects = clean_data_with_key(sample_objects, key_func=lambda x: x["id"])
     print(f"Original objects: {sample_objects}")
-    print(f"Cleaned objects: {cleaned_objects}")
+    print(f"Cleaned objects: {cleaned_objects}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    Returns boolean mask for outliers.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    return (data[column] < lower_bound) | (data[column] > upper_bound)
+
+def remove_outliers(data, column, method='iqr', **kwargs):
+    """
+    Remove outliers from specified column.
+    Supports 'iqr' and 'zscore' methods.
+    """
+    if method == 'iqr':
+        outlier_mask = detect_outliers_iqr(data, column, **kwargs)
+    elif method == 'zscore':
+        z_scores = np.abs(stats.zscore(data[column].dropna()))
+        outlier_mask = z_scores > kwargs.get('threshold', 3)
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return data[~outlier_mask]
+
+def normalize_column(data, column, method='minmax'):
+    """
+    Normalize column values.
+    Supports 'minmax' and 'standard' normalization.
+    """
+    if method == 'minmax':
+        min_val = data[column].min()
+        max_val = data[column].max()
+        data[column] = (data[column] - min_val) / (max_val - min_val)
+    elif method == 'standard':
+        mean_val = data[column].mean()
+        std_val = data[column].std()
+        data[column] = (data[column] - mean_val) / std_val
+    else:
+        raise ValueError("Method must be 'minmax' or 'standard'")
+    
+    return data
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='standard'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers(cleaned_df, col, method=outlier_method)
+            cleaned_df = normalize_column(cleaned_df, col, method=normalize_method)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns, numeric_check=True):
+    """
+    Validate dataframe structure and content.
+    """
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if numeric_check:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) == 0:
+            raise ValueError("No numeric columns found in dataframe")
+    
+    return True
