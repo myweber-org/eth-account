@@ -210,3 +210,159 @@ class DataCleaner:
             'missing_values': self.df.isnull().sum().sum()
         }
         return summary
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers from a column using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize column values to range [0, 1] using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize column values using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(data, numeric_columns=None, outlier_factor=1.5):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names (default: all numeric columns)
+        outlier_factor: IQR factor for outlier detection
+    
+    Returns:
+        Tuple of (cleaned_data, normalization_stats)
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    normalization_stats = {}
+    
+    for col in numeric_columns:
+        if col not in cleaned_data.columns:
+            continue
+            
+        original_len = len(cleaned_data)
+        cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_factor)
+        removed_count = original_len - len(cleaned_data)
+        
+        if removed_count > 0:
+            print(f"Removed {removed_count} outliers from column '{col}'")
+        
+        normalized_col = normalize_minmax(cleaned_data, col)
+        cleaned_data[f"{col}_normalized"] = normalized_col
+        
+        col_stats = {
+            'min': cleaned_data[col].min(),
+            'max': cleaned_data[col].max(),
+            'mean': cleaned_data[col].mean(),
+            'std': cleaned_data[col].std()
+        }
+        normalization_stats[col] = col_stats
+    
+    return cleaned_data, normalization_stats
+
+def validate_data(data, required_columns=None, allow_nan=False):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        data: pandas DataFrame
+        required_columns: list of required column names
+        allow_nan: whether NaN values are allowed
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False, "Input must be a pandas DataFrame"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if not allow_nan and data.isnull().any().any():
+        nan_cols = data.columns[data.isnull().any()].tolist()
+        return False, f"NaN values found in columns: {nan_cols}"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    is_valid, message = validate_data(sample_data)
+    print(f"Validation: {message}")
+    
+    if is_valid:
+        cleaned_data, stats = clean_dataset(sample_data)
+        print(f"Original shape: {sample_data.shape}")
+        print(f"Cleaned shape: {cleaned_data.shape}")
+        print(f"Normalization stats collected for {len(stats)} columns")
