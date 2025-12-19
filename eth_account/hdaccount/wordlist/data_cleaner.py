@@ -94,4 +94,96 @@ if __name__ == "__main__":
     
     cleaned_df = clean_numeric_data(df, ['temperature', 'pressure'])
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    print(cleaned_df)import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (bool): Whether to fill missing values. Default is True.
+        fill_value: Value to use for filling missing data. Default is 0.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def normalize_column(df, column_name):
+    """
+    Normalize a column to have values between 0 and 1.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to normalize.
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    normalized_df = df.copy()
+    col_min = normalized_df[column_name].min()
+    col_max = normalized_df[column_name].max()
+    
+    if col_max != col_min:
+        normalized_df[column_name] = (normalized_df[column_name] - col_min) / (col_max - col_min)
+    
+    return normalized_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 3, None],
+        'B': [4, None, 6, 7, 8],
+        'C': [9, 10, 10, 11, 12]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid, message = validate_dataframe(cleaned, ['A', 'B', 'C'])
+    print(f"\nValidation: {is_valid} - {message}")
+    
+    normalized = normalize_column(cleaned, 'A')
+    print("\nDataFrame with normalized column A:")
+    print(normalized)
