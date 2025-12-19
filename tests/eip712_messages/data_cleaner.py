@@ -225,3 +225,81 @@ def handle_missing_values(df, strategy='mean'):
         return df.dropna()
     else:
         raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using min-max scaling
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    normalized_data = data.copy()
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            min_val = data[col].min()
+            max_val = data[col].max()
+            if max_val > min_val:
+                normalized_data[col] = (data[col] - min_val) / (max_val - min_val)
+    
+    return normalized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    cleaned_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            cleaned_data[col] = data[col].fillna(fill_value)
+    
+    return cleaned_data
+
+def validate_dataframe(data, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if len(data) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
