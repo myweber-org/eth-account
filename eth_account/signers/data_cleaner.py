@@ -172,4 +172,55 @@ if __name__ == "__main__":
     
     print("\nSummary statistics:")
     print(f"Original - Mean: {df['value'].mean():.2f}, Std: {df['value'].std():.2f}")
-    print(f"Cleaned - Mean: {cleaned_df['value'].mean():.2f}, Std: {cleaned_df['value'].std():.2f}")
+    print(f"Cleaned - Mean: {cleaned_df['value'].mean():.2f}, Std: {cleaned_df['value'].std():.2f}")import pandas as pd
+
+def clean_dataset(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_na (bool): Whether to drop rows with null values
+    rename_columns (bool): Whether to rename columns to lowercase with underscores
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if rename_columns:
+        cleaned_df.columns = (
+            cleaned_df.columns
+            .str.lower()
+            .str.replace(' ', '_')
+            .str.replace(r'[^\w_]', '', regex=True)
+        )
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    bool: True if DataFrame passes validation
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame cannot be empty")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
