@@ -417,3 +417,48 @@ if __name__ == "__main__":
     cleaned = clean_dataset('sample_data.csv')
     if cleaned:
         print(f"Cleaned data saved to: {cleaned}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                normalized_df[col] = (df[col] - min_val) / (max_val - min_val)
+    return normalized_df
+
+def clean_dataset(file_path, output_path):
+    try:
+        df = pd.read_csv(file_path)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        df_cleaned = remove_outliers_iqr(df, numeric_cols)
+        df_normalized = normalize_minmax(df_cleaned, numeric_cols)
+        
+        df_normalized.to_csv(output_path, index=False)
+        print(f"Data cleaned and saved to {output_path}")
+        print(f"Original rows: {len(df)}, Cleaned rows: {len(df_cleaned)}")
+        
+    except Exception as e:
+        print(f"Error processing file: {e}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    clean_dataset(input_file, output_file)
