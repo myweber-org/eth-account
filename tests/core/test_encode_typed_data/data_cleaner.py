@@ -462,4 +462,52 @@ def clean_dataset(df, missing_strategy='drop', outlier_strategy='cap'):
         for col in numeric_cols:
             df_clean = cap_outliers(df_clean, col)
     
-    return df_clean
+    return df_cleanimport csv
+import re
+
+def clean_csv(input_file, output_file):
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        headers = next(reader)
+        cleaned_rows.append(headers)
+        
+        for row in reader:
+            cleaned_row = []
+            for cell in row:
+                cleaned_cell = re.sub(r'\s+', ' ', cell.strip())
+                cleaned_cell = cleaned_cell.replace('"', '')
+                cleaned_row.append(cleaned_cell)
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(cleaned_rows)
+
+def validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(input_file, output_file):
+    unique_rows = []
+    seen = set()
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        headers = next(reader)
+        unique_rows.append(headers)
+        
+        for row in reader:
+            row_tuple = tuple(row)
+            if row_tuple not in seen:
+                seen.add(row_tuple)
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerows(unique_rows)
+
+if __name__ == "__main__":
+    clean_csv("raw_data.csv", "cleaned_data.csv")
+    remove_duplicates("cleaned_data.csv", "final_data.csv")
