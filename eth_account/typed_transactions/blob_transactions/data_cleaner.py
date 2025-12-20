@@ -1,83 +1,42 @@
-
+import pandas as pd
 import numpy as np
+from scipy import stats
 
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_dataimport pandas as pd
-import numpy as np
+def load_data(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
 
 def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
-    
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        column (str): The column name to clean.
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed from the specified column.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
+    """Remove outliers using IQR method."""
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
-    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a DataFrame column.
+def normalize_column(df, column):
+    """Normalize column using min-max scaling."""
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(input_path, output_path):
+    """Main function to clean dataset."""
+    df = load_data(input_path)
     
-    Args:
-        df (pd.DataFrame): The input DataFrame.
-        column (str): The column name to analyze.
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    Returns:
-        dict: Dictionary containing summary statistics.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    for col in numeric_cols:
+        df = remove_outliers_iqr(df, col)
+        df = normalize_column(df, col)
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+    return df
 
 if __name__ == "__main__":
-    sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 102, 12, 14, 13, 12, 11, 14, 13, 12, 14, 105]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print(f"\nOriginal shape: {df.shape}")
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print(f"Cleaned shape: {cleaned_df.shape}")
-    
-    stats = calculate_summary_statistics(cleaned_df, 'values')
-    print("\nSummary Statistics:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}" if isinstance(value, (int, float)) else f"{key}: {value}")
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    cleaned_df = clean_dataset(input_file, output_file)
