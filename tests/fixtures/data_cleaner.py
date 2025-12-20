@@ -1219,3 +1219,11 @@ if __name__ == "__main__":
     cleaned['Price_Numeric'] = cleaned['Price'].apply(extract_numeric)
     print("\nExtracted numeric values:")
     print(cleaned[['Age', 'Age_Numeric', 'Price', 'Price_Numeric']])
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
