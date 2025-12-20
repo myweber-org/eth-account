@@ -1093,3 +1093,129 @@ def clean_dataset(input_path, output_path):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: dictionary mapping old column names to new ones
+        drop_duplicates: whether to remove duplicate rows
+        normalize_text: whether to normalize text columns (lowercase, strip whitespace)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    # Normalize text columns
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].apply(
+                lambda x: str(x).lower().strip() if pd.notnull(x) else x
+            )
+        print(f"Normalized text in {len(text_columns)} columns")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    
+    Args:
+        email: string to validate as email
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    if pd.isna(email):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def extract_numeric(text):
+    """
+    Extract numeric values from text.
+    
+    Args:
+        text: string containing numeric values
+    
+    Returns:
+        Extracted numeric value as float, or None if no numbers found
+    """
+    if pd.isna(text):
+        return None
+    
+    numbers = re.findall(r'\d+\.?\d*', str(text))
+    if numbers:
+        return float(numbers[0])
+    return None
+
+def clean_column_names(df):
+    """
+    Standardize column names to lowercase with underscores.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        DataFrame with cleaned column names
+    """
+    cleaned_df = df.copy()
+    cleaned_df.columns = (
+        cleaned_df.columns
+        .str.lower()
+        .str.replace(r'[^\w\s]', '', regex=True)
+        .str.replace(r'\s+', '_', regex=True)
+        .str.strip('_')
+    )
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', ' Bob Johnson '],
+        'Email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.net'],
+        'Age': ['25', '30', '25', '35'],
+        'Price': ['$19.99', '25.50 USD', '15', 'invalid']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    cleaned = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate emails
+    cleaned['Email_Valid'] = cleaned['Email'].apply(validate_email)
+    print("\nEmail validation:")
+    print(cleaned[['Email', 'Email_Valid']])
+    
+    # Extract numeric values
+    cleaned['Age_Numeric'] = cleaned['Age'].apply(extract_numeric)
+    cleaned['Price_Numeric'] = cleaned['Price'].apply(extract_numeric)
+    print("\nExtracted numeric values:")
+    print(cleaned[['Age', 'Age_Numeric', 'Price', 'Price_Numeric']])
