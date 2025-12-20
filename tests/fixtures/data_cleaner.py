@@ -912,4 +912,151 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid = validate_data(cleaned_df, required_columns=['id', 'value'])
-    print(f"\nData validation result: {is_valid}")
+    print(f"\nData validation result: {is_valid}")import numpy as np
+import pandas as pd
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to analyze
+    threshold (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers flagged
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    data['is_outlier'] = ~data[column].between(lower_bound, upper_bound)
+    return data
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    columns (list): List of columns to normalize (default: all numeric columns)
+    
+    Returns:
+    pd.DataFrame: Normalized dataframe
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_min = data[col].min()
+            col_max = data[col].max()
+            
+            if col_max != col_min:
+                normalized_data[col] = (data[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_data[col] = 0
+    
+    return normalized_data
+
+def remove_missing_rows(data, threshold=0.8):
+    """
+    Remove rows with missing values above a threshold.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    threshold (float): Maximum allowed missing ratio (0-1)
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if not 0 <= threshold <= 1:
+        raise ValueError("Threshold must be between 0 and 1")
+    
+    missing_ratio = data.isnull().sum(axis=1) / data.shape[1]
+    cleaned_data = data[missing_ratio <= threshold].copy()
+    
+    return cleaned_data
+
+def clean_dataset(data, numeric_columns=None, outlier_threshold=1.5, missing_threshold=0.8):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): Columns to check for outliers and normalize
+    outlier_threshold (float): IQR multiplier for outlier detection
+    missing_threshold (float): Maximum allowed missing ratio
+    
+    Returns:
+    pd.DataFrame: Cleaned and normalized dataframe
+    """
+    cleaned_data = data.copy()
+    
+    # Remove rows with excessive missing values
+    cleaned_data = remove_missing_rows(cleaned_data, missing_threshold)
+    
+    if numeric_columns is None:
+        numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    # Detect and flag outliers
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data = detect_outliers_iqr(cleaned_data, col, outlier_threshold)
+    
+    # Normalize numeric columns
+    cleaned_data = normalize_minmax(cleaned_data, numeric_columns)
+    
+    return cleaned_data
+
+def validate_dataframe(data):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    data (pd.DataFrame): Dataframe to validate
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'total_rows': len(data),
+        'total_columns': len(data.columns),
+        'missing_values': data.isnull().sum().sum(),
+        'duplicate_rows': data.duplicated().sum(),
+        'numeric_columns': data.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': data.select_dtypes(include=['object']).columns.tolist()
+    }
+    
+    return validation_results
+
+# Example usage demonstration
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 50),
+        'feature_b': np.random.uniform(0, 1, 50),
+        'category': np.random.choice(['A', 'B', 'C'], 50)
+    })
+    
+    # Add some missing values and outliers
+    sample_data.loc[5:10, 'feature_a'] = np.nan
+    sample_data.loc[0, 'feature_a'] = 500  # Outlier
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nValidation results:")
+    print(validate_dataframe(sample_data))
+    
+    # Clean the data
+    cleaned = clean_dataset(sample_data)
+    print("\nCleaned data shape:", cleaned.shape)
+    print("\nOutlier count:", cleaned['is_outlier'].sum())
