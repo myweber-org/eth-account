@@ -673,4 +673,124 @@ def clean_dataframe(df: pd.DataFrame,
             if column in cleaned_df.columns:
                 cleaned_df = normalize_column(cleaned_df, column)
     
-    return cleaned_df.reset_index(drop=True)
+    return cleaned_df.reset_index(drop=True)import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to process, None for all numeric columns
+    factor (float): Multiplier for IQR
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize, None for all numeric columns
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_norm = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        col_min = df_norm[col].min()
+        col_max = df_norm[col].max()
+        
+        if col_max - col_min == 0:
+            df_norm[col] = min_val
+        else:
+            df_norm[col] = min_val + (df_norm[col] - col_min) * (max_val - min_val) / (col_max - col_min)
+    
+    return df_norm
+
+def z_score_normalize(df, columns=None):
+    """
+    Normalize data using Z-score standardization.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to standardize
+    
+    Returns:
+    pd.DataFrame: Dataframe with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_std = df.copy()
+    for col in columns:
+        mean_val = df_std[col].mean()
+        std_val = df_std[col].std()
+        
+        if std_val > 0:
+            df_std[col] = (df_std[col] - mean_val) / std_val
+        else:
+            df_std[col] = 0
+    
+    return df_std
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'drop')
+    columns (list): List of column names to process
+    
+    Returns:
+    pd.DataFrame: Dataframe with handled missing values
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_processed = df.copy()
+    
+    for col in columns:
+        if df_processed[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_processed[col].mean()
+            elif strategy == 'median':
+                fill_value = df_processed[col].median()
+            elif strategy == 'mode':
+                fill_value = df_processed[col].mode()[0]
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_processed[col] = df_processed[col].fillna(fill_value)
+    
+    return df_processed.reset_index(drop=True)
