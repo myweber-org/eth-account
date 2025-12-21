@@ -487,4 +487,70 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     print("\nCleaned data statistics:")
-    print(cleaned_df.describe())
+    print(cleaned_df.describe())import pandas as pd
+import re
+
+def clean_dataframe(df, text_columns=None, drop_duplicates=True, lowercase=True, strip_whitespace=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        text_columns: list of column names to apply text standardization
+        drop_duplicates: whether to remove duplicate rows
+        lowercase: whether to convert text to lowercase
+        strip_whitespace: whether to strip leading/trailing whitespace
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                if lowercase:
+                    cleaned_df[col] = cleaned_df[col].astype(str).str.lower()
+                if strip_whitespace:
+                    cleaned_df[col] = cleaned_df[col].astype(str).str.strip()
+    
+    return cleaned_df
+
+def remove_special_characters(text, keep_pattern=r'[a-zA-Z0-9\s]'):
+    """
+    Remove special characters from text, keeping only specified pattern.
+    
+    Args:
+        text: input string
+        keep_pattern: regex pattern of characters to keep
+    
+    Returns:
+        Cleaned string
+    """
+    if pd.isna(text):
+        return text
+    
+    text = str(text)
+    return re.sub(f'[^{keep_pattern}]', '', text)
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    
+    Args:
+        email: email string to validate
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    if pd.isna(email):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
