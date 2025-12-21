@@ -817,3 +817,50 @@ def validate_dataframe(df, required_columns=None):
 #     
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
 #     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        z_scores = np.abs(stats.zscore(df[col].dropna()))
+        outliers = z_scores > 3
+        df.loc[outliers, col] = np.nan
+        
+        if df[col].notna().sum() > 0:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            if col_max > col_min:
+                df[col] = (df[col] - col_min) / (col_max - col_min)
+    
+    df = df.dropna(thresh=len(df.columns)*0.7)
+    
+    for col in df.columns:
+        if df[col].dtype == 'object':
+            df[col] = df[col].fillna('Unknown')
+        else:
+            df[col] = df[col].fillna(df[col].median())
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = load_and_clean_data(input_file)
+        save_cleaned_data(cleaned_df, output_file)
+        print(f"Original shape: {pd.read_csv(input_file).shape}")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+    except FileNotFoundError:
+        print(f"Error: {input_file} not found")
+    except Exception as e:
+        print(f"Error during processing: {str(e)}")
