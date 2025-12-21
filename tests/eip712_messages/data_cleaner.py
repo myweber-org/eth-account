@@ -632,4 +632,90 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=1)
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+import numpy as np
+from typing import Optional, Union, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, 
+                             strategy: str = 'mean', 
+                             columns: Optional[List[str]] = None) -> pd.DataFrame:
+        if columns is None:
+            columns = self.df.columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                if self.df[col].isnull().any():
+                    if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                        self.df[col].fillna(self.df[col].mean(), inplace=True)
+                    elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                        self.df[col].fillna(self.df[col].median(), inplace=True)
+                    elif strategy == 'mode':
+                        self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                    elif strategy == 'drop':
+                        self.df = self.df.dropna(subset=[col])
+                    elif strategy == 'ffill':
+                        self.df[col].fillna(method='ffill', inplace=True)
+                    elif strategy == 'bfill':
+                        self.df[col].fillna(method='bfill', inplace=True)
+                    else:
+                        self.df[col].fillna(0, inplace=True)
+        return self.df
+    
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> pd.DataFrame:
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        return self.df
+    
+    def normalize_numeric(self, columns: Optional[List[str]] = None) -> pd.DataFrame:
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
+                col_min = self.df[col].min()
+                col_max = self.df[col].max()
+                if col_max > col_min:
+                    self.df[col] = (self.df[col] - col_min) / (col_max - col_min)
+        return self.df
+    
+    def get_cleaning_report(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1]
+        }
+    
+    def save_cleaned_data(self, filepath: str, format: str = 'csv'):
+        if format == 'csv':
+            self.df.to_csv(filepath, index=False)
+        elif format == 'excel':
+            self.df.to_excel(filepath, index=False)
+        elif format == 'parquet':
+            self.df.to_parquet(filepath, index=False)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+
+def load_and_clean_data(filepath: str, 
+                       missing_strategy: str = 'mean',
+                       remove_dups: bool = True) -> pd.DataFrame:
+    if filepath.endswith('.csv'):
+        df = pd.read_csv(filepath)
+    elif filepath.endswith('.xlsx') or filepath.endswith('.xls'):
+        df = pd.read_excel(filepath)
+    else:
+        raise ValueError("Unsupported file format")
+    
+    cleaner = DataCleaner(df)
+    cleaner.handle_missing_values(strategy=missing_strategy)
+    
+    if remove_dups:
+        cleaner.remove_duplicates()
+    
+    return cleaner.df
