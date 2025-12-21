@@ -940,4 +940,54 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val == min_val:
+        return df[column].apply(lambda x: 0.5)
+    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    if std_val == 0:
+        return df[column].apply(lambda x: 0)
+    return df[column].apply(lambda x: (x - mean_val) / std_val)
+
+def clean_dataset(df, numeric_columns, outlier_threshold=1.5):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            z_scores = np.abs(stats.zscore(cleaned_df[col].dropna()))
+            cleaned_df = cleaned_df[(z_scores < outlier_threshold) | cleaned_df[col].isna()]
+            cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    return cleaned_df.dropna()
+
+def validate_data(df, required_columns):
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(0, 1, 100),
+        'feature_b': np.random.exponential(2, 100),
+        'feature_c': np.random.randint(0, 50, 100)
+    })
+    print("Original data shape:", sample_data.shape)
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b', 'feature_c'])
+    print("Cleaned data shape:", cleaned.shape)
+    print("Data validation passed:", validate_data(cleaned, ['feature_a', 'feature_b', 'feature_c']))
