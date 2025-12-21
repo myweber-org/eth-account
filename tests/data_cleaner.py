@@ -353,3 +353,114 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns, factor=1.5):
+    """
+    Remove outliers using Interquartile Range method
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean.reset_index(drop=True)
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    """
+    Normalize data using Min-Max scaling
+    """
+    df_normalized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def normalize_zscore(df, columns):
+    """
+    Normalize data using Z-score standardization
+    """
+    df_normalized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df_normalized[col].mean()
+            std_val = df_normalized[col].std()
+            if std_val > 0:
+                df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if col in df.columns:
+            if strategy == 'mean':
+                fill_value = df_filled[col].mean()
+            elif strategy == 'median':
+                fill_value = df_filled[col].median()
+            elif strategy == 'mode':
+                fill_value = df_filled[col].mode()[0] if not df_filled[col].mode().empty else 0
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = 0
+            
+            df_filled[col] = df_filled[col].fillna(fill_value)
+    
+    return df_filled
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'shape': df.shape,
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': df.describe().to_dict() if df.select_dtypes(include=[np.number]).shape[1] > 0 else {},
+        'categorical_stats': {col: df[col].value_counts().to_dict() 
+                            for col in df.select_dtypes(include=['object', 'category']).columns}
+    }
+    return summary
