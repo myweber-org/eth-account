@@ -416,4 +416,23 @@ def clean_dataset(df, outlier_threshold=3, normalize=True, fill_missing=True):
     if normalize:
         cleaner.normalize_minmax()
     
-    return cleaner.get_cleaned_data()
+    return cleaner.get_cleaned_data()def remove_duplicates(data_list):
+    seen = set()
+    unique_data = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_data.append(item)
+    return unique_data
+
+def clean_data_with_order(data_list, key=None):
+    if key is None:
+        key = lambda x: x
+    seen = set()
+    cleaned = []
+    for item in data_list:
+        identifier = key(item)
+        if identifier not in seen:
+            seen.add(identifier)
+            cleaned.append(item)
+    return cleaned
