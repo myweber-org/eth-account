@@ -1327,3 +1327,90 @@ if __name__ == "__main__":
         print(f"Data validation result: {is_valid}")
         print("\nCleaned data summary:")
         print(cleaned_df.describe())
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from DataFrame.
+    If columns specified, only consider missing values in those columns.
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_with_mean(df, columns):
+    """
+    Fill missing values in specified columns with column mean.
+    """
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            df_filled[col] = df[col].fillna(mean_val)
+    return df_filled
+
+def detect_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Detect outliers using IQR method.
+    Returns boolean Series where True indicates outlier.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def cap_outliers(df, column, method='iqr', multiplier=1.5):
+    """
+    Cap outliers to specified bounds.
+    Supports 'iqr' method only currently.
+    """
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        df_capped = df.copy()
+        df_capped[column] = np.where(df[column] < lower_bound, lower_bound, df[column])
+        df_capped[column] = np.where(df[column] > upper_bound, upper_bound, df_capped[column])
+        
+        return df_capped
+    
+    raise ValueError(f"Unsupported method: {method}")
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize column values to range [0, 1].
+    Supports 'minmax' normalization.
+    """
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        
+        if max_val == min_val:
+            return df[column].apply(lambda x: 0.5)
+        
+        df_normalized = df.copy()
+        df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
+        return df_normalized
+    
+    raise ValueError(f"Unsupported method: {method}")
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for DataFrame.
+    """
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'missing_percentage': (df.isnull().sum().sum() / (len(df) * len(df.columns))) * 100,
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object', 'category']).columns)
+    }
+    return summary
