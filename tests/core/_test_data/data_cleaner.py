@@ -169,3 +169,64 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+def remove_duplicates(input_list):
+    """
+    Remove duplicate items from a list while preserving original order.
+    
+    Args:
+        input_list: A list containing any hashable items.
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_data_with_threshold(data, threshold=None):
+    """
+    Clean data by removing duplicates, optionally filtering by frequency threshold.
+    
+    Args:
+        data: List of items to clean.
+        threshold: Minimum frequency for items to keep (inclusive).
+    
+    Returns:
+        Cleaned list and frequency statistics.
+    """
+    from collections import Counter
+    
+    counter = Counter(data)
+    
+    if threshold is None:
+        cleaned = [item for item in data if counter[item] == 1]
+    else:
+        cleaned = [item for item in data if counter[item] >= threshold]
+    
+    stats = {
+        'original_count': len(data),
+        'cleaned_count': len(cleaned),
+        'unique_items': len(counter),
+        'most_common': counter.most_common(5)
+    }
+    
+    return cleaned, stats
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 4, 5, 1, 6]
+    
+    print("Original data:", sample_data)
+    
+    cleaned = remove_duplicates(sample_data)
+    print("After removing duplicates:", cleaned)
+    
+    filtered, statistics = clean_data_with_threshold(sample_data, threshold=2)
+    print("Items appearing at least twice:", filtered)
+    print("Statistics:", statistics)
