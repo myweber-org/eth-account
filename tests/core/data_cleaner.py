@@ -918,3 +918,114 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', fill_value=None):
+    """
+    Clean a pandas DataFrame by handling duplicates and null values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_duplicates (bool): Whether to drop duplicate rows
+    handle_nulls (str): How to handle null values - 'drop', 'fill', or 'ignore'
+    fill_value: Value to fill nulls with if handle_nulls='fill'
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if handle_nulls == 'drop':
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.dropna()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} rows with null values")
+    elif handle_nulls == 'fill' and fill_value is not None:
+        cleaned_df = cleaned_df.fillna(fill_value)
+        print(f"Filled null values with {fill_value}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of column names that must be present
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Error: DataFrame has fewer than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Summary statistics
+    """
+    summary = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'dtypes': df.dtypes.to_dict(),
+        'memory_usage': df.memory_usage(deep=True).sum()
+    }
+    return summary
+
+def convert_column_types(df, column_type_map):
+    """
+    Convert columns to specified data types.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_type_map (dict): Dictionary mapping column names to target types
+    
+    Returns:
+    pd.DataFrame: DataFrame with converted columns
+    """
+    df_copy = df.copy()
+    
+    for column, target_type in column_type_map.items():
+        if column in df_copy.columns:
+            try:
+                if target_type == 'datetime':
+                    df_copy[column] = pd.to_datetime(df_copy[column])
+                elif target_type == 'numeric':
+                    df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
+                elif target_type == 'category':
+                    df_copy[column] = df_copy[column].astype('category')
+                else:
+                    df_copy[column] = df_copy[column].astype(target_type)
+            except Exception as e:
+                print(f"Warning: Could not convert column '{column}' to {target_type}: {e}")
+    
+    return df_copy
