@@ -266,3 +266,58 @@ if __name__ == "__main__":
         print(f"\nCleaned shape: {cleaned_df.shape}")
         print("\nCleaned DataFrame:")
         print(cleaned_df)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        mode_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+        df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_dataset(df):
+    """
+    Validate that the dataset has no missing values after cleaning.
+    """
+    missing_values = df.isnull().sum().sum()
+    duplicates = df.duplicated().sum()
+    
+    if missing_values == 0 and duplicates == 0:
+        return True, "Dataset is clean"
+    else:
+        return False, f"Dataset has {missing_values} missing values and {duplicates} duplicates"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'age': [25, 30, 25, None, 35],
+        'score': [85.5, 92.0, 85.5, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nMissing values:", df.isnull().sum().sum())
+    print("Duplicates:", df.duplicated().sum())
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    is_valid, message = validate_dataset(cleaned_df)
+    print(f"\nValidation: {message}")
