@@ -74,3 +74,11 @@ def validate_dataframe(dataframe, required_columns=None):
         print(f"Found {null_counts.sum()} null values in the DataFrame")
     
     return True, "DataFrame validation passed"
+def deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
