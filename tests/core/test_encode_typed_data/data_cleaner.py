@@ -950,3 +950,61 @@ if __name__ == "__main__":
     
     is_valid = validate_dataset(cleaned, required_columns=['A', 'B'])
     print(f"\nDataset valid: {is_valid}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling missing values, removing duplicates,
+    and optionally renaming columns.
+    """
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    for col in df_clean.columns:
+        if df_clean[col].dtype in [np.float64, np.int64]:
+            if fill_missing == 'mean':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+            elif fill_missing == 'median':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+            elif fill_missing == 'zero':
+                df_clean[col] = df_clean[col].fillna(0)
+        elif df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].fillna('Unknown')
+    
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate that a DataFrame meets basic requirements.
+    """
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 1],
+        'B': [5, np.nan, 7, 8, 5],
+        'C': ['x', 'y', 'z', np.nan, 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataset(df, fill_missing='median')
+    print(cleaned_df)
