@@ -131,4 +131,69 @@ def main():
     print(validated_df[['name', 'email', 'email_valid']])
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicate rows.
+    
+    Args:
+        df (pd.DataFrame): The input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: The cleaned DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = df.copy()
+    
+    cleaned_df = cleaned_df.dropna()
+    
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): The DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Alice'],
+        'age': [25, 30, None, 35, 25],
+        'city': ['NYC', 'LA', 'Chicago', 'Boston', 'NYC']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    required_cols = ['name', 'age']
+    is_valid = validate_data(cleaned_df, required_cols)
+    print(f"\nData validation result: {is_valid}")
