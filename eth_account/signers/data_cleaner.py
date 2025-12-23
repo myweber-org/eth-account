@@ -1251,4 +1251,141 @@ if __name__ == "__main__":
     input_file = sys.argv[1]
     output_file = sys.argv[2] if len(sys.argv) > 2 else None
     
-    cleaned_data = remove_duplicates(input_file, output_file)
+    cleaned_data = remove_duplicates(input_file, output_file)import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def detect_skewness(data, column, threshold=0.5):
+    """
+    Detect skewness in data distribution
+    """
+    skewness = data[column].skew()
+    is_skewed = abs(skewness) > threshold
+    
+    return {
+        'skewness': skewness,
+        'is_skewed': is_skewed,
+        'skew_direction': 'right' if skewness > 0 else 'left' if skewness < 0 else 'none'
+    }
+
+def clean_dataset(df, numeric_columns, outlier_factor=1.5):
+    """
+    Comprehensive dataset cleaning pipeline
+    """
+    original_shape = df.shape
+    cleaned_df = df.copy()
+    
+    removal_report = {}
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df, removed = remove_outliers_iqr(cleaned_df, column, outlier_factor)
+            removal_report[column] = removed
+            
+            skew_info = detect_skewness(cleaned_df, column)
+            if skew_info['is_skewed']:
+                cleaned_df[f'{column}_log'] = np.log1p(cleaned_df[column])
+    
+    final_shape = cleaned_df.shape
+    rows_removed = original_shape[0] - final_shape[0]
+    
+    return {
+        'cleaned_data': cleaned_df,
+        'original_shape': original_shape,
+        'final_shape': final_shape,
+        'rows_removed': rows_removed,
+        'removal_report': removal_report
+    }
+
+def create_summary_statistics(df, numeric_columns):
+    """
+    Generate summary statistics for numeric columns
+    """
+    summary = {}
+    
+    for column in numeric_columns:
+        if column in df.columns:
+            col_data = df[column].dropna()
+            summary[column] = {
+                'mean': col_data.mean(),
+                'median': col_data.median(),
+                'std': col_data.std(),
+                'min': col_data.min(),
+                'max': col_data.max(),
+                'q1': col_data.quantile(0.25),
+                'q3': col_data.quantile(0.75),
+                'count': len(col_data),
+                'missing': df[column].isnull().sum()
+            }
+    
+    return pd.DataFrame(summary).T
+
+# Example usage demonstration
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    sample_data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    
+    # Add some outliers
+    df.loc[1000] = [500, 1000, 300]  # Extreme outlier
+    df.loc[1001] = [-100, 10, -50]   # Negative outlier
+    
+    # Clean the dataset
+    result = clean_dataset(df, ['feature_a', 'feature_b', 'feature_c'])
+    
+    print(f"Original dataset shape: {result['original_shape']}")
+    print(f"Cleaned dataset shape: {result['final_shape']}")
+    print(f"Rows removed: {result['rows_removed']}")
+    
+    # Generate summary statistics
+    summary_stats = create_summary_statistics(result['cleaned_data'], 
+                                             ['feature_a', 'feature_b', 'feature_c'])
+    print("\nSummary Statistics:")
+    print(summary_stats)
