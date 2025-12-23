@@ -252,3 +252,38 @@ if __name__ == "__main__":
         print("Data validation passed.")
     except ValueError as e:
         print(f"Data validation failed: {e}")
+import re
+
+def clean_string(text):
+    """
+    Clean and normalize a string by:
+    - Removing leading/trailing whitespace
+    - Converting multiple spaces to a single space
+    - Converting to lowercase
+    """
+    if not isinstance(text, str):
+        return text
+    
+    # Remove leading/trailing whitespace
+    text = text.strip()
+    
+    # Replace multiple spaces with a single space
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    return text
+
+def clean_string_list(strings):
+    """
+    Clean a list of strings using clean_string function.
+    """
+    return [clean_string(s) for s in strings]
+
+if __name__ == "__main__":
+    # Example usage
+    test_data = ["  Hello   World  ", "  TEST  DATA ", "Mixed   CASE   String"]
+    cleaned = clean_string_list(test_data)
+    for original, cleaned_str in zip(test_data, cleaned):
+        print(f"Original: '{original}' -> Cleaned: '{cleaned_str}'")
