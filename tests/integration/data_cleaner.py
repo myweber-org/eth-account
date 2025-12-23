@@ -363,4 +363,168 @@ def remove_duplicates_preserve_order(iterable):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, threshold=0.5):
+    """
+    Remove rows with missing values exceeding a threshold percentage.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        threshold (float): Maximum allowed missing value ratio per row (0-1)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    missing_ratio = df.isnull().sum(axis=1) / df.shape[1]
+    return df[missing_ratio <= threshold].copy()
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median for specified columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with filled values
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            median_val = df[col].median()
+            df_filled[col].fillna(median_val, inplace=True)
+    
+    return df_filled
+
+def detect_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+        multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+        tuple: (lower_bound, upper_bound, outlier_indices)
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)].index
+    
+    return lower_bound, upper_bound, outliers.tolist()
+
+def cap_outliers(df, column, method='iqr', multiplier=1.5):
+    """
+    Cap outliers to specified bounds.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+        method (str): 'iqr' or 'percentile'
+        multiplier (float): Multiplier for IQR method
+    
+    Returns:
+        pd.DataFrame: DataFrame with capped values
+    """
+    df_capped = df.copy()
+    
+    if method == 'iqr':
+        lower, upper, _ = detect_outliers_iqr(df, column, multiplier)
+    elif method == 'percentile':
+        lower = df[column].quantile(0.01)
+        upper = df[column].quantile(0.99)
+    else:
+        raise ValueError("Method must be 'iqr' or 'percentile'")
+    
+    df_capped[column] = df_capped[column].clip(lower=lower, upper=upper)
+    
+    return df_capped
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to normalize
+        method (str): 'minmax' or 'zscore'
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column
+    """
+    df_normalized = df.copy()
+    
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val > 0:
+            df_normalized[column] = (df[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_normalized
+
+def validate_dataframe(df, required_columns=None, dtypes=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        dtypes (dict): Dictionary of column:dtype requirements
+    
+    Returns:
+        dict: Validation results with issues and status
+    """
+    validation = {
+        'is_valid': True,
+        'issues': [],
+        'missing_columns': [],
+        'type_mismatches': []
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation['is_valid'] = False
+            validation['missing_columns'] = missing
+            validation['issues'].append(f"Missing required columns: {missing}")
+    
+    if dtypes:
+        for col, expected_type in dtypes.items():
+            if col in df.columns:
+                actual_type = str(df[col].dtype)
+                if actual_type != expected_type:
+                    validation['is_valid'] = False
+                    validation['type_mismatches'].append({
+                        'column': col,
+                        'expected': expected_type,
+                        'actual': actual_type
+                    })
+                    validation['issues'].append(
+                        f"Type mismatch for column '{col}': expected {expected_type}, got {actual_type}"
+                    )
+    
+    return validation
