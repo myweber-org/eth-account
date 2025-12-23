@@ -430,3 +430,63 @@ def sample_data_cleaning():
 
 if __name__ == "__main__":
     sample_data_cleaning()
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        if column not in self.numeric_columns:
+            return self.df
+            
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        filtered_df = self.df[(self.df[column] >= lower_bound) & 
+                              (self.df[column] <= upper_bound)]
+        return filtered_df
+    
+    def zscore_normalize(self, column):
+        if column not in self.numeric_columns:
+            return self.df
+            
+        mean_val = self.df[column].mean()
+        std_val = self.df[column].std()
+        
+        if std_val > 0:
+            self.df[f'{column}_normalized'] = (self.df[column] - mean_val) / std_val
+        return self.df
+    
+    def handle_missing_values(self, strategy='mean'):
+        for col in self.numeric_columns:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                else:
+                    fill_value = 0
+                    
+                self.df[col] = self.df[col].fillna(fill_value)
+        return self.df
+    
+    def get_summary(self):
+        summary = {}
+        for col in self.numeric_columns:
+            summary[col] = {
+                'mean': self.df[col].mean(),
+                'std': self.df[col].std(),
+                'min': self.df[col].min(),
+                'max': self.df[col].max(),
+                'missing': self.df[col].isnull().sum()
+            }
+        return pd.DataFrame(summary).T
