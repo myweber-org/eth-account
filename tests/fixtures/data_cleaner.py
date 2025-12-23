@@ -44,3 +44,11 @@ if __name__ == "__main__":
     print(f"Original shape: {pd.read_csv('raw_data.csv').shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
     print("Data cleaning completed successfully.")
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
