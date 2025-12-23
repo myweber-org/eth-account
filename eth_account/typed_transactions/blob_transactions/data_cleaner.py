@@ -526,3 +526,107 @@ def clean_dataset(data, numeric_columns):
             cleaned_data = remove_outliers_iqr(cleaned_data, column)
     
     return cleaned_data
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        mask = (self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)
+        return self.df[mask]
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        mask = z_scores < threshold
+        return self.df[mask]
+    
+    def normalize_minmax(self, column):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        min_val = self.df[column].min()
+        max_val = self.df[column].max()
+        self.df[f"{column}_normalized"] = (self.df[column] - min_val) / (max_val - min_val)
+        return self.df
+    
+    def standardize_zscore(self, column):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        mean_val = self.df[column].mean()
+        std_val = self.df[column].std()
+        self.df[f"{column}_standardized"] = (self.df[column] - mean_val) / std_val
+        return self.df
+    
+    def fill_missing_mean(self, column):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        mean_val = self.df[column].mean()
+        self.df[column] = self.df[column].fillna(mean_val)
+        return self.df
+    
+    def get_summary(self):
+        summary = {}
+        for col in self.numeric_columns:
+            summary[col] = {
+                'mean': self.df[col].mean(),
+                'median': self.df[col].median(),
+                'std': self.df[col].std(),
+                'min': self.df[col].min(),
+                'max': self.df[col].max(),
+                'missing': self.df[col].isnull().sum()
+            }
+        return pd.DataFrame(summary).T
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 200, 1000)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    indices = np.random.choice(df.index, size=50, replace=False)
+    for col in df.columns:
+        df.loc[indices[:25], col] = np.nan
+    
+    outlier_indices = np.random.choice(df.index, size=20, replace=False)
+    df.loc[outlier_indices, 'feature_a'] = df['feature_a'].mean() + 5 * df['feature_a'].std()
+    
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Original data summary:")
+    print(cleaner.get_summary())
+    
+    cleaned_df = cleaner.remove_outliers_zscore('feature_a')
+    cleaner2 = DataCleaner(cleaned_df)
+    
+    print("\nAfter outlier removal:")
+    print(cleaner2.get_summary())
+    
+    normalized_df = cleaner2.normalize_minmax('feature_b')
+    print(f"\nNormalized feature_b range: [{normalized_df['feature_b_normalized'].min():.3f}, "
+          f"{normalized_df['feature_b_normalized'].max():.3f}]")
