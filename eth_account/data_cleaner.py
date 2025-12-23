@@ -904,3 +904,97 @@ def clean_missing_data(df, strategy='mean'):
         raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'.")
     
     return df_cleaned
+import pandas as pd
+
+def clean_dataset(df, remove_duplicates=True, fill_method=None):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    remove_duplicates (bool): Whether to remove duplicate rows
+    fill_method (str): Method for filling missing values ('mean', 'median', 'mode', or None)
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if fill_method:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        
+        if fill_method == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
+                cleaned_df[numeric_cols].mean()
+            )
+        elif fill_method == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(
+                cleaned_df[numeric_cols].median()
+            )
+        elif fill_method == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(
+                        cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else ''
+                    )
+    
+    # Remove duplicates
+    if remove_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        if removed > 0:
+            print(f"Removed {removed} duplicate row(s)")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_cols
+    
+    return validation_results
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, None],
+        'name': ['Alice', 'Bob', 'Charlie', 'Charlie', 'David', None],
+        'age': [25, 30, None, 35, 40, 45],
+        'score': [85.5, 92.0, 78.5, 78.5, None, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nValidation results:")
+    print(validate_dataset(df))
+    
+    # Clean the dataset
+    cleaned = clean_dataset(df, remove_duplicates=True, fill_method='mean')
+    print("\nCleaned dataset:")
+    print(cleaned)
+    print("\nCleaned validation results:")
+    print(validate_dataset(cleaned))
