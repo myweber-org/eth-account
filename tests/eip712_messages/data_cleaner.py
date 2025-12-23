@@ -215,3 +215,121 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Statistics:")
     print(calculate_basic_stats(cleaned_df, 'values'))
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, missing_strategy='drop'):
+    """
+    Clean CSV data by handling missing values and standardizing columns.
+    
+    Parameters:
+    input_path (str): Path to input CSV file
+    output_path (str, optional): Path for cleaned output CSV
+    missing_strategy (str): Strategy for handling missing values
+                           'drop' - drop rows with missing values
+                           'mean' - fill with column mean
+                           'median' - fill with column median
+    
+    Returns:
+    pandas.DataFrame: Cleaned dataframe
+    """
+    
+    # Read input file
+    if not Path(input_path).exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+    
+    df = pd.read_csv(input_path)
+    
+    # Standardize column names
+    df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        df_cleaned = df.dropna()
+    elif missing_strategy == 'mean':
+        df_cleaned = df.fillna(df.select_dtypes(include=[np.number]).mean())
+    elif missing_strategy == 'median':
+        df_cleaned = df.fillna(df.select_dtypes(include=[np.number]).median())
+    else:
+        raise ValueError(f"Unknown missing strategy: {missing_strategy}")
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    # Save to output file if specified
+    if output_path:
+        df_cleaned.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': [],
+        'stats': {}
+    }
+    
+    # Check if dataframe is empty
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Dataframe is empty')
+        return validation_results
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Collect statistics
+    validation_results['stats']['row_count'] = len(df)
+    validation_results['stats']['column_count'] = len(df.columns)
+    validation_results['stats']['missing_values'] = df.isnull().sum().sum()
+    validation_results['stats']['duplicate_rows'] = df.duplicated().sum()
+    
+    # Check for numeric columns with all zeros
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if (df[col] == 0).all():
+            validation_results['warnings'].append(f'Column {col} contains only zeros')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Charlie', None, 'Eve'],
+        'Age': [25, 30, None, 35, 40],
+        'Score': [85.5, 92.0, 78.5, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.to_csv('sample_data.csv', index=False)
+    
+    # Clean the data
+    cleaned_df = clean_csv_data('sample_data.csv', 
+                               'cleaned_sample_data.csv',
+                               missing_strategy='mean')
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned_df, required_columns=['name', 'age', 'score'])
+    
+    print(f"Validation results: {validation}")
