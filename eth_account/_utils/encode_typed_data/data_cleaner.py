@@ -549,3 +549,94 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    
+    if drop_duplicates:
+        df = df.drop_duplicates()
+        print(f"Removed {original_shape[0] - df.shape[0]} duplicate rows.")
+    
+    if fill_missing:
+        missing_before = df.isnull().sum().sum()
+        
+        if fill_strategy == 'mean':
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif fill_strategy == 'median':
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif fill_strategy == 'mode':
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        elif fill_strategy == 'ffill':
+            df = df.fillna(method='ffill')
+        elif fill_strategy == 'bfill':
+            df = df.fillna(method='bfill')
+        
+        missing_after = df.isnull().sum().sum()
+        print(f"Filled {missing_before - missing_after} missing values using '{fill_strategy}' strategy.")
+    
+    print(f"Data cleaned. Original shape: {original_shape}, New shape: {df.shape}")
+    return df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    """
+    if df.empty:
+        raise ValueError("DataFrame is empty.")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame has fewer than {min_rows} rows.")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def export_cleaned_data(df, output_path, format='csv'):
+    """
+    Export cleaned DataFrame to file.
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Data exported to {output_path} in {format} format.")
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', None],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df, fill_strategy='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age', 'score'], min_rows=3)
+        print("Data validation passed.")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
