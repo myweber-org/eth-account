@@ -868,3 +868,39 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+
+def clean_missing_data(df, strategy='mean'):
+    """
+    Clean missing data in a DataFrame using specified strategy.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    strategy (str): Strategy to handle missing values. Options: 'mean', 'median', 'mode', 'drop'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    if df.empty:
+        return df
+    
+    df_cleaned = df.copy()
+    
+    if strategy == 'drop':
+        df_cleaned = df_cleaned.dropna()
+    elif strategy in ['mean', 'median']:
+        numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+        if strategy == 'mean':
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+        else:
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+    elif strategy == 'mode':
+        for col in df_cleaned.columns:
+            if df_cleaned[col].dtype == 'object':
+                mode_val = df_cleaned[col].mode()
+                if not mode_val.empty:
+                    df_cleaned[col] = df_cleaned[col].fillna(mode_val.iloc[0])
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'.")
+    
+    return df_cleaned
