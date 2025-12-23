@@ -183,4 +183,127 @@ if __name__ == "__main__":
     stats = calculate_basic_stats(df, 'values')
     print("\nStatistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Columns to consider for duplicates
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): 'mean', 'median', 'mode', or 'drop'
+        columns (list): Specific columns to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_copy = df.copy()
+    
+    for col in columns:
+        if df_copy[col].isnull().any():
+            if strategy == 'mean':
+                df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_copy[col].fillna(df_copy[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_copy[col].fillna(df_copy[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_copy = df_copy.dropna(subset=[col])
+    
+    return df_copy
+
+def normalize_columns(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): Columns to normalize
+        method (str): 'minmax' or 'zscore'
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_copy = df.copy()
+    
+    for col in columns:
+        if method == 'minmax':
+            min_val = df_copy[col].min()
+            max_val = df_copy[col].max()
+            if max_val != min_val:
+                df_copy[col] = (df_copy[col] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = df_copy[col].mean()
+            std_val = df_copy[col].std()
+            if std_val != 0:
+                df_copy[col] = (df_copy[col] - mean_val) / std_val
+    
+    return df_copy
+
+def clean_dataframe(df, operations=None):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        operations (dict): Dictionary of operations to apply
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if operations is None:
+        operations = {
+            'remove_duplicates': True,
+            'handle_missing': {'strategy': 'mean'},
+            'normalize': {'method': 'minmax'}
+        }
+    
+    df_clean = df.copy()
+    
+    if operations.get('remove_duplicates', False):
+        df_clean = remove_duplicates(df_clean)
+    
+    if 'handle_missing' in operations:
+        config = operations['handle_missing']
+        df_clean = handle_missing_values(df_clean, **config)
+    
+    if 'normalize' in operations:
+        config = operations['normalize']
+        df_clean = normalize_columns(df_clean, **config)
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None],
+        'B': [10, 20, 20, 40, 50, 60],
+        'C': [100, 200, 300, 400, 500, 600]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
