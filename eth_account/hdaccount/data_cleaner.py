@@ -756,3 +756,92 @@ if __name__ == "__main__":
     print("\n" + "="*50 + "\n")
     
     validation_result = validate_dataframe(cleaned_df)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def normalize_data(df, columns=None, method='zscore'):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    
+    for col in columns:
+        if method == 'zscore':
+            df_normalized[col] = (df[col] - df[col].mean()) / df[col].std()
+        elif method == 'minmax':
+            df_normalized[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+        elif method == 'robust':
+            df_normalized[col] = (df[col] - df[col].median()) / stats.iqr(df[col])
+        else:
+            raise ValueError(f"Unknown normalization method: {method}")
+    
+    return df_normalized
+
+def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if method == 'iqr':
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        elif method == 'zscore':
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            mask = z_scores < threshold
+        else:
+            raise ValueError(f"Unknown outlier removal method: {method}")
+        
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def handle_missing_values(df, columns=None, strategy='mean'):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if strategy == 'mean':
+            fill_value = df[col].mean()
+        elif strategy == 'median':
+            fill_value = df[col].median()
+        elif strategy == 'mode':
+            fill_value = df[col].mode()[0]
+        elif strategy == 'ffill':
+            df_filled[col] = df[col].ffill()
+            continue
+        elif strategy == 'bfill':
+            df_filled[col] = df[col].bfill()
+            continue
+        else:
+            raise ValueError(f"Unknown missing value strategy: {strategy}")
+        
+        df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def validate_dataframe(df, check_duplicates=True, check_types=True):
+    validation_report = {}
+    
+    validation_report['shape'] = df.shape
+    validation_report['missing_values'] = df.isnull().sum().to_dict()
+    validation_report['dtypes'] = df.dtypes.to_dict()
+    
+    if check_duplicates:
+        validation_report['duplicates'] = df.duplicated().sum()
+    
+    if check_types:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+        validation_report['numeric_columns'] = numeric_cols
+        validation_report['categorical_columns'] = categorical_cols
+    
+    return validation_report
