@@ -275,3 +275,109 @@ def process_numerical_data(df, columns):
             all_stats[col] = stats
     
     return cleaned_df, all_stats
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Column labels to consider for duplicates
+    keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    if subset is not None:
+        if not all(col in df.columns for col in subset):
+            raise ValueError("All subset columns must exist in DataFrame")
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate dtype and handling NaNs.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with cleaned numeric columns
+    """
+    if not validate_dataframe(df):
+        return df
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df_clean.columns:
+            try:
+                df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
+            except Exception as e:
+                print(f"Error converting column {col}: {e}")
+    
+    return df_clean
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if not validate_dataframe(df):
+        return {}
+    
+    summary = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'column_types': df.dtypes.to_dict(),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist()
+    }
+    
+    return summary
