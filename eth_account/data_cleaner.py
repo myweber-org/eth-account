@@ -535,4 +535,36 @@ if __name__ == "__main__":
     print()
     
     is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"Validation: {is_valid} - {message}")
+    print(f"Validation: {is_valid} - {message}")import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing column names to lowercase with underscores.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Standardize column names
+    df_cleaned.columns = (
+        df_cleaned.columns
+        .str.lower()
+        .str.replace(' ', '_')
+        .str.replace('-', '_')
+    )
+    
+    return df_cleaned.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic requirements.
+    """
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
