@@ -970,4 +970,145 @@ if __name__ == "__main__":
     print(df)
     print("\nCleaned DataFrame:")
     cleaned_df = clean_dataset(df)
-    print(cleaned_df)
+    print(cleaned_df)import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame using specified strategy.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Strategy for handling missing values.
+                       Options: 'mean', 'median', 'mode', 'drop', 'fill_zero'
+        columns (list): List of columns to apply cleaning to. If None, applies to all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df_clean[col].mean()
+        elif strategy == 'median':
+            fill_value = df_clean[col].median()
+        elif strategy == 'mode':
+            fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0
+        elif strategy == 'fill_zero':
+            fill_value = 0
+        elif strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+            continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to check for outliers
+        threshold (float): IQR multiplier threshold
+    
+    Returns:
+        pd.Series: Boolean series indicating outliers
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    return outliers
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to normalize
+        method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column
+    """
+    df_norm = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_norm[column].min()
+        max_val = df_norm[column].max()
+        if max_val != min_val:
+            df_norm[column] = (df_norm[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_norm[column].mean()
+        std_val = df_norm[column].std()
+        if std_val != 0:
+            df_norm[column] = (df_norm[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
+    
+    return df_norm
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def load_and_clean_csv(filepath, cleaning_strategy='mean'):
+    """
+    Load CSV file and apply basic cleaning.
+    
+    Args:
+        filepath (str): Path to CSV file
+        cleaning_strategy (str): Strategy for handling missing values
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(filepath)
+        df_clean = clean_missing_values(df, strategy=cleaning_strategy)
+        return df_clean
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error loading file: {str(e)}")
+        return pd.DataFrame()
