@@ -191,3 +191,125 @@ def get_summary_statistics(df):
             'kurtosis': stats.kurtosis(df[col].dropna())
         }
     return pd.DataFrame(summary).T
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.df.columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                
+                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
+                df_clean = df_clean[mask]
+        
+        removed_count = len(self.df) - len(df_clean)
+        self.df = df_clean
+        return removed_count
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mode().iloc[0])
+        elif strategy == 'constant' and fill_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+        elif strategy == 'drop':
+            self.df = self.df.dropna(subset=numeric_cols)
+        
+        return self.df.isnull().sum().sum()
+    
+    def remove_duplicates(self, subset=None, keep='first'):
+        before = len(self.df)
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        return before - len(self.df)
+    
+    def standardize_columns(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                mean = self.df[col].mean()
+                std = self.df[col].std()
+                if std > 0:
+                    self.df[col] = (self.df[col] - mean) / std
+        
+        return self.df
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_cleaning_report(self):
+        final_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': final_shape[0],
+            'cleaned_columns': final_shape[1],
+            'rows_removed': self.original_shape[0] - final_shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.randint(1, 100, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.iloc[10:20, 0] = np.nan
+    df.iloc[50:60, 1] = np.nan
+    
+    df = pd.concat([df, df.iloc[:50]], ignore_index=True)
+    
+    df.iloc[200:205, 0] = 500
+    df.iloc[300:305, 1] = 1000
+    
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Initial shape:", sample_df.shape)
+    print("Missing values:", sample_df.isnull().sum().sum())
+    
+    removed_outliers = cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
+    print(f"Removed {removed_outliers} outliers")
+    
+    remaining_missing = cleaner.handle_missing_values(strategy='median')
+    print(f"Missing values after handling: {remaining_missing}")
+    
+    removed_duplicates = cleaner.remove_duplicates()
+    print(f"Removed {removed_duplicates} duplicates")
+    
+    cleaner.standardize_columns(['feature_a', 'feature_b'])
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    report = cleaner.get_cleaning_report()
+    
+    print("\nCleaning Report:")
+    for key, value in report.items():
+        print(f"{key}: {value}")
