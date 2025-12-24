@@ -85,4 +85,106 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned.shape)
     
     stats = calculate_statistics(cleaned[:, 0])
-    print("Column 1 statistics:", stats)
+    print("Column 1 statistics:", stats)import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Drop rows where all values are NaN
+        df = df.dropna(how='all')
+        print(f"After dropping all-NaN rows: {df.shape}")
+        
+        # Fill numeric column NaN values with column mean
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isna().any():
+                df[col] = df[col].fillna(df[col].mean())
+        
+        # Fill string column NaN values with 'Unknown'
+        string_cols = df.select_dtypes(include=['object']).columns
+        for col in string_cols:
+            if df[col].isna().any():
+                df[col] = df[col].fillna('Unknown')
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        else:
+            base_name = file_path.rsplit('.', 1)[0]
+            output_path = f"{base_name}_cleaned.csv"
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate the structure and content of a DataFrame.
+    """
+    if df is None or df.empty:
+        print("DataFrame is empty or None")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if np.isinf(df[col]).any():
+            print(f"Column {col} contains infinite values")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', None, 'Charlie'],
+        'age': [25, 30, 25, 40, None],
+        'score': [85.5, 92.0, 85.5, 78.5, 88.0],
+        'city': ['NYC', 'LA', 'NYC', 'Chicago', None]
+    }
+    
+    # Create a sample DataFrame for testing
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    # Clean the sample data
+    cleaned_df = clean_csv_data('test_data.csv', 'test_data_cleaned.csv')
+    
+    if cleaned_df is not None:
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+        
+        # Validate the cleaned data
+        is_valid = validate_dataframe(cleaned_df, ['name', 'age', 'score'])
+        print(f"\nData validation: {'Passed' if is_valid else 'Failed'}")
