@@ -950,3 +950,143 @@ def save_cleaned_data(df, output_path, format='csv'):
         raise ValueError(f"Unsupported format: {format}. Use 'csv', 'excel', or 'json'")
     
     print(f"Data saved to {output_path} in {format} format")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers from a column using the IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize column values to range [0, 1] using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    return (data[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(data, column):
+    """
+    Standardize column values using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    return (data[column] - mean_val) / std_val
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'zero')
+        columns: list of columns to process (None for all numeric columns)
+    
+    Returns:
+        DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    result = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = data[col].mean()
+        elif strategy == 'median':
+            fill_value = data[col].median()
+        elif strategy == 'mode':
+            fill_value = data[col].mode()[0] if not data[col].mode().empty else 0
+        elif strategy == 'zero':
+            fill_value = 0
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        result[col] = data[col].fillna(fill_value)
+    
+    return result
+
+def create_clean_dataframe(data, numeric_columns, outlier_factor=1.5):
+    """
+    Create a cleaned dataframe with outlier removal and normalization.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric columns to process
+        outlier_factor: IQR factor for outlier removal
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            # Remove outliers
+            q1 = cleaned_data[col].quantile(0.25)
+            q3 = cleaned_data[col].quantile(0.75)
+            iqr = q3 - q1
+            lower_bound = q1 - outlier_factor * iqr
+            upper_bound = q3 + outlier_factor * iqr
+            
+            mask = (cleaned_data[col] >= lower_bound) & (cleaned_data[col] <= upper_bound)
+            cleaned_data = cleaned_data[mask]
+            
+            # Normalize
+            min_val = cleaned_data[col].min()
+            max_val = cleaned_data[col].max()
+            if max_val > min_val:
+                cleaned_data[col] = (cleaned_data[col] - min_val) / (max_val - min_val)
+    
+    return cleaned_data.reset_index(drop=True)
