@@ -452,3 +452,31 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    df = pd.read_csv(input_file)
+    
+    df.replace(['', 'NA', 'N/A', 'null', 'NULL'], np.nan, inplace=True)
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_columns:
+        df[col].fillna(df[col].median(), inplace=True)
+    
+    categorical_columns = df.select_dtypes(include=['object']).columns
+    for col in categorical_columns:
+        df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+    
+    df.drop_duplicates(inplace=True)
+    
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    print(f"Original shape: {df.shape}")
+    
+    return df
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    cleaned_df = clean_csv_data(input_csv, output_csv)
