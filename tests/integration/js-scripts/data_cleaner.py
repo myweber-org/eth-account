@@ -312,3 +312,106 @@ if __name__ == "__main__":
     numeric_cleaned = clean_numeric_data(df)
     print("DataFrame after numeric cleaning:")
     print(numeric_cleaned)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (bool): Whether to fill missing values
+    strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                if cleaned_df[column].isnull().any():
+                    if strategy == 'mean':
+                        fill_value = cleaned_df[column].mean()
+                    elif strategy == 'median':
+                        fill_value = cleaned_df[column].median()
+                    elif strategy == 'mode':
+                        fill_value = cleaned_df[column].mode()[0]
+                    elif strategy == 'zero':
+                        fill_value = 0
+                    else:
+                        fill_value = cleaned_df[column].mean()
+                    
+                    cleaned_df[column].fillna(fill_value, inplace=True)
+                    print(f"Filled missing values in column '{column}' with {strategy} value: {fill_value}")
+    
+    return cleaned_df
+
+def validate_dataset(df):
+    """
+    Validate dataset for common data quality issues.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Dictionary containing validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': len(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': len(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+def save_cleaned_data(df, filename, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    filename (str): Output filename
+    format (str): File format ('csv', 'excel', 'json')
+    """
+    if format == 'csv':
+        df.to_csv(filename, index=False)
+    elif format == 'excel':
+        df.to_excel(filename, index=False)
+    elif format == 'json':
+        df.to_json(filename, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Data saved to {filename} in {format} format")
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10.5, 20.3, np.nan, 40.1, 50.0, 50.0, np.nan],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\nValidation results:")
+    print(validate_dataset(df))
+    
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing=True, strategy='mean')
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    print("\nValidation results after cleaning:")
+    print(validate_dataset(cleaned_df))
