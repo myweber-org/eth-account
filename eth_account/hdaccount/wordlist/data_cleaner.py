@@ -1160,4 +1160,45 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned)
     print("\nCleaned Validation Results:")
-    print(validate_dataframe(cleaned))
+    print(validate_dataframe(cleaned))import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing numeric values with column mean.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that DataFrame contains all required columns.
+    """
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def filter_outliers(df, column, threshold=3):
+    """
+    Filter outliers from a DataFrame column using z-score method.
+    """
+    from scipy import stats
+    import numpy as np
+    
+    z_scores = np.abs(stats.zscore(df[column].dropna()))
+    
+    if len(z_scores) > 0:
+        mask = z_scores < threshold
+        filtered_df = df[mask].copy()
+        return filtered_df
+    
+    return df
