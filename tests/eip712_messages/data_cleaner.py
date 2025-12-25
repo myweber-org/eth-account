@@ -1,75 +1,84 @@
 import numpy as np
-import pandas as pd
-from scipy import stats
 
-def remove_outliers_iqr(df, columns=None, threshold=1.5):
+def remove_outliers_iqr(data, column):
     """
-    Remove outliers using IQR method
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or np.array): Input data array
+    column (int): Column index for 2D data, or None for 1D data
+    
+    Returns:
+    np.array: Data with outliers removed
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+    if column is not None:
+        column_data = data[:, column]
+    else:
+        column_data = data
     
-    df_clean = df.copy()
-    for col in columns:
-        Q1 = df_clean[col].quantile(0.25)
-        Q3 = df_clean[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - threshold * IQR
-        upper_bound = Q3 + threshold * IQR
-        
-        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
     
-    return df_clean
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    if column is not None:
+        mask = (data[:, column] >= lower_bound) & (data[:, column] <= upper_bound)
+        return data[mask]
+    else:
+        mask = (data >= lower_bound) & (data <= upper_bound)
+        return data[mask]
 
-def normalize_minmax(df, columns=None):
+def calculate_statistics(data):
     """
-    Normalize data using min-max scaling
+    Calculate basic statistics for the data.
+    
+    Parameters:
+    data (np.array): Input data array
+    
+    Returns:
+    dict: Dictionary containing mean, median, std, min, max
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_normalized = df.copy()
-    for col in columns:
-        min_val = df_normalized[col].min()
-        max_val = df_normalized[col].max()
-        if max_val != min_val:
-            df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
-    
-    return df_normalized
+    return {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data)
+    }
 
-def handle_missing_values(df, strategy='mean', columns=None):
+def clean_dataset(data, columns_to_clean=None):
     """
-    Handle missing values with specified strategy
+    Clean dataset by removing outliers from specified columns.
+    
+    Parameters:
+    data (np.array): Input dataset
+    columns_to_clean (list): List of column indices to clean
+    
+    Returns:
+    np.array: Cleaned dataset
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+    if columns_to_clean is None:
+        columns_to_clean = range(data.shape[1])
     
-    df_filled = df.copy()
-    for col in columns:
-        if df_filled[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = df_filled[col].mean()
-            elif strategy == 'median':
-                fill_value = df_filled[col].median()
-            elif strategy == 'mode':
-                fill_value = df_filled[col].mode()[0]
-            else:
-                fill_value = 0
-            
-            df_filled[col] = df_filled[col].fillna(fill_value)
+    cleaned_data = data.copy()
     
-    return df_filled
+    for col in columns_to_clean:
+        if col < data.shape[1]:
+            cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    
+    return cleaned_data
 
-def clean_dataset(df, outlier_threshold=1.5, normalize=True, missing_strategy='mean'):
-    """
-    Complete data cleaning pipeline
-    """
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    sample_data = np.random.randn(100, 3)
+    sample_data[0, 0] = 10  # Add an outlier
     
-    df_processed = handle_missing_values(df, strategy=missing_strategy, columns=numeric_cols)
-    df_processed = remove_outliers_iqr(df_processed, columns=numeric_cols, threshold=outlier_threshold)
+    print("Original data shape:", sample_data.shape)
+    print("Original statistics:", calculate_statistics(sample_data[:, 0]))
     
-    if normalize:
-        df_processed = normalize_minmax(df_processed, columns=numeric_cols)
-    
-    return df_processed
+    cleaned = clean_dataset(sample_data, columns_to_clean=[0])
+    print("\nCleaned data shape:", cleaned.shape)
+    print("Cleaned statistics:", calculate_statistics(cleaned[:, 0]))
