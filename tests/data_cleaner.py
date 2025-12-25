@@ -1,94 +1,48 @@
 
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
+from pathlib import Path
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
-                df_clean = df_clean[mask]
-                
-        self.df = df_clean.reset_index(drop=True)
-        return self
-        
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_normalized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val != min_val:
-                    df_normalized[col] = (self.df[col] - min_val) / (max_val - min_val)
-                    
-        self.df = df_normalized
-        return self
-        
-    def standardize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_standardized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                mean_val = self.df[col].mean()
-                std_val = self.df[col].std()
-                if std_val > 0:
-                    df_standardized[col] = (self.df[col] - mean_val) / std_val
-                    
-        self.df = df_standardized
-        return self
-        
-    def fill_missing_median(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                median_val = self.df[col].median()
-                df_filled[col] = self.df[col].fillna(median_val)
-                
-        self.df = df_filled
-        return self
-        
-    def get_cleaned_data(self):
-        return self.df
-        
-    def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
-        
-    def summary(self):
-        print(f"Original shape: {self.original_shape}")
-        print(f"Cleaned shape: {self.df.shape}")
-        print(f"Rows removed: {self.get_removed_count()}")
-        print(f"Columns: {list(self.df.columns)}")
-
-def clean_dataset(df, outlier_threshold=1.5, normalize=True, standardize=False):
-    cleaner = DataCleaner(df)
-    cleaner.remove_outliers_iqr(threshold=outlier_threshold)
-    cleaner.fill_missing_median()
+def clean_dataset(input_path, output_path=None):
+    """
+    Load a CSV dataset, remove duplicate rows, standardize string columns,
+    handle missing values, and save the cleaned version.
+    """
+    df = pd.read_csv(input_path)
     
-    if normalize:
-        cleaner.normalize_minmax()
-    if standardize:
-        cleaner.standardize_zscore()
-        
-    return cleaner.get_cleaned_data()
+    initial_rows = df.shape[0]
+    print(f"Initial dataset rows: {initial_rows}")
+    
+    df = df.drop_duplicates()
+    duplicates_removed = initial_rows - df.shape[0]
+    print(f"Removed {duplicates_removed} duplicate rows")
+    
+    for col in df.select_dtypes(include=['object']).columns:
+        df[col] = df[col].str.strip().str.lower()
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    
+    if output_path is None:
+        input_stem = Path(input_path).stem
+        output_path = f"{input_stem}_cleaned.csv"
+    
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned dataset saved to: {output_path}")
+    print(f"Final dataset rows: {df.shape[0]}, columns: {df.shape[1]}")
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['Alice', 'alice ', 'Bob', 'bob', 'Charlie', None],
+        'age': [25, 25, 30, 30, 35, 40],
+        'score': [85.5, 85.5, 92.0, None, 78.5, 88.0]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_dataset('test_data.csv')
+    print("\nSample cleaned data:")
+    print(cleaned_df.head())
