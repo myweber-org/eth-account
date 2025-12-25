@@ -151,3 +151,11 @@ if __name__ == "__main__":
     print(f"Rows removed: {cleaner.get_removed_count()}")
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
