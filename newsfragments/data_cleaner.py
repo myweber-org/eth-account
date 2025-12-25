@@ -813,3 +813,94 @@ if __name__ == "__main__":
     print("\nFilling missing values...")
     filled = cleaner.fill_missing_mean()
     print("Missing values filled")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_stats(df, column):
+    """
+    Calculate summary statistics for a column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': len(df[column]),
+        'q1': df[column].quantile(0.25),
+        'q3': df[column].quantile(0.75)
+    }
+    
+    return stats
+
+def validate_numeric_data(df, column):
+    """
+    Validate that a column contains only numeric data.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to validate
+    
+    Returns:
+    bool: True if all values are numeric, False otherwise
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    numeric_count = pd.to_numeric(df[column], errors='coerce').notna().sum()
+    return numeric_count == len(df[column])
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'values': [10, 12, 13, 15, 16, 18, 20, 22, 24, 100, 120]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original data:")
+    print(df)
+    print("\nSummary statistics:")
+    print(calculate_summary_stats(df, 'values'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nCleaned data (outliers removed):")
+    print(cleaned_df)
+    print("\nCleaned summary statistics:")
+    print(calculate_summary_stats(cleaned_df, 'values'))
+    
+    print(f"\nIs numeric data valid? {validate_numeric_data(df, 'values')}")
