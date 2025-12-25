@@ -1,84 +1,80 @@
-import numpy as np
 
-def remove_outliers_iqr(data, column):
+import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Remove outliers from a specified column using the Interquartile Range method.
+    Remove duplicate rows from a DataFrame.
     
-    Parameters:
-    data (list or np.array): Input data array
-    column (int): Column index for 2D data, or None for 1D data
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Column labels to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
     
     Returns:
-    np.array: Data with outliers removed
+        pd.DataFrame: DataFrame with duplicates removed
     """
-    if column is not None:
-        column_data = data[:, column]
-    else:
-        column_data = data
+    if df.empty:
+        return df
     
-    q1 = np.percentile(column_data, 25)
-    q3 = np.percentile(column_data, 75)
-    iqr = q3 - q1
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
     
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
     
-    if column is not None:
-        mask = (data[:, column] >= lower_bound) & (data[:, column] <= upper_bound)
-        return data[mask]
-    else:
-        mask = (data >= lower_bound) & (data <= upper_bound)
-        return data[mask]
+    return cleaned_df.reset_index(drop=True)
 
-def calculate_statistics(data):
+def clean_numeric_columns(df, columns):
     """
-    Calculate basic statistics for the data.
+    Clean numeric columns by removing non-numeric characters and converting to float.
     
-    Parameters:
-    data (np.array): Input data array
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to clean
     
     Returns:
-    dict: Dictionary containing mean, median, std, min, max
+        pd.DataFrame: DataFrame with cleaned numeric columns
     """
-    return {
-        'mean': np.mean(data),
-        'median': np.median(data),
-        'std': np.std(data),
-        'min': np.min(data),
-        'max': np.max(data)
-    }
-
-def clean_dataset(data, columns_to_clean=None):
-    """
-    Clean dataset by removing outliers from specified columns.
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col].astype(str).str.replace('[^0-9.-]', '', regex=True), errors='coerce')
     
-    Parameters:
-    data (np.array): Input dataset
-    columns_to_clean (list): List of column indices to clean
+    return df
+
+def standardize_text(df, columns):
+    """
+    Standardize text columns by trimming whitespace and converting to lowercase.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to standardize
     
     Returns:
-    np.array: Cleaned dataset
+        pd.DataFrame: DataFrame with standardized text columns
     """
-    if columns_to_clean is None:
-        columns_to_clean = range(data.shape[1])
+    for col in columns:
+        if col in df.columns:
+            df[col] = df[col].astype(str).str.strip().str.lower()
     
-    cleaned_data = data.copy()
-    
-    for col in columns_to_clean:
-        if col < data.shape[1]:
-            cleaned_data = remove_outliers_iqr(cleaned_data, col)
-    
-    return cleaned_data
+    return df
 
-if __name__ == "__main__":
-    # Example usage
-    np.random.seed(42)
-    sample_data = np.random.randn(100, 3)
-    sample_data[0, 0] = 10  # Add an outlier
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
     
-    print("Original data shape:", sample_data.shape)
-    print("Original statistics:", calculate_statistics(sample_data[:, 0]))
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        required_columns (list, optional): List of required column names
     
-    cleaned = clean_dataset(sample_data, columns_to_clean=[0])
-    print("\nCleaned data shape:", cleaned.shape)
-    print("Cleaned statistics:", calculate_statistics(cleaned[:, 0]))
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
