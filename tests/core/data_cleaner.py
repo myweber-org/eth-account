@@ -1419,3 +1419,70 @@ if __name__ == "__main__":
         print("Dataset validation passed")
     except ValueError as e:
         print(f"Validation error: {e}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove columns that are completely empty
+    df_cleaned = df_cleaned.dropna(axis=1, how='all')
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Perform basic validation on the DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def process_csv_file(input_path, output_path=None):
+    """
+    Read a CSV file, clean the data, and optionally save to a new file.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        if validate_dataframe(df):
+            cleaned_df = clean_dataframe(df)
+            
+            if output_path:
+                cleaned_df.to_csv(output_path, index=False)
+                print(f"Cleaned data saved to {output_path}")
+            
+            return cleaned_df
+            
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    result = process_csv_file(input_file, output_file)
+    
+    if result is not None:
+        print(f"Data cleaning complete. Shape: {result.shape}")
+        print("First few rows:")
+        print(result.head())
