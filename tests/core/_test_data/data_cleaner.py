@@ -1,92 +1,92 @@
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+def clean_dataset(df):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Clean a pandas DataFrame by removing null values and duplicates.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_duplicates (bool): Whether to remove duplicate rows
-        fill_missing (str or dict): Strategy for filling missing values:
-            - 'mean': Fill with column mean
-            - 'median': Fill with column median
-            - 'mode': Fill with column mode
-            - dict: Column-specific fill values
+        df (pd.DataFrame): Input DataFrame to be cleaned.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+        pd.DataFrame: Cleaned DataFrame.
     """
-    cleaned_df = df.copy()
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
     
-    if fill_missing is not None:
-        if isinstance(fill_missing, dict):
-            cleaned_df = cleaned_df.fillna(fill_missing)
-        elif fill_missing == 'mean':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
-        elif fill_missing == 'median':
-            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
-        elif fill_missing == 'mode':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
     
-    return cleaned_df
+    return df_cleaned
 
-def validate_dataframe(df, required_columns=None):
+def validate_dataframe(df):
     """
-    Validate DataFrame structure and content.
+    Validate if the input is a pandas DataFrame and not empty.
     
     Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
+        df: Object to validate.
     
     Returns:
-        tuple: (is_valid, error_message)
+        bool: True if valid DataFrame, False otherwise.
     """
     if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
+        print("Error: Input is not a pandas DataFrame.")
+        return False
     
     if df.empty:
-        return False, "DataFrame is empty"
+        print("Warning: DataFrame is empty.")
+        return False
     
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+    return True
 
-def remove_outliers(df, column, method='iqr', threshold=1.5):
+def get_cleaning_report(df, df_cleaned):
     """
-    Remove outliers from a specific column using specified method.
+    Generate a report of the cleaning operations performed.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to check for outliers
-        method (str): 'iqr' for interquartile range or 'zscore' for standard deviations
-        threshold (float): Threshold value for outlier detection
+        df (pd.DataFrame): Original DataFrame.
+        df_cleaned (pd.DataFrame): Cleaned DataFrame.
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+        dict: Dictionary containing cleaning statistics.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    original_rows = len(df)
+    cleaned_rows = len(df_cleaned)
+    null_rows = df.isnull().any(axis=1).sum()
+    duplicate_rows = df.duplicated().sum()
     
-    data = df[column].dropna()
+    report = {
+        'original_rows': original_rows,
+        'cleaned_rows': cleaned_rows,
+        'rows_removed': original_rows - cleaned_rows,
+        'null_rows_removed': null_rows,
+        'duplicate_rows_removed': duplicate_rows,
+        'cleaning_percentage': ((original_rows - cleaned_rows) / original_rows * 100) if original_rows > 0 else 0
+    }
     
-    if method == 'iqr':
-        Q1 = data.quantile(0.25)
-        Q3 = data.quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - threshold * IQR
-        upper_bound = Q3 + threshold * IQR
-        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
-    elif method == 'zscore':
-        mean = data.mean()
-        std = data.std()
-        mask = (df[column] - mean).abs() <= threshold * std
-    else:
-        raise ValueError("Method must be 'iqr' or 'zscore'")
-    
-    return df[mask]
+    return report
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     data = {
+#         'A': [1, 2, None, 4, 2],
+#         'B': [5, 6, 7, None, 6],
+#         'C': [8, 9, 10, 11, 9]
+#     }
+#     
+#     df = pd.DataFrame(data)
+#     print("Original DataFrame:")
+#     print(df)
+#     
+#     if validate_dataframe(df):
+#         cleaned_df = clean_dataset(df)
+#         print("\nCleaned DataFrame:")
+#         print(cleaned_df)
+#         
+#         report = get_cleaning_report(df, cleaned_df)
+#         print("\nCleaning Report:")
+#         for key, value in report.items():
+#             print(f"{key}: {value}")
