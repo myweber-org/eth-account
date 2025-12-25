@@ -174,3 +174,80 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     validate_data(cleaned_df, required_columns=['A', 'B', 'C'])
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, case_normalization='lower'):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns_to_clean (list, optional): List of column names to clean. If None, clean all object dtype columns.
+    remove_duplicates (bool): If True, remove duplicate rows.
+    case_normalization (str): One of 'lower', 'upper', or None to specify case normalization.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].astype(str).str.strip()
+            
+            if case_normalization == 'lower':
+                df_clean[col] = df_clean[col].str.lower()
+            elif case_normalization == 'upper':
+                df_clean[col] = df_clean[col].str.upper()
+            
+            df_clean[col] = df_clean[col].replace(r'^\s*$', pd.NA, regex=True)
+    
+    if remove_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
+    
+    return df_clean
+
+def normalize_text(text, remove_special=True, replace_whitespace=True):
+    """
+    Normalize a text string by removing special characters and extra whitespace.
+    
+    Parameters:
+    text (str): Input text.
+    remove_special (bool): If True, remove non-alphanumeric characters.
+    replace_whitespace (bool): If True, replace multiple whitespaces with single space.
+    
+    Returns:
+    str: Normalized text.
+    """
+    if not isinstance(text, str):
+        return text
+    
+    normalized = text.strip()
+    
+    if remove_special:
+        normalized = re.sub(r'[^a-zA-Z0-9\s]', '', normalized)
+    
+    if replace_whitespace:
+        normalized = re.sub(r'\s+', ' ', normalized)
+    
+    return normalized
+
+def validate_email(email):
+    """
+    Validate an email address format.
+    
+    Parameters:
+    email (str): Email address to validate.
+    
+    Returns:
+    bool: True if email format is valid, False otherwise.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
