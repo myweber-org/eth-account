@@ -344,4 +344,101 @@ if __name__ == "__main__":
     validation = validate_data(cleaned, required_columns=['name', 'email'])
     print("Validation Results:")
     for key, value in validation.items():
-        print(f"{key}: {value}")
+        print(f"{key}: {value}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, missing_strategy='mean', remove_duplicates=True):
+    """
+    Load and clean CSV data by handling missing values and duplicates.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        missing_strategy (str): Strategy for handling missing values.
+                                Options: 'mean', 'median', 'drop', 'zero'.
+        remove_duplicates (bool): Whether to remove duplicate rows.
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    original_shape = df.shape
+    
+    if remove_duplicates:
+        df = df.drop_duplicates()
+        print(f"Removed {original_shape[0] - df.shape[0]} duplicate rows.")
+    
+    if df.isnull().sum().any():
+        print("Handling missing values...")
+        for column in df.columns:
+            if df[column].dtype in [np.float64, np.int64]:
+                if missing_strategy == 'mean':
+                    df[column].fillna(df[column].mean(), inplace=True)
+                elif missing_strategy == 'median':
+                    df[column].fillna(df[column].median(), inplace=True)
+                elif missing_strategy == 'zero':
+                    df[column].fillna(0, inplace=True)
+                elif missing_strategy == 'drop':
+                    df = df.dropna(subset=[column])
+            else:
+                df[column].fillna('Unknown', inplace=True)
+    
+    print(f"Data cleaned. Original shape: {original_shape}, New shape: {df.shape}")
+    return df
+
+def validate_numeric_columns(df, columns):
+    """
+    Validate that specified columns contain only numeric values.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate.
+        columns (list): List of column names to check.
+    
+    Returns:
+        bool: True if all columns are numeric, False otherwise.
+    """
+    for column in columns:
+        if column not in df.columns:
+            print(f"Column '{column}' not found in DataFrame.")
+            return False
+        
+        if not pd.api.types.is_numeric_dtype(df[column]):
+            print(f"Column '{column}' is not numeric.")
+            return False
+    
+    return True
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a column using the IQR method.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame containing the data.
+        column (str): Column name to process.
+        multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+        pandas.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric.")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    outliers_removed = len(df) - len(filtered_df)
+    print(f"Removed {outliers_removed} outliers from column '{column}'.")
+    
+    return filtered_df
