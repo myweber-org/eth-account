@@ -344,3 +344,81 @@ def load_and_clean_data(filepath, cleaning_steps=None):
                 cleaner.handle_missing_values(**step.get('params', {}))
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = len(cleaned_df)
+    cleaned_df = cleaned_df.drop_duplicates()
+    removed_duplicates = initial_rows - len(cleaned_df)
+    
+    # Standardize text in specified columns
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].apply(standardize_text)
+    
+    return cleaned_df, removed_duplicates
+
+def standardize_text(text):
+    """
+    Standardize text by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if pd.isna(text):
+        return text
+    
+    # Convert to string and lowercase
+    text = str(text).lower()
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Remove special characters (keep alphanumeric and basic punctuation)
+    text = re.sub(r'[^\w\s.,!?-]', '', text)
+    
+    return text
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    """
+    if pd.isna(email):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def get_cleaning_summary(df, cleaned_df, removed_duplicates):
+    """
+    Generate a summary of the cleaning process.
+    """
+    summary = {
+        'initial_rows': len(df),
+        'final_rows': len(cleaned_df),
+        'duplicates_removed': removed_duplicates,
+        'columns_cleaned': list(df.columns)
+    }
+    return summary
+
+# Example usage (commented out for library use)
+# if __name__ == "__main__":
+#     # Create sample data
+#     data = {
+#         'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  '],
+#         'email': ['john@example.com', 'jane@example.com', 'john@example.com', 'invalid-email'],
+#         'notes': ['Important   client', 'Regular customer', 'Important   client', 'New prospect!!!']
+#     }
+#     
+#     df = pd.DataFrame(data)
+#     cleaned_df, removed = clean_dataframe(df, text_columns=['name', 'notes'])
+#     summary = get_cleaning_summary(df, cleaned_df, removed)
+#     
+#     print(f"Cleaning complete. Removed {removed} duplicates.")
+#     print(f"Summary: {summary}")
