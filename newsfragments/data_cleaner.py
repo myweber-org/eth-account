@@ -82,4 +82,45 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_dfimport pandas as pd
+import re
+
+def clean_dataframe(df, text_column):
+    """
+    Clean a DataFrame by removing duplicates and normalizing text in a specified column.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase, remove extra whitespace, and strip punctuation
+    def normalize_text(text):
+        if pd.isna(text):
+            return text
+        # Convert to lowercase
+        text = str(text).lower()
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        # Remove punctuation (optional, can be customized)
+        text = re.sub(r'[^\w\s]', '', text)
+        return text
+    
+    df_cleaned[text_column] = df_cleaned[text_column].apply(normalize_text)
+    
+    return df_cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'comment': [
+            'Hello World!',
+            'hello world',
+            '  Hello   World  ',
+            'Good morning.',
+            'Good morning.',
+            'Good morning.'
+        ]
+    }
+    df = pd.DataFrame(data)
+    cleaned_df = clean_dataframe(df, 'comment')
+    print(cleaned_df)
