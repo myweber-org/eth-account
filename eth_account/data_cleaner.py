@@ -721,3 +721,93 @@ if __name__ == "__main__":
     cleaned_df = clean_missing_values(df, strategy='mean')
     print("\nCleaned DataFrame (mean strategy):")
     print(cleaned_df)
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from DataFrame.
+    If columns specified, only check those columns.
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values using specified strategy.
+    Strategies: 'mean', 'median', 'mode', or 'constant'
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+            elif strategy == 'constant':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using IQR method.
+    Returns DataFrame without outliers.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have mean=0 and std=1.
+    """
+    df_standardized = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if df[col].std() != 0:
+            df_standardized[col] = (df[col] - df[col].mean()) / df[col].std()
+    
+    return df_standardized
+
+def clean_dataset(df, missing_strategy='mean', remove_outliers=True):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    df_clean = df.copy()
+    
+    df_clean = fill_missing_values(df_clean, strategy=missing_strategy)
+    
+    if remove_outliers:
+        df_clean = remove_outliers_iqr(df_clean)
+    
+    df_clean = standardize_columns(df_clean)
+    
+    return df_clean
