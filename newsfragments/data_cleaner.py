@@ -1,128 +1,85 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
 
-def remove_outliers_iqr(data, column, factor=1.5):
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers using IQR method
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Strategy to fill missing values. 
+                        Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    else:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+                elif fill_missing == 'median':
+                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+                elif fill_missing == 'mode':
+                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+    
+    return cleaned_df
 
-def normalize_minmax(data, column):
+def validate_dataframe(df, required_columns=None, min_rows=1):
     """
-    Normalize column using min-max scaling
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (is_valid, error_message)
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
     
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def standardize_zscore(data, column):
-    """
-    Standardize column using z-score normalization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def handle_missing_values(data, strategy='mean'):
-    """
-    Handle missing values in numeric columns
-    """
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
-    
-    if strategy == 'mean':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].mean())
-    elif strategy == 'median':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].median())
-    elif strategy == 'mode':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].mode()[0])
-    elif strategy == 'drop':
-        data = data.dropna(subset=numeric_cols)
-    
-    return data
-
-def validate_dataframe(data, required_columns=None):
-    """
-    Validate DataFrame structure and content
-    """
-    if not isinstance(data, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
-    
-    if data.empty:
-        raise ValueError("DataFrame is empty")
+    if len(df) < min_rows:
+        return False, f"DataFrame must have at least {min_rows} row(s)"
     
     if required_columns:
-        missing_cols = [col for col in required_columns if col not in data.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    return Truedef remove_duplicates(input_list):
-    """
-    Remove duplicate items from a list while preserving order.
-    Returns a new list with unique elements.
-    """
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    return True, "DataFrame is valid"
 
-def clean_numeric_strings(string_list):
+def remove_outliers_iqr(df, column, multiplier=1.5):
     """
-    Clean a list of numeric strings by converting to integers,
-    removing invalid entries, and returning sorted unique values.
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    cleaned = []
-    for s in string_list:
-        try:
-            num = int(s.strip())
-            cleaned.append(num)
-        except ValueError:
-            continue
-    unique_nums = remove_duplicates(cleaned)
-    return sorted(unique_nums)
-
-if __name__ == "__main__":
-    sample_data = ["5", " 3 ", "7", "3", "abc", "5", "12", "7"]
-    cleaned = clean_numeric_strings(sample_data)
-    print(f"Original: {sample_data}")
-    print(f"Cleaned: {cleaned}")
-def remove_duplicates(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
