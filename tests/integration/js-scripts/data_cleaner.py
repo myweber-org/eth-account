@@ -177,3 +177,11 @@ if __name__ == "__main__":
     
     clean_df = cleaner.get_clean_data()
     print(f"\nFinal data shape: {clean_df.shape}")
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
