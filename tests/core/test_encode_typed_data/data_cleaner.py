@@ -114,3 +114,58 @@ if __name__ == "__main__":
     
     is_valid, msg = validate_data(cleaned_df, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {msg}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    """Remove outliers using IQR method."""
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns):
+    """Normalize data using min-max scaling."""
+    df_normalized = df.copy()
+    for col in columns:
+        min_val = df_normalized[col].min()
+        max_val = df_normalized[col].max()
+        df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean'):
+    """Handle missing values with specified strategy."""
+    df_filled = df.copy()
+    for col in df_filled.columns:
+        if df_filled[col].dtype in ['float64', 'int64']:
+            if strategy == 'mean':
+                df_filled[col].fillna(df_filled[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_filled[col].fillna(df_filled[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+    return df_filled
+
+def clean_dataset(input_path, output_path, numeric_columns):
+    """Main function to clean dataset."""
+    df = load_dataset(input_path)
+    df = handle_missing_values(df, strategy='median')
+    df = remove_outliers_iqr(df, numeric_columns)
+    df = normalize_data(df, numeric_columns)
+    df.to_csv(output_path, index=False)
+    return df
+
+if __name__ == "__main__":
+    numeric_cols = ['age', 'income', 'score']
+    cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv', numeric_cols)
+    print(f"Dataset cleaned. Shape: {cleaned_df.shape}")
