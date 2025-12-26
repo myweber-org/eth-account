@@ -996,3 +996,80 @@ def validate_dataframe(df, required_columns=None, min_rows=10):
             raise ValueError(f"Missing required columns: {missing_cols}")
     
     return True
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in specified columns.
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                df_filled[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_filled[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+        else:
+            df_filled[col] = df[col].fillna('Unknown')
+    
+    return df_filled
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize values in a column.
+    """
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val != 0:
+            df[column] = (df[column] - mean_val) / std_val
+    
+    return df
+
+def clean_dataframe(df, remove_dups=True, fill_na=True, normalize_cols=None):
+    """
+    Perform comprehensive cleaning on DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if remove_dups:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if fill_na:
+        cleaned_df = fill_missing_values(cleaned_df)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
+
+def load_and_clean_csv(filepath, **kwargs):
+    """
+    Load CSV file and clean the data.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        return clean_dataframe(df, **kwargs)
+    except Exception as e:
+        print(f"Error loading or cleaning file: {e}")
+        return None
