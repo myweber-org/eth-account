@@ -1,199 +1,96 @@
-import numpy as np
 import pandas as pd
-
-def remove_outliers_iqr(dataframe, column):
-    Q1 = dataframe[column].quantile(0.25)
-    Q3 = dataframe[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
-    return filtered_df
-
-def normalize_minmax(dataframe, column):
-    min_val = dataframe[column].min()
-    max_val = dataframe[column].max()
-    if max_val - min_val == 0:
-        return dataframe[column].apply(lambda x: 0.0)
-    normalized = (dataframe[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def clean_dataset(dataframe, numeric_columns):
-    cleaned_df = dataframe.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df
-
-def calculate_statistics(dataframe, column):
-    stats = {
-        'mean': dataframe[column].mean(),
-        'median': dataframe[column].median(),
-        'std': dataframe[column].std(),
-        'count': dataframe[column].count()
-    }
-    return stats
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport pandas as pd
 import numpy as np
 
-def remove_missing_rows(df, threshold=0.8):
+def clean_csv_data(filepath, fill_method='mean', drop_threshold=0.5):
     """
-    Remove rows with missing values exceeding the threshold.
+    Load and clean CSV data by handling missing values.
     
-    Args:
-        df: pandas DataFrame
-        threshold: float, maximum allowed proportion of missing values per row
+    Parameters:
+    filepath (str): Path to the CSV file
+    fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
+    drop_threshold (float): Drop columns with missing ratio above this threshold
     
     Returns:
-        Cleaned DataFrame
+    pd.DataFrame: Cleaned dataframe
     """
-    missing_prop = df.isnull().mean(axis=1)
-    return df[missing_prop <= threshold].reset_index(drop=True)
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+    
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+    
+    # Calculate missing percentage per column
+    missing_percent = df.isnull().sum() / len(df) * 100
+    
+    # Drop columns with too many missing values
+    columns_to_drop = missing_percent[missing_percent > drop_threshold * 100].index
+    if len(columns_to_drop) > 0:
+        print(f"Dropping columns with >{drop_threshold*100}% missing values: {list(columns_to_drop)}")
+        df = df.drop(columns=columns_to_drop)
+    
+    # Fill remaining missing values based on specified method
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if fill_method == 'mean':
+        fill_values = df[numeric_cols].mean()
+    elif fill_method == 'median':
+        fill_values = df[numeric_cols].median()
+    elif fill_method == 'zero':
+        fill_values = 0
+    elif fill_method == 'mode':
+        fill_values = df[numeric_cols].mode().iloc[0]
+    else:
+        print(f"Warning: Unknown fill method '{fill_method}', using mean instead")
+        fill_values = df[numeric_cols].mean()
+    
+    # Fill numeric columns
+    df[numeric_cols] = df[numeric_cols].fillna(fill_values)
+    
+    # Fill categorical columns with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df[col].isnull().any():
+            mode_value = df[col].mode()[0] if not df[col].mode().empty else 'Unknown'
+            df[col] = df[col].fillna(mode_value)
+    
+    # Report cleaning results
+    final_missing = df.isnull().sum().sum()
+    if final_missing > 0:
+        print(f"Warning: {final_missing} missing values remain after cleaning")
+    else:
+        print("All missing values have been handled")
+    
+    print(f"Final data shape: {df.shape}")
+    print(f"Removed {original_shape[1] - df.shape[1]} columns")
+    
+    return df
 
-def fill_missing_with_median(df, columns=None):
+def export_cleaned_data(df, output_path):
     """
-    Fill missing values with column median.
+    Export cleaned dataframe to CSV.
     
-    Args:
-        df: pandas DataFrame
-        columns: list of column names to process, if None processes all numeric columns
-    
-    Returns:
-        DataFrame with filled values
+    Parameters:
+    df (pd.DataFrame): Cleaned dataframe
+    output_path (str): Path for output CSV file
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_filled = df.copy()
-    for col in columns:
-        if col in df.columns:
-            median_val = df[col].median()
-            df_filled[col].fillna(median_val, inplace=True)
-    
-    return df_filled
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data exported to {output_path}")
+        return True
+    return False
 
-def remove_outliers_iqr(df, column, multiplier=1.5):
-    """
-    Remove outliers using the Interquartile Range method.
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    Args:
-        df: pandas DataFrame
-        column: string, column name to check for outliers
-        multiplier: float, IQR multiplier for outlier detection
+    cleaned_df = clean_csv_data(input_file, fill_method='median', drop_threshold=0.3)
     
-    Returns:
-        DataFrame without outliers in the specified column
-    """
-    if column not in df.columns:
-        return df
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - multiplier * IQR
-    upper_bound = Q3 + multiplier * IQR
-    
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)].reset_index(drop=True)
-
-def standardize_columns(df, columns=None):
-    """
-    Standardize specified columns to have zero mean and unit variance.
-    
-    Args:
-        df: pandas DataFrame
-        columns: list of column names to standardize, if None processes all numeric columns
-    
-    Returns:
-        DataFrame with standardized columns
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_standardized = df.copy()
-    for col in columns:
-        if col in df.columns and df[col].std() > 0:
-            df_standardized[col] = (df[col] - df[col].mean()) / df[col].std()
-    
-    return df_standardized
-
-def clean_dataset(df, missing_threshold=0.8, outlier_columns=None, outlier_multiplier=1.5):
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Args:
-        df: pandas DataFrame
-        missing_threshold: float for missing value removal
-        outlier_columns: list of columns to check for outliers
-        outlier_multiplier: float for IQR outlier detection
-    
-    Returns:
-        Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    cleaned_df = remove_missing_rows(cleaned_df, threshold=missing_threshold)
-    cleaned_df = fill_missing_with_median(cleaned_df)
-    
-    if outlier_columns:
-        for col in outlier_columns:
-            if col in cleaned_df.columns:
-                cleaned_df = remove_outliers_iqr(cleaned_df, col, multiplier=outlier_multiplier)
-    
-    return cleaned_df.reset_index(drop=True)import pandas as pd
-
-def clean_dataset(df, drop_na=True, rename_columns=True):
-    """
-    Clean a pandas DataFrame by removing null values and standardizing column names.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_na (bool): Whether to drop rows with null values
-        rename_columns (bool): Whether to rename columns to lowercase with underscores
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    if drop_na:
-        cleaned_df = cleaned_df.dropna()
-    
-    if rename_columns:
-        cleaned_df.columns = (
-            cleaned_df.columns
-            .str.lower()
-            .str.replace(r'[^a-z0-9]+', '_', regex=True)
-            .str.strip('_')
-        )
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate that a DataFrame meets basic requirements.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+    if cleaned_df is not None:
+        export_cleaned_data(cleaned_df, output_file)
