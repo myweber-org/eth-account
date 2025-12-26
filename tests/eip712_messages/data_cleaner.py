@@ -191,4 +191,65 @@ if __name__ == "__main__":
         validate_data(cleaned_df, required_columns=['id', 'value'], min_rows=3)
         print("\nData validation passed.")
     except ValueError as e:
-        print(f"\nData validation failed: {e}")
+        print(f"\nData validation failed: {e}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to process
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to analyze
+    
+    Returns:
+        Dictionary containing summary statistics
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def process_dataframe(df, column):
+    """
+    Process a DataFrame by removing outliers and calculating statistics.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to process
+    
+    Returns:
+        Tuple of (cleaned_df, statistics_dict)
+    """
+    cleaned_df = remove_outliers_iqr(df, column)
+    stats = calculate_summary_statistics(cleaned_df, column)
+    
+    return cleaned_df, stats
