@@ -232,3 +232,11 @@ def get_data_summary(df):
         summary['numeric_stats'] = df[numeric_cols].describe().to_dict()
     
     return summary
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
