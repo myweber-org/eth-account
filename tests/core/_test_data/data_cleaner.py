@@ -1,92 +1,111 @@
+
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing null values and duplicates.
+    Remove outliers from a specified column in a DataFrame using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to be cleaned.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    # Remove rows with any null values
-    df_cleaned = df.dropna()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    # Remove duplicate rows
-    df_cleaned = df_cleaned.drop_duplicates()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    # Reset index after cleaning
-    df_cleaned = df_cleaned.reset_index(drop=True)
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return df_cleaned
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def validate_dataframe(df):
+def clean_numeric_data(df, columns=None):
     """
-    Validate if the input is a pandas DataFrame and not empty.
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
     
-    Args:
-        df: Object to validate.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
     
     Returns:
-        bool: True if valid DataFrame, False otherwise.
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{col}'")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
     """
     if not isinstance(df, pd.DataFrame):
-        print("Error: Input is not a pandas DataFrame.")
+        print("Error: Input is not a pandas DataFrame")
         return False
     
     if df.empty:
-        print("Warning: DataFrame is empty.")
-        return False
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
     
     return True
 
-def get_cleaning_report(df, df_cleaned):
+def example_usage():
     """
-    Generate a report of the cleaning operations performed.
-    
-    Args:
-        df (pd.DataFrame): Original DataFrame.
-        df_cleaned (pd.DataFrame): Cleaned DataFrame.
-    
-    Returns:
-        dict: Dictionary containing cleaning statistics.
+    Example usage of the data cleaning functions.
     """
-    original_rows = len(df)
-    cleaned_rows = len(df_cleaned)
-    null_rows = df.isnull().any(axis=1).sum()
-    duplicate_rows = df.duplicated().sum()
+    np.random.seed(42)
     
-    report = {
-        'original_rows': original_rows,
-        'cleaned_rows': cleaned_rows,
-        'rows_removed': original_rows - cleaned_rows,
-        'null_rows_removed': null_rows,
-        'duplicate_rows_removed': duplicate_rows,
-        'cleaning_percentage': ((original_rows - cleaned_rows) / original_rows * 100) if original_rows > 0 else 0
+    data = {
+        'id': range(100),
+        'value': np.random.randn(100) * 10 + 50,
+        'score': np.random.randn(100) * 5 + 75
     }
     
-    return report
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("\nSummary statistics:")
+    print(df[['value', 'score']].describe())
+    
+    cleaned_df = clean_numeric_data(df, ['value', 'score'])
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned summary statistics:")
+    print(cleaned_df[['value', 'score']].describe())
+    
+    return cleaned_df
 
-# Example usage (commented out for production)
-# if __name__ == "__main__":
-#     # Create sample data
-#     data = {
-#         'A': [1, 2, None, 4, 2],
-#         'B': [5, 6, 7, None, 6],
-#         'C': [8, 9, 10, 11, 9]
-#     }
-#     
-#     df = pd.DataFrame(data)
-#     print("Original DataFrame:")
-#     print(df)
-#     
-#     if validate_dataframe(df):
-#         cleaned_df = clean_dataset(df)
-#         print("\nCleaned DataFrame:")
-#         print(cleaned_df)
-#         
-#         report = get_cleaning_report(df, cleaned_df)
-#         print("\nCleaning Report:")
-#         for key, value in report.items():
-#             print(f"{key}: {value}")
+if __name__ == "__main__":
+    cleaned_data = example_usage()
