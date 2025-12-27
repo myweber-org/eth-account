@@ -1,92 +1,87 @@
+
 import pandas as pd
 import numpy as np
 
-def load_and_clean_csv(filepath, drop_na=True, fill_value=None):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Load a CSV file and perform basic cleaning operations.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    Args:
-        filepath (str): Path to the CSV file.
-        drop_na (bool): If True, drop rows with any NaN values.
-        fill_value: If provided and drop_na is False, fill NaN with this value.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    try:
-        df = pd.read_csv(filepath)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {filepath}")
+    cleaned_df = df.copy()
     
-    if drop_na:
-        df = df.dropna()
-    elif fill_value is not None:
-        df = df.fillna(fill_value)
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    return df
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            elif fill_missing == 'median':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+    
+    return cleaned_df
 
-def remove_duplicates(df, subset=None):
+def validate_dataframe(df, required_columns=None):
     """
-    Remove duplicate rows from DataFrame.
+    Validate DataFrame structure and content.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        subset (list): Columns to consider for identifying duplicates.
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
+    dict: Dictionary with validation results.
     """
-    return df.drop_duplicates(subset=subset, keep='first')
+    validation_result = {
+        'is_valid': True,
+        'missing_columns': [],
+        'null_counts': {},
+        'data_types': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_result['is_valid'] = False
+            validation_result['missing_columns'] = missing
+    
+    for col in df.columns:
+        validation_result['null_counts'][col] = df[col].isnull().sum()
+        validation_result['data_types'][col] = str(df[col].dtype)
+    
+    return validation_result
 
-def normalize_column(df, column_name):
-    """
-    Normalize a numeric column to range [0, 1].
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', None]
+    }
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        column_name (str): Name of column to normalize.
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
     
-    Returns:
-        pd.DataFrame: DataFrame with normalized column.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
     
-    col = df[column_name]
-    if not np.issubdtype(col.dtype, np.number):
-        raise TypeError(f"Column '{column_name}' must be numeric")
-    
-    min_val = col.min()
-    max_val = col.max()
-    
-    if max_val == min_val:
-        df[column_name] = 0.5
-    else:
-        df[column_name] = (col - min_val) / (max_val - min_val)
-    
-    return df
-
-def filter_by_quantile(df, column_name, lower=0.05, upper=0.95):
-    """
-    Filter DataFrame rows based on column quantile thresholds.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        column_name (str): Column name for filtering.
-        lower (float): Lower quantile threshold.
-        upper (float): Upper quantile threshold.
-    
-    Returns:
-        pd.DataFrame: Filtered DataFrame.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
-    
-    col = df[column_name]
-    if not np.issubdtype(col.dtype, np.number):
-        raise TypeError(f"Column '{column_name}' must be numeric")
-    
-    lower_bound = col.quantile(lower)
-    upper_bound = col.quantile(upper)
-    
-    return df[(col >= lower_bound) & (col <= upper_bound)]
+    validation = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
