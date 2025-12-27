@@ -1,121 +1,36 @@
 
 import pandas as pd
 import numpy as np
+from scipy import stats
 
-def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-        print(f"Removed {len(df) - len(cleaned_df)} duplicate rows.")
-    
-    if fill_missing == 'drop':
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.dropna()
-        print(f"Dropped {initial_rows - len(cleaned_df)} rows with missing values.")
-    elif fill_missing in ['mean', 'median', 'mode']:
-        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
-            if cleaned_df[column].isnull().any():
-                if fill_missing == 'mean':
-                    fill_value = cleaned_df[column].mean()
-                elif fill_missing == 'median':
-                    fill_value = cleaned_df[column].median()
-                else:  # mode
-                    fill_value = cleaned_df[column].mode()[0]
-                cleaned_df[column].fillna(fill_value, inplace=True)
-                print(f"Filled missing values in column '{column}' with {fill_missing}: {fill_value}")
-    
-    print(f"Data cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
-    return cleaned_df
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def validate_dataframe(df):
-    """
-    Validate a DataFrame by checking for missing values and data types.
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path, columns_to_clean):
+    df = pd.read_csv(file_path)
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
+    for column in columns_to_clean:
+        if column in df.columns:
+            df = remove_outliers_iqr(df, column)
+            df = normalize_minmax(df, column)
     
-    Returns:
-    dict: Dictionary containing validation results.
-    """
-    validation_results = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'missing_values': df.isnull().sum().to_dict(),
-        'data_types': df.dtypes.astype(str).to_dict(),
-        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
-        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
-    }
-    return validation_results
+    cleaned_file = file_path.replace('.csv', '_cleaned.csv')
+    df.to_csv(cleaned_file, index=False)
+    return cleaned_file
 
 if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 4, 5, None],
-        'B': [10, 20, 20, None, 50, 60],
-        'C': ['x', 'y', 'y', 'z', None, 'x']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n" + "="*50 + "\n")
-    
-    cleaned = clean_dataframe(df, drop_duplicates=True, fill_missing='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    print("\n" + "="*50 + "\n")
-    validation = validate_dataframe(cleaned)
-    print("Validation Results:")
-    for key, value in validation.items():
-        print(f"{key}: {value}")
-def remove_duplicates(input_list):
-    """
-    Remove duplicate elements from a list while preserving order.
-    Returns a new list with unique elements.
-    """
-    seen = set()
-    unique_list = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            unique_list.append(item)
-    return unique_list
-
-def clean_numeric_data(values, default=0):
-    """
-    Clean numeric data by converting strings to floats,
-    handling None values, and replacing invalid entries with default.
-    """
-    cleaned = []
-    for val in values:
-        if val is None:
-            cleaned.append(default)
-        elif isinstance(val, str):
-            try:
-                cleaned.append(float(val))
-            except ValueError:
-                cleaned.append(default)
-        else:
-            cleaned.append(float(val))
-    return cleaned
-
-if __name__ == "__main__":
-    sample_data = [1, 2, 2, 3, 4, 4, 5]
-    print("Original:", sample_data)
-    print("Cleaned:", remove_duplicates(sample_data))
-    
-    numeric_data = ["1.5", "invalid", None, 3, "4.2"]
-    print("Numeric data:", numeric_data)
-    print("Cleaned numeric:", clean_numeric_data(numeric_data))
+    input_file = "raw_data.csv"
+    columns = ["temperature", "humidity", "pressure"]
+    result = clean_dataset(input_file, columns)
+    print(f"Cleaned data saved to: {result}")
