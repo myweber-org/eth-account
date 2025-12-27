@@ -63,4 +63,66 @@ def validate_dataframe(df, required_columns=None):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    """
+    cleaned_df = df.copy()
+    for col in columns:
+        Q1 = cleaned_df[col].quantile(0.25)
+        Q3 = cleaned_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    """
+    Normalize data using min-max scaling.
+    """
+    normalized_df = df.copy()
+    for col in columns:
+        min_val = normalized_df[col].min()
+        max_val = normalized_df[col].max()
+        if max_val != min_val:
+            normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+        else:
+            normalized_df[col] = 0
+    return normalized_df
+
+def handle_missing_mean(df, columns):
+    """
+    Fill missing values with column mean.
+    """
+    filled_df = df.copy()
+    for col in columns:
+        filled_df[col].fillna(filled_df[col].mean(), inplace=True)
+    return filled_df
+
+def clean_dataset(df, numeric_columns):
+    """
+    Main cleaning pipeline.
+    """
+    df_no_missing = handle_missing_mean(df, numeric_columns)
+    df_no_outliers = remove_outliers_iqr(df_no_missing, numeric_columns)
+    df_normalized = normalize_minmax(df_no_outliers, numeric_columns)
+    return df_normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': [1, 2, 3, 4, 5, 100],
+        'feature_b': [10, 20, np.nan, 40, 50, 200],
+        'feature_c': [0.1, 0.2, 0.3, 0.4, 0.5, 2.0]
+    }
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature_a', 'feature_b', 'feature_c']
+    cleaned_df = clean_dataset(df, numeric_cols)
+    print("Original dataset:")
+    print(df)
+    print("\nCleaned dataset:")
+    print(cleaned_df)
