@@ -35,3 +35,49 @@ def validate_dataframe(df, required_columns):
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     return True
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        Q1 = cleaned_df[col].quantile(0.25)
+        Q3 = cleaned_df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df
+
+def normalize_minmax(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        min_val = normalized_df[col].min()
+        max_val = normalized_df[col].max()
+        if max_val != min_val:
+            normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+        else:
+            normalized_df[col] = 0
+    return normalized_df
+
+def clean_dataset(df, numeric_columns):
+    df_clean = df.dropna(subset=numeric_columns)
+    df_no_outliers = remove_outliers_iqr(df_clean, numeric_columns)
+    df_normalized = normalize_minmax(df_no_outliers, numeric_columns)
+    return df_normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': [1, 2, 3, 100, 5, 6, 7, 8, 9, 10],
+        'feature_b': [10, 20, 30, 40, 50, 60, 70, 80, 90, 1000],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+    }
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature_a', 'feature_b']
+    
+    cleaned_df = clean_dataset(df, numeric_cols)
+    print("Original dataset shape:", df.shape)
+    print("Cleaned dataset shape:", cleaned_df.shape)
+    print("\nCleaned data summary:")
+    print(cleaned_df.describe())
