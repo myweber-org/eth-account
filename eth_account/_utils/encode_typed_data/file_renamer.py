@@ -16,7 +16,7 @@ def rename_files(directory, prefix="file"):
             os.rename(old_path, new_path)
             print(f"Renamed: {filename} -> {new_name}")
             
-        print(f"Renamed {len(files)} files successfully.")
+        print(f"Successfully renamed {len(files)} files.")
         
     except FileNotFoundError:
         print(f"Error: Directory '{directory}' not found.")
