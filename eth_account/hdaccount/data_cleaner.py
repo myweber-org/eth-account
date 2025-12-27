@@ -1,101 +1,84 @@
-
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def remove_duplicates(df, subset=None):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Remove duplicate rows from DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def clean_dataset(df, numeric_columns=None):
+def fill_missing_values(df, strategy='mean', columns=None):
     """
-    Clean dataset by removing outliers from all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
+    Fill missing values using specified strategy.
     """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    if columns is None:
+        columns = df.columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                fill_value = 0
+            
+            df_filled[col] = df[col].fillna(fill_value)
+        else:
+            df_filled[col] = df[col].fillna('Unknown')
+    
+    return df_filled
+
+def normalize_column(df, column):
+    """
+    Normalize numeric column to range [0, 1].
+    """
+    if df[column].dtype in [np.float64, np.int64]:
+        min_val = df[column].min()
+        max_val = df[column].max()
+        
+        if max_val > min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df
+
+def clean_dataframe(df, operations=None):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    """
+    if operations is None:
+        operations = ['remove_duplicates', 'fill_missing']
     
     cleaned_df = df.copy()
     
-    for column in numeric_columns:
-        if column in df.columns:
-            try:
-                cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            except Exception as e:
-                print(f"Error cleaning column {column}: {e}")
+    if 'remove_duplicates' in operations:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if 'fill_missing' in operations:
+        cleaned_df = fill_missing_values(cleaned_df)
     
     return cleaned_df
 
-if __name__ == "__main__":
-    sample_data = {
-        'id': range(1, 101),
-        'value': np.random.randn(100) * 10 + 50,
-        'category': np.random.choice(['A', 'B', 'C'], 100)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print(f"Original shape: {df.shape}")
-    
-    cleaned_df = clean_dataset(df, ['value'])
-    print(f"Cleaned shape: {cleaned_df.shape}")
-    print(f"Removed {len(df) - len(cleaned_df)} outliers")
-import numpy as np
-
-def remove_outliers_iqr(data, column):
+def validate_dataframe(df, rules=None):
     """
-    Remove outliers from a specified column using the IQR method.
-    
-    Parameters:
-    data (DataFrame): The input data.
-    column (str): The column name to process.
-    
-    Returns:
-    DataFrame: Data with outliers removed from the specified column.
+    Validate DataFrame against specified rules.
     """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if rules is None:
+        rules = {}
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-def remove_duplicates(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-
-def clean_data(data):
-    if not isinstance(data, list):
-        raise TypeError("Input must be a list")
-    return remove_duplicates(data)
+    validation_results = {}
+    
+    for column, rule in rules.items():
+        if column in df.columns:
+            if 'min' in rule:
+                validation_results[f'{column}_min'] = df[column].min() >= rule['min']
+            if 'max' in rule:
+                validation_results[f'{column}_max'] = df[column].max() <= rule['max']
+            if 'not_null' in rule and rule['not_null']:
+                validation_results[f'{column}_not_null'] = df[column].isnull().sum() == 0
+    
+    return validation_results
