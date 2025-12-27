@@ -34,3 +34,7 @@ if __name__ == "__main__":
     columns = ["temperature", "humidity", "pressure"]
     result = clean_dataset(input_file, columns)
     print(f"Cleaned data saved to: {result}")
+def remove_duplicates(seq):
+    seen = set()
+    seen_add = seen.add
+    return [x for x in seq if not (x in seen or seen_add(x))]
