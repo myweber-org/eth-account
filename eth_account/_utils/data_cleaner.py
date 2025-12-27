@@ -143,4 +143,136 @@ def clean_csv_file(input_path: str,
     cleaned_df = cleaner.get_cleaned_data()
     cleaned_df.to_csv(output_path, index=False)
     
-    return cleaner.get_cleaning_report()
+    return cleaner.get_cleaning_report()import pandas as pd
+import numpy as np
+
+def clean_dataset(df, duplicate_threshold=0.8, missing_strategy='median'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    duplicate_threshold (float): Threshold for considering rows as duplicates (0.0 to 1.0)
+    missing_strategy (str): Strategy for handling missing values ('median', 'mean', 'drop', 'fill')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    original_shape = df.shape
+    print(f"Original dataset shape: {original_shape}")
+    
+    # Remove exact duplicates
+    df_cleaned = df.drop_duplicates()
+    exact_duplicates = original_shape[0] - df_cleaned.shape[0]
+    print(f"Removed {exact_duplicates} exact duplicate rows")
+    
+    # Remove approximate duplicates based on threshold
+    if duplicate_threshold < 1.0:
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        if len(numeric_cols) > 0:
+            similarity_matrix = df_cleaned[numeric_cols].corr().abs()
+            high_correlation = (similarity_matrix > duplicate_threshold) & (similarity_matrix < 1.0)
+            duplicate_pairs = np.where(high_correlation)
+            
+            if len(duplicate_pairs[0]) > 0:
+                cols_to_drop = set()
+                for i, j in zip(duplicate_pairs[0], duplicate_pairs[1]):
+                    if i < j:
+                        cols_to_drop.add(df_cleaned.columns[j])
+                
+                df_cleaned = df_cleaned.drop(columns=list(cols_to_drop))
+                print(f"Removed {len(cols_to_drop)} highly correlated columns")
+    
+    # Handle missing values
+    missing_before = df_cleaned.isnull().sum().sum()
+    
+    if missing_strategy == 'drop':
+        df_cleaned = df_cleaned.dropna()
+        print(f"Dropped rows with missing values")
+    elif missing_strategy == 'median':
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df_cleaned[col].isnull().any():
+                df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    elif missing_strategy == 'mean':
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df_cleaned[col].isnull().any():
+                df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mean())
+    elif missing_strategy == 'fill':
+        df_cleaned = df_cleaned.fillna(method='ffill').fillna(method='bfill')
+    
+    missing_after = df_cleaned.isnull().sum().sum()
+    print(f"Handled {missing_before - missing_after} missing values")
+    
+    # Remove constant columns
+    constant_cols = [col for col in df_cleaned.columns if df_cleaned[col].nunique() <= 1]
+    if constant_cols:
+        df_cleaned = df_cleaned.drop(columns=constant_cols)
+        print(f"Removed {len(constant_cols)} constant columns: {constant_cols}")
+    
+    final_shape = df_cleaned.shape
+    print(f"Final dataset shape: {final_shape}")
+    print(f"Reduced from {original_shape[0]} to {final_shape[0]} rows "
+          f"and {original_shape[1]} to {final_shape[1]} columns")
+    
+    return df_cleaned
+
+def validate_dataframe(df, min_rows=10, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    min_rows (int): Minimum number of rows required
+    required_columns (list): List of column names that must be present
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Validation failed: Less than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing required columns: {missing_cols}")
+            return False
+    
+    # Check for infinite values
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        inf_count = np.isinf(df[numeric_cols]).sum().sum()
+        if inf_count > 0:
+            print(f"Warning: Found {inf_count} infinite values")
+    
+    print("DataFrame validation passed")
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None, 7, 8, 9, 10],
+        'B': [1.1, 2.2, 2.2, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0],
+        'C': ['a', 'b', 'b', 'd', 'e', 'f', 'g', 'h', 'i', 'j'],
+        'D': [1, 1, 1, 1, 1, 1, 1, 1, 1, 1]  # Constant column
+    }
+    
+    df = pd.DataFrame(sample_data)
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, duplicate_threshold=0.9, missing_strategy='median')
+    
+    # Validate the cleaned dataset
+    is_valid = validate_dataframe(cleaned_df, min_rows=5, required_columns=['A', 'B', 'C'])
+    
+    print(f"\nCleaned DataFrame head:")
+    print(cleaned_df.head())
