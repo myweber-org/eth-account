@@ -1,106 +1,54 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
 
-class DataCleaner:
-    def __init__(self, data):
-        self.data = data
-        self.original_shape = data.shape
-        
-    def remove_outliers_iqr(self, columns=None, factor=1.5):
-        if columns is None:
-            columns = self.data.columns
-            
-        clean_data = self.data.copy()
-        for col in columns:
-            if pd.api.types.is_numeric_dtype(clean_data[col]):
-                Q1 = clean_data[col].quantile(0.25)
-                Q3 = clean_data[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - factor * IQR
-                upper_bound = Q3 + factor * IQR
-                clean_data = clean_data[(clean_data[col] >= lower_bound) & (clean_data[col] <= upper_bound)]
-        return clean_data
+def clean_dataframe(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    def remove_outliers_zscore(self, columns=None, threshold=3):
-        if columns is None:
-            columns = self.data.columns
-            
-        clean_data = self.data.copy()
-        for col in columns:
-            if pd.api.types.is_numeric_dtype(clean_data[col]):
-                z_scores = np.abs(stats.zscore(clean_data[col]))
-                clean_data = clean_data[z_scores < threshold]
-        return clean_data
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str or dict): Method to fill missing values. 
+            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+            If None, missing values are not filled. Default is None.
     
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.data.select_dtypes(include=[np.number]).columns
-            
-        normalized_data = self.data.copy()
-        for col in columns:
-            if pd.api.types.is_numeric_dtype(normalized_data[col]):
-                min_val = normalized_data[col].min()
-                max_val = normalized_data[col].max()
-                if max_val != min_val:
-                    normalized_data[col] = (normalized_data[col] - min_val) / (max_val - min_val)
-        return normalized_data
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
     
-    def normalize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.data.select_dtypes(include=[np.number]).columns
-            
-        normalized_data = self.data.copy()
-        for col in columns:
-            if pd.api.types.is_numeric_dtype(normalized_data[col]):
-                mean_val = normalized_data[col].mean()
-                std_val = normalized_data[col].std()
-                if std_val > 0:
-                    normalized_data[col] = (normalized_data[col] - mean_val) / std_val
-        return normalized_data
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    def fill_missing_mean(self, columns=None):
-        if columns is None:
-            columns = self.data.columns
-            
-        filled_data = self.data.copy()
-        for col in columns:
-            if pd.api.types.is_numeric_dtype(filled_data[col]):
-                filled_data[col] = filled_data[col].fillna(filled_data[col].mean())
-        return filled_data
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
     
-    def get_cleaning_report(self):
-        report = {
-            'original_rows': self.original_shape[0],
-            'original_columns': self.original_shape[1],
-            'current_rows': self.data.shape[0],
-            'current_columns': self.data.shape[1],
-            'missing_values': self.data.isnull().sum().sum(),
-            'numeric_columns': list(self.data.select_dtypes(include=[np.number]).columns),
-            'categorical_columns': list(self.data.select_dtypes(exclude=[np.number]).columns)
-        }
-        return report
+    return cleaned_df
 
-def load_and_clean_data(filepath, outlier_method='iqr', normalization_method='minmax'):
-    try:
-        data = pd.read_csv(filepath)
-        cleaner = DataCleaner(data)
-        
-        if outlier_method == 'iqr':
-            data = cleaner.remove_outliers_iqr()
-        elif outlier_method == 'zscore':
-            data = cleaner.remove_outliers_zscore()
-        
-        if normalization_method == 'minmax':
-            data = cleaner.normalize_minmax()
-        elif normalization_method == 'zscore':
-            data = cleaner.normalize_zscore()
-        
-        data = cleaner.fill_missing_mean()
-        report = cleaner.get_cleaning_report()
-        
-        return data, report
-    except Exception as e:
-        print(f"Error during data cleaning: {e}")
-        return None, None
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate a DataFrame for required columns and minimum row count.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if required_columns is not None:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    return True, "DataFrame is valid"
