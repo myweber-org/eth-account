@@ -187,4 +187,71 @@ def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
             z_scores = (df_clean[col] - mean) / std
             df_clean = df_clean[abs(z_scores) <= threshold]
     
-    return df_clean
+    return df_cleanimport pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+    
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        column (str): The column name to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean a dataset by removing outliers from all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        numeric_columns (list, optional): List of numeric columns to clean.
+            If None, all numeric columns will be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in df.columns:
+            original_len = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_len - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000).tolist() + [500, -200],
+        'B': np.random.normal(50, 10, 1000).tolist() + [300, -100],
+        'C': np.random.normal(0, 1, 1002),
+        'category': ['X', 'Y'] * 501
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print(f"Original dataset shape: {df.shape}")
+    
+    cleaned_df = clean_dataset(df, ['A', 'B', 'C'])
+    print(f"Cleaned dataset shape: {cleaned_df.shape}")
+    print(f"Removed {len(df) - len(cleaned_df)} total outliers")
