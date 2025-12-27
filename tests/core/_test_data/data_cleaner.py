@@ -196,3 +196,38 @@ def main():
 
 if __name__ == "__main__":
     cleaned_data = main()
+import pandas as pd
+import sys
+
+def remove_duplicates(input_file, output_file, subset=None):
+    try:
+        df = pd.read_csv(input_file)
+        initial_count = len(df)
+        if subset:
+            df_cleaned = df.drop_duplicates(subset=subset)
+        else:
+            df_cleaned = df.drop_duplicates()
+        final_count = len(df_cleaned)
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaning complete. Removed {initial_count - final_count} duplicate rows.")
+        print(f"Original rows: {initial_count}, Cleaned rows: {final_count}")
+        print(f"Cleaned data saved to: {output_file}")
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 3:
+        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv> [subset_columns]")
+        print("Example: python data_cleaner.py data.csv cleaned_data.csv")
+        print("To check duplicates based on specific columns, provide them as a comma-separated string.")
+        sys.exit(1)
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    subset = None
+    if len(sys.argv) > 3:
+        subset = [col.strip() for col in sys.argv[3].split(',')]
+    remove_duplicates(input_file, output_file, subset)
