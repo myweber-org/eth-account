@@ -1,73 +1,75 @@
 
 import pandas as pd
-import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to process.
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return cleaned_df
 
-def calculate_summary_statistics(df, column):
+def validate_dataset(df, required_columns=None):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Validate a DataFrame for required columns and data types.
     
     Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to analyze.
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
     
     Returns:
-    dict: Dictionary containing summary statistics.
+    bool: True if validation passes, False otherwise.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    if df.empty:
+        print("DataFrame is empty")
+        return False
     
-    return stats
+    return True
 
 if __name__ == "__main__":
     sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 15, 12, 11, 10, -50]
+        'A': [1, 2, 2, 3, None],
+        'B': [4, None, 6, 7, 8],
+        'C': ['x', 'y', 'y', 'z', None]
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
-    print(f"\nOriginal shape: {df.shape}")
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
+    cleaned = clean_dataset(df, fill_missing='mean')
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print(f"Cleaned shape: {cleaned_df.shape}")
+    print(cleaned)
     
-    stats = calculate_summary_statistics(cleaned_df, 'values')
-    print("\nSummary Statistics:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+    is_valid = validate_dataset(cleaned, required_columns=['A', 'B'])
+    print(f"\nDataset validation: {is_valid}")
