@@ -354,4 +354,114 @@ def clean_dataset(df, numeric_columns=None):
             removed_count = original_count - len(cleaned_df)
             print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return cleaned_df
+    return cleaned_dfimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from specified column
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    data_copy = data.copy()
+    
+    if columns is None:
+        columns = data_copy.select_dtypes(include=[np.number]).columns
+    
+    for column in columns:
+        if strategy == 'mean':
+            fill_value = data_copy[column].mean()
+        elif strategy == 'median':
+            fill_value = data_copy[column].median()
+        elif strategy == 'mode':
+            fill_value = data_copy[column].mode()[0]
+        elif strategy == 'drop':
+            data_copy = data_copy.dropna(subset=[column])
+            continue
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        data_copy[column] = data_copy[column].fillna(fill_value)
+    
+    return data_copy
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, 
+                  standardize_columns=None, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    # Remove outliers
+    if outlier_columns:
+        for column in outlier_columns:
+            cleaned_data = remove_outliers(cleaned_data, column)
+    
+    # Normalize specified columns
+    if normalize_columns:
+        for column in normalize_columns:
+            cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
+    
+    # Standardize specified columns
+    if standardize_columns:
+        for column in standardize_columns:
+            cleaned_data[f'{column}_standardized'] = standardize_zscore(cleaned_data, column)
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'shape': data.shape,
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'numeric_summary': data.describe().to_dict() if data.select_dtypes(include=[np.number]).shape[1] > 0 else {},
+        'categorical_summary': data.select_dtypes(include=['object']).describe().to_dict() if data.select_dtypes(include=['object']).shape[1] > 0 else {}
+    }
+    return summary
