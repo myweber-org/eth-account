@@ -243,4 +243,105 @@ def clean_dataframe(df, remove_dups=True, fill_na=True, normalize=True):
     if normalize:
         cleaned_df = normalize_columns(cleaned_df)
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def load_data(filepath):
+    """Load dataset from CSV file."""
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        return None
+
+def remove_outliers(df, column, threshold=3):
+    """Remove outliers using Z-score method."""
+    if column not in df.columns:
+        print(f"Column '{column}' not found in dataframe.")
+        return df
+    
+    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+    filtered_df = df[z_scores < threshold]
+    removed_count = len(df) - len(filtered_df)
+    print(f"Removed {removed_count} outliers from column '{column}'.")
+    return filtered_df
+
+def normalize_column(df, column):
+    """Normalize column values to range [0,1]."""
+    if column not in df.columns:
+        print(f"Column '{column}' not found in dataframe.")
+        return df
+    
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        print(f"Column '{column}' has constant values. Skipping normalization.")
+        return df
+    
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    print(f"Column '{column}' normalized successfully.")
+    return df
+
+def clean_data(df, numeric_columns):
+    """Main data cleaning pipeline."""
+    if df is None or df.empty:
+        print("No data to clean.")
+        return df
+    
+    print("Starting data cleaning process...")
+    
+    # Remove duplicates
+    initial_count = len(df)
+    df = df.drop_duplicates()
+    duplicates_removed = initial_count - len(df)
+    print(f"Removed {duplicates_removed} duplicate rows.")
+    
+    # Handle missing values
+    for col in numeric_columns:
+        if col in df.columns:
+            missing_count = df[col].isnull().sum()
+            if missing_count > 0:
+                df[col].fillna(df[col].median(), inplace=True)
+                print(f"Filled {missing_count} missing values in column '{col}' with median.")
+    
+    # Remove outliers from numeric columns
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers(df, col)
+    
+    # Normalize numeric columns
+    for col in numeric_columns:
+        if col in df.columns:
+            df = normalize_column(df, col)
+    
+    print("Data cleaning completed.")
+    return df
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned data to CSV file."""
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to '{output_path}'")
+    except Exception as e:
+        print(f"Error saving data: {e}")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    # Define numeric columns for processing
+    numeric_cols = ['age', 'income', 'score']
+    
+    # Load data
+    data = load_data(input_file)
+    
+    if data is not None:
+        # Clean data
+        cleaned_data = clean_data(data, numeric_cols)
+        
+        # Save cleaned data
+        save_cleaned_data(cleaned_data, output_file)
