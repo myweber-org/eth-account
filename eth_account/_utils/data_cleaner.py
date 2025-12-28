@@ -465,3 +465,87 @@ def get_data_summary(data):
         'categorical_summary': data.select_dtypes(include=['object']).describe().to_dict() if data.select_dtypes(include=['object']).shape[1] > 0 else {}
     }
     return summary
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): The DataFrame to clean.
+    drop_duplicates (bool): If True, drop duplicate rows.
+    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'.
+    
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if fill_missing == 'drop':
+        df_clean = df_clean.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                fill_value = df_clean[col].mean()
+            else:
+                fill_value = df_clean[col].median()
+            df_clean[col].fillna(fill_value, inplace=True)
+    elif fill_missing == 'mode':
+        for col in df_clean.columns:
+            mode_value = df_clean[col].mode()
+            if not mode_value.empty:
+                df_clean[col].fillna(mode_value[0], inplace=True)
+    
+    return df_clean
+
+def validate_dataframe(df, check_nulls=True, check_types=True):
+    """
+    Validate a DataFrame for common data quality issues.
+    
+    Parameters:
+    df (pd.DataFrame): The DataFrame to validate.
+    check_nulls (bool): Check for null values.
+    check_types (bool): Check for consistent data types.
+    
+    Returns:
+    dict: A dictionary with validation results.
+    """
+    validation_results = {}
+    
+    if check_nulls:
+        null_counts = df.isnull().sum()
+        validation_results['null_counts'] = null_counts[null_counts > 0].to_dict()
+    
+    if check_types:
+        dtypes = df.dtypes.to_dict()
+        validation_results['dtypes'] = dtypes
+    
+    validation_results['shape'] = df.shape
+    validation_results['columns'] = list(df.columns)
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_dataframe(cleaned_df)
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
