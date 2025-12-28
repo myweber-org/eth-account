@@ -182,3 +182,98 @@ def clean_dataset(df, columns_to_clean):
             all_stats[column] = stats
     
     return cleaned_df, all_stats
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None):
+    """
+    Clean CSV data by handling missing values and standardizing columns.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Remove rows where all values are null
+        df = df.dropna(how='all')
+        
+        # Generate output path if not provided
+        if output_path is None:
+            input_file = Path(input_path)
+            output_path = input_file.parent / f"cleaned_{input_file.name}"
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        
+        print(f"Data cleaning completed. Cleaned file saved to: {output_path}")
+        print(f"Original shape: {df.shape[0]} rows, {df.shape[1]} columns")
+        
+        return df, output_path
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None, None
+    except pd.errors.EmptyDataError:
+        print(f"Error: File at {input_path} is empty")
+        return None, None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None, None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    """
+    if df is None or df.empty:
+        return False, "DataFrame is empty or None"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    # Check for excessive missing values
+    missing_percentage = df.isnull().sum().sum() / (df.shape[0] * df.shape[1])
+    if missing_percentage > 0.5:
+        return False, f"Excessive missing values: {missing_percentage:.1%}"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Charlie', None, 'Eve'],
+        'Age': [25, 30, None, 35, 40],
+        'Salary': [50000, 60000, 55000, None, 65000],
+        'Department': ['IT', 'HR', 'IT', 'Finance', None]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df, output_file = clean_csv_data('test_data.csv')
+    
+    if cleaned_df is not None:
+        is_valid, message = validate_dataframe(cleaned_df)
+        print(f"Validation: {is_valid} - {message}")
+        
+        # Clean up test file
+        import os
+        os.remove('test_data.csv')
+        if os.path.exists(output_file):
+            os.remove(output_file)
