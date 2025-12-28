@@ -549,3 +549,100 @@ if __name__ == "__main__":
     print("\nValidation Results:")
     for key, value in validation.items():
         print(f"{key}: {value}")
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        column_mapping (dict, optional): Dictionary mapping old column names to new ones
+        drop_duplicates (bool): Whether to remove duplicate rows
+        normalize_text (bool): Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    
+    return cleaned_df
+
+def remove_special_characters(text, keep_pattern=r'[a-zA-Z0-9\s]'):
+    """
+    Remove special characters from text, keeping only alphanumeric and spaces by default.
+    
+    Args:
+        text (str): Input text
+        keep_pattern (str): Regex pattern of characters to keep
+    
+    Returns:
+        str: Cleaned text
+    """
+    if pd.isna(text):
+        return text
+    
+    text = str(text)
+    return re.sub(f'[^{keep_pattern}]', '', text)
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    
+    Args:
+        email (str): Email address to validate
+    
+    Returns:
+        bool: True if email format is valid
+    """
+    if pd.isna(email):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email).strip()))
+
+def standardize_date(date_str, target_format='%Y-%m-%d'):
+    """
+    Attempt to standardize date strings to a common format.
+    
+    Args:
+        date_str (str): Date string in various formats
+        target_format (str): Target date format
+    
+    Returns:
+        str: Standardized date string or original if parsing fails
+    """
+    if pd.isna(date_str):
+        return date_str
+    
+    date_str = str(date_str).strip()
+    
+    common_formats = [
+        '%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y',
+        '%d-%m-%Y', '%m-%d-%Y', '%Y/%m/%d',
+        '%b %d, %Y', '%B %d, %Y', '%d %b %Y'
+    ]
+    
+    for fmt in common_formats:
+        try:
+            parsed_date = pd.to_datetime(date_str, format=fmt)
+            return parsed_date.strftime(target_format)
+        except (ValueError, TypeError):
+            continue
+    
+    try:
+        parsed_date = pd.to_datetime(date_str)
+        return parsed_date.strftime(target_format)
+    except (ValueError, TypeError):
+        return date_str
