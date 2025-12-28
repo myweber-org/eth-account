@@ -398,3 +398,116 @@ if __name__ == "__main__":
     normalized = normalize_column(cleaned_df, 'C', method='minmax')
     print("\nNormalized column C:")
     print(normalized)
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, fill_na_method='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): Columns to check for duplicates. 
+            If None, checks all columns. Defaults to None.
+        fill_na_method (str, optional): Method to fill missing values. 
+            Options: 'mean', 'median', 'mode', 'zero', or 'drop'. Defaults to 'mean'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove duplicates
+    if columns_to_check is None:
+        cleaned_df = cleaned_df.drop_duplicates()
+    else:
+        cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+    
+    # Handle missing values
+    if fill_na_method == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_na_method == 'zero':
+        cleaned_df = cleaned_df.fillna(0)
+    elif fill_na_method == 'mean':
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+    elif fill_na_method == 'median':
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+    elif fill_na_method == 'mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                mode_value = cleaned_df[col].mode()
+                if not mode_value.empty:
+                    cleaned_df[col] = cleaned_df[col].fillna(mode_value.iloc[0])
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of columns that must be present.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    # Check if input is a DataFrame
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Input is not a pandas DataFrame')
+        return validation_results
+    
+    # Check for empty DataFrame
+    if df.empty:
+        validation_results['warnings'].append('DataFrame is empty')
+    
+    # Check required columns
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    # Check for all NaN columns
+    nan_columns = df.columns[df.isna().all()].tolist()
+    if nan_columns:
+        validation_results['warnings'].append(f'Columns with all NaN values: {nan_columns}')
+    
+    return validation_results
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     sample_data = {
+#         'id': [1, 2, 2, 3, 4, 5],
+#         'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+#         'age': [25, 30, 30, None, 35, 40],
+#         'score': [85.5, 92.0, 92.0, 78.5, None, 95.0]
+#     }
+#     
+#     df = pd.DataFrame(sample_data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print("\n" + "="*50 + "\n")
+#     
+#     # Clean the data
+#     cleaned = clean_dataset(df, columns_to_check=['id', 'name'], fill_na_method='mean')
+#     print("Cleaned DataFrame:")
+#     print(cleaned)
+#     
+#     # Validate the cleaned data
+#     validation = validate_dataframe(cleaned, required_columns=['id', 'name', 'age', 'score'])
+#     print("\nValidation Results:")
+#     print(validation)
