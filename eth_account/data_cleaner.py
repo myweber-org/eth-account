@@ -344,4 +344,100 @@ def remove_duplicates(sequence):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (list or array-like): The dataset
+    column (int or str): Column index or name if data is structured
+    
+    Returns:
+    tuple: (cleaned_data, outliers_removed)
+    """
+    if isinstance(data, np.ndarray):
+        col_data = data[:, column] if data.ndim > 1 else data
+    else:
+        col_data = np.array(data)
+    
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    cleaned_data = col_data[mask]
+    outliers = col_data[~mask]
+    
+    return cleaned_data, outliers
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the dataset.
+    
+    Parameters:
+    data (array-like): Input data
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    data_array = np.array(data)
+    
+    stats = {
+        'mean': np.mean(data_array),
+        'median': np.median(data_array),
+        'std': np.std(data_array),
+        'min': np.min(data_array),
+        'max': np.max(data_array),
+        'count': len(data_array)
+    }
+    
+    return stats
+
+def validate_data(data, min_value=None, max_value=None):
+    """
+    Validate data against optional min and max constraints.
+    
+    Parameters:
+    data (array-like): Data to validate
+    min_value (float): Minimum allowed value
+    max_value (float): Maximum allowed value
+    
+    Returns:
+    bool: True if data passes validation
+    """
+    data_array = np.array(data)
+    
+    if min_value is not None and np.any(data_array < min_value):
+        return False
+    
+    if max_value is not None and np.any(data_array > max_value):
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = np.random.normal(100, 15, 1000)
+    
+    print("Original data statistics:")
+    original_stats = calculate_statistics(sample_data)
+    for key, value in original_stats.items():
+        print(f"{key}: {value:.2f}")
+    
+    cleaned_data, outliers = remove_outliers_iqr(sample_data, 0)
+    
+    print(f"\nRemoved {len(outliers)} outliers")
+    print(f"Cleaned data has {len(cleaned_data)} points")
+    
+    print("\nCleaned data statistics:")
+    cleaned_stats = calculate_statistics(cleaned_data)
+    for key, value in cleaned_stats.items():
+        print(f"{key}: {value:.2f}")
+    
+    is_valid = validate_data(cleaned_data, min_value=0, max_value=200)
+    print(f"\nData validation result: {is_valid}")
