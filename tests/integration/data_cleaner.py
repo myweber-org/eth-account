@@ -34,3 +34,11 @@ def validate_dataframe(df):
         if not check(df):
             raise ValueError(message)
     return True
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
