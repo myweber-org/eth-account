@@ -1,36 +1,48 @@
-import csv
-import sys
+import pandas as pd
 
-def clean_csv(input_file, output_file):
-    try:
-        with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-            reader = csv.reader(infile)
-            rows = list(reader)
-        
-        cleaned_rows = []
-        for row in rows:
-            cleaned_row = [cell.strip() for cell in row]
-            cleaned_rows.append(cleaned_row)
-        
-        with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.writer(outfile)
-            writer.writerows(cleaned_rows)
-        
-        print(f"Cleaned data saved to {output_file}")
-        return True
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing numeric values with column mean.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
     
-    except FileNotFoundError:
-        print(f"Error: Input file '{input_file}' not found.")
-        return False
-    except Exception as e:
-        print(f"Error: {e}")
-        return False
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(
+        df_cleaned[numeric_cols].mean()
+    )
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that DataFrame contains all required columns.
+    """
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"Missing required columns: {missing_cols}")
+    return True
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
-        print("Usage: python data_cleaner.py <input_file> <output_file>")
-        sys.exit(1)
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, None, 15.2, 20.1, None],
+        'category': ['A', 'B', 'B', 'A', 'C']
+    }
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    clean_csv(input_file, output_file)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_data(cleaned_df, ['id', 'value'])
+        print("\nData validation passed")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
