@@ -817,4 +817,49 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned_df)
     print("\nValidation after cleaning:")
-    print(validate_dataframe(cleaned_df))
+    print(validate_dataframe(cleaned_df))import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                median_val = df[col].median()
+                df[col] = df[col].fillna(median_val)
+                print(f"Filled missing values in {col} with median: {median_val}")
+
+        # Remove rows where critical columns are still null
+        critical_cols = ['id', 'timestamp']
+        existing_critical = [col for col in critical_cols if col in df.columns]
+        if existing_critical:
+            df = df.dropna(subset=existing_critical)
+            print(f"After dropping rows with null critical columns: {df.shape}")
+
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        return True
+
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    clean_data("raw_data.csv", "cleaned_data.csv")
