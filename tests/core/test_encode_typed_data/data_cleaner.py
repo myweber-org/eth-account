@@ -39,4 +39,65 @@ def clean_dataset(input_file, output_file):
 if __name__ == "__main__":
     input_path = "raw_data.csv"
     output_path = "cleaned_data.csv"
-    cleaned_df = clean_dataset(input_path, output_path)
+    cleaned_df = clean_dataset(input_path, output_path)import pandas as pd
+
+def clean_dataframe(df, drop_na=True, rename_columns=True):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing column names.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_na (bool): Whether to drop rows with any null values. Default is True.
+        rename_columns (bool): Whether to rename columns to lowercase with underscores. Default is True.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna()
+    
+    if rename_columns:
+        cleaned_df.columns = [col.lower().replace(' ', '_') for col in cleaned_df.columns]
+    
+    return cleaned_df
+
+def filter_by_threshold(df, column, threshold):
+    """
+    Filter DataFrame rows where the specified column value is above a threshold.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to apply threshold on.
+        threshold (float): Threshold value.
+    
+    Returns:
+        pd.DataFrame: Filtered DataFrame.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    return df[df[column] > threshold].copy()
+
+def main():
+    sample_data = {
+        'Product Name': ['A', 'B', 'C', None],
+        'Price': [100, 200, None, 400],
+        'Quantity': [10, 20, 30, 40]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    filtered = filter_by_threshold(cleaned, 'price', 150)
+    print("\nFiltered DataFrame (price > 150):")
+    print(filtered)
+
+if __name__ == "__main__":
+    main()
