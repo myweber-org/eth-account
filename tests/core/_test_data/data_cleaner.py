@@ -25,18 +25,18 @@ def remove_outliers_iqr(df, column):
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    return filtered_df
+    return filtered_df.reset_index(drop=True)
 
-def calculate_basic_stats(df, column):
+def calculate_summary_stats(df, column):
     """
-    Calculate basic statistics for a column after outlier removal.
+    Calculate summary statistics for a column after outlier removal.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
     column (str): Column name to analyze
     
     Returns:
-    dict: Dictionary containing statistical measures
+    dict: Dictionary containing summary statistics
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -52,53 +52,30 @@ def calculate_basic_stats(df, column):
     
     return stats
 
-def clean_dataset(df, columns_to_clean=None):
+def example_usage():
     """
-    Clean multiple columns in a DataFrame by removing outliers.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean. If None, clean all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each cleaned column
+    Example usage of the data cleaning functions.
     """
-    if columns_to_clean is None:
-        columns_to_clean = df.select_dtypes(include=[np.number]).columns.tolist()
+    np.random.seed(42)
     
-    cleaned_df = df.copy()
-    stats_dict = {}
-    
-    for column in columns_to_clean:
-        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            stats_dict[column] = {
-                'stats': calculate_basic_stats(cleaned_df, column),
-                'removed_outliers': removed_count
-            }
-    
-    return cleaned_df, stats_dict
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
+    data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100)
     }
     
-    df = pd.DataFrame(sample_data)
-    df.loc[::100, 'A'] = 500
+    df = pd.DataFrame(data)
     
     print("Original DataFrame shape:", df.shape)
-    print("\nOriginal statistics for column 'A':")
-    print(calculate_basic_stats(df, 'A'))
+    print("Original summary statistics:")
+    print(calculate_summary_stats(df, 'value'))
     
-    cleaned_df, stats = clean_dataset(df, ['A'])
+    cleaned_df = remove_outliers_iqr(df, 'value')
     
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("\nCleaned statistics for column 'A':")
-    print(stats['A']['stats'])
-    print(f"Removed outliers: {stats['A']['removed_outliers']}")
+    print("Cleaned summary statistics:")
+    print(calculate_summary_stats(cleaned_df, 'value'))
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    cleaned_data = example_usage()
