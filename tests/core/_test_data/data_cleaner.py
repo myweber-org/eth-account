@@ -78,4 +78,68 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    cleaned_data = example_usage()import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate rows.")
+    
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        if fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+        elif fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+        else:
+            raise ValueError("Invalid fill_missing method. Choose from 'mean', 'median', 'mode', or 'drop'.")
+    
+    print(f"Dataset cleaned. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the dataset structure and content.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.shape[0] < min_rows:
+        raise ValueError(f"Dataset must have at least {min_rows} rows.")
+    
+    if df.empty:
+        raise ValueError("Dataset is empty.")
+    
+    print("Data validation passed.")
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, np.nan],
+        'B': [5, np.nan, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, fill_missing='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    validate_data(cleaned, required_columns=['A', 'B', 'C'])
