@@ -752,3 +752,69 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text.
+    """
+    # Create a copy to avoid modifying the original
+    df_clean = df.copy()
+    
+    # Fill numeric nulls with column median
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    
+    # Fill categorical nulls with 'Unknown'
+    categorical_cols = df_clean.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_clean[col].isnull().any():
+            df_clean[col] = df_clean[col].fillna('Unknown')
+    
+    # Standardize text columns: trim whitespace and convert to lowercase
+    for col in categorical_cols:
+        df_clean[col] = df_clean[col].str.strip().str.lower()
+    
+    # Remove duplicate rows
+    df_clean = df_clean.drop_duplicates()
+    
+    return df_clean
+
+def validate_dataframe(df):
+    """
+    Validate that DataFrame meets basic quality standards.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Eve  '],
+        'age': [25, None, 30, 35, 40],
+        'city': ['New York', 'los angeles', '  Chicago', 'Miami', None],
+        'score': [85.5, 92.0, None, 78.5, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation before cleaning:")
+    print(validate_dataframe(df))
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nValidation after cleaning:")
+    print(validate_dataframe(cleaned_df))
