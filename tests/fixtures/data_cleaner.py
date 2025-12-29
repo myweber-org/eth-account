@@ -531,3 +531,53 @@ def calculate_summary_statistics(data, column):
         'median': median_val,
         'std': std_val
     }
+import re
+import unicodedata
+
+def clean_text(text, remove_digits=False, remove_punctuation=False, normalize_unicode=True):
+    """
+    Clean and normalize a given text string.
+
+    Args:
+        text (str): The input text to clean.
+        remove_digits (bool): If True, remove all digits from the text.
+        remove_punctuation (bool): If True, remove all punctuation characters.
+        normalize_unicode (bool): If True, normalize unicode characters (e.g., convert accented characters).
+
+    Returns:
+        str: The cleaned text.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string.")
+
+    cleaned = text
+
+    if normalize_unicode:
+        cleaned = unicodedata.normalize('NFKD', cleaned)
+        cleaned = cleaned.encode('ascii', 'ignore').decode('ascii')
+
+    if remove_digits:
+        cleaned = re.sub(r'\d+', '', cleaned)
+
+    if remove_punctuation:
+        cleaned = re.sub(r'[^\w\s]', '', cleaned)
+
+    cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+    return cleaned
+
+def tokenize_text(text, lower_case=True):
+    """
+    Simple tokenization by splitting on whitespace.
+
+    Args:
+        text (str): The input text to tokenize.
+        lower_case (bool): If True, convert text to lowercase before tokenizing.
+
+    Returns:
+        list: A list of tokens.
+    """
+    if lower_case:
+        text = text.lower()
+    tokens = text.split()
+    return tokens
