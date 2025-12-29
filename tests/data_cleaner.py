@@ -1,223 +1,132 @@
-
 import pandas as pd
 import numpy as np
-from scipy import stats
 
-def remove_outliers_iqr(df, columns):
+def remove_missing_rows(df, columns=None):
     """
-    Remove outliers using IQR method for specified columns.
-    Returns cleaned DataFrame and outlier indices.
-    """
-    df_clean = df.copy()
-    outlier_indices = []
+    Remove rows with missing values from DataFrame.
     
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to check for missing values.
+                                 If None, checks all columns.
+    
+    Returns:
+        pd.DataFrame: DataFrame with rows containing missing values removed
+    """
+    if columns is None:
+        return df.dropna()
+    else:
+        return df.dropna(subset=columns)
+
+def fill_missing_with_mean(df, columns):
+    """
+    Fill missing values in specified columns with column mean.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to fill
+    
+    Returns:
+        pd.DataFrame: DataFrame with missing values filled
+    """
+    df_filled = df.copy()
     for col in columns:
         if col in df.columns:
-            Q1 = df_clean[col].quantile(0.25)
-            Q3 = df_clean[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            
-            outliers = df_clean[(df_clean[col] < lower_bound) | (df_clean[col] > upper_bound)]
-            outlier_indices.extend(outliers.index.tolist())
-            
-            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-    
-    outlier_indices = list(set(outlier_indices))
-    return df_clean, outlier_indices
+            df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
+    return df_filled
 
-def remove_outliers_zscore(df, columns, threshold=3):
+def detect_outliers_iqr(df, column):
     """
-    Remove outliers using Z-score method.
-    Returns cleaned DataFrame and outlier indices.
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to check for outliers
+    
+    Returns:
+        pd.DataFrame: DataFrame containing only outlier rows
     """
-    df_clean = df.copy()
-    outlier_indices = []
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    for col in columns:
-        if col in df.columns:
-            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
-            outliers = df_clean[z_scores > threshold]
-            outlier_indices.extend(outliers.index.tolist())
-            
-            df_clean = df_clean[z_scores <= threshold]
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    outlier_indices = list(set(outlier_indices))
-    return df_clean, outlier_indices
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
 
-def normalize_minmax(df, columns):
+def remove_outliers_iqr(df, column):
     """
-    Normalize specified columns using Min-Max scaling.
-    Returns DataFrame with normalized columns.
+    Remove outliers using Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to remove outliers from
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_column(df, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to normalize
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     df_normalized = df.copy()
+    min_val = df_normalized[column].min()
+    max_val = df_normalized[column].max()
     
-    for col in columns:
-        if col in df.columns:
-            min_val = df_normalized[col].min()
-            max_val = df_normalized[col].max()
-            
-            if max_val != min_val:
-                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
-            else:
-                df_normalized[col] = 0
+    if max_val != min_val:
+        df_normalized[column] = (df_normalized[column] - min_val) / (max_val - min_val)
     
     return df_normalized
 
-def normalize_zscore(df, columns):
+def get_column_stats(df, column):
     """
-    Normalize specified columns using Z-score standardization.
-    Returns DataFrame with standardized columns.
-    """
-    df_standardized = df.copy()
-    
-    for col in columns:
-        if col in df.columns:
-            mean_val = df_standardized[col].mean()
-            std_val = df_standardized[col].std()
-            
-            if std_val != 0:
-                df_standardized[col] = (df_standardized[col] - mean_val) / std_val
-            else:
-                df_standardized[col] = 0
-    
-    return df_standardized
-
-def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
-    """
-    Main function to clean dataset by removing outliers and normalizing.
-    """
-    if outlier_method == 'iqr':
-        df_clean, outliers = remove_outliers_iqr(df, numeric_columns)
-    elif outlier_method == 'zscore':
-        df_clean, outliers = remove_outliers_zscore(df, numeric_columns)
-    else:
-        df_clean, outliers = df.copy(), []
-    
-    if normalize_method == 'minmax':
-        df_final = normalize_minmax(df_clean, numeric_columns)
-    elif normalize_method == 'zscore':
-        df_final = normalize_zscore(df_clean, numeric_columns)
-    else:
-        df_final = df_clean
-    
-    return df_final, outliers
-
-def validate_data(df, numeric_columns):
-    """
-    Validate data by checking for missing values and data types.
-    Returns validation report.
-    """
-    report = {
-        'missing_values': df[numeric_columns].isnull().sum().to_dict(),
-        'data_types': df[numeric_columns].dtypes.to_dict(),
-        'basic_stats': df[numeric_columns].describe().to_dict()
-    }
-    
-    return report
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'feature1': [1, 2, 3, 4, 5, 100],
-        'feature2': [10, 20, 30, 40, 50, 200],
-        'category': ['A', 'B', 'A', 'B', 'A', 'B']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    numeric_cols = ['feature1', 'feature2']
-    
-    print("Original DataFrame:")
-    print(df)
-    print("\n" + "="*50)
-    
-    validation_report = validate_data(df, numeric_cols)
-    print("Validation Report:")
-    print(f"Missing values: {validation_report['missing_values']}")
-    
-    cleaned_df, removed_outliers = clean_dataset(
-        df, 
-        numeric_cols, 
-        outlier_method='iqr', 
-        normalize_method='minmax'
-    )
-    
-    print(f"\nRemoved {len(removed_outliers)} outliers at indices: {removed_outliers}")
-    print("\nCleaned and Normalized DataFrame:")
-    print(cleaned_df)
-import numpy as np
-
-def remove_outliers_iqr(data, column):
-    """
-    Remove outliers from a specified column using the IQR method.
+    Get basic statistics for a column.
     
     Args:
-        data (np.ndarray): Input data array
-        column (int): Column index to process
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
     
     Returns:
-        np.ndarray: Data with outliers removed
+        dict: Dictionary containing column statistics
     """
-    if not isinstance(data, np.ndarray):
-        raise TypeError("Input data must be a numpy array")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if column >= data.shape[1]:
-        raise IndexError("Column index out of bounds")
-    
-    col_data = data[:, column]
-    
-    q1 = np.percentile(col_data, 25)
-    q3 = np.percentile(col_data, 75)
-    iqr = q3 - q1
-    
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    
-    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
-    
-    return data[mask]
-
-def calculate_statistics(data):
-    """
-    Calculate basic statistics for the data.
-    
-    Args:
-        data (np.ndarray): Input data array
-    
-    Returns:
-        dict: Dictionary containing statistics
-    """
     stats = {
-        'mean': np.mean(data, axis=0),
-        'median': np.median(data, axis=0),
-        'std': np.std(data, axis=0),
-        'min': np.min(data, axis=0),
-        'max': np.max(data, axis=0)
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
     return stats
-
-def normalize_data(data, method='minmax'):
-    """
-    Normalize data using specified method.
-    
-    Args:
-        data (np.ndarray): Input data array
-        method (str): Normalization method ('minmax' or 'zscore')
-    
-    Returns:
-        np.ndarray: Normalized data
-    """
-    if method == 'minmax':
-        data_min = np.min(data, axis=0)
-        data_max = np.max(data, axis=0)
-        return (data - data_min) / (data_max - data_min + 1e-8)
-    
-    elif method == 'zscore':
-        mean = np.mean(data, axis=0)
-        std = np.std(data, axis=0)
-        return (data - mean) / (std + 1e-8)
-    
-    else:
-        raise ValueError("Method must be 'minmax' or 'zscore'")
