@@ -617,3 +617,11 @@ def validate_data(df, required_columns=None, allow_nan=True, max_nan_ratio=0.1):
                 return False, f"Column '{column}' has {nan_ratio:.1%} NaN values (max allowed: {max_nan_ratio:.1%})"
     
     return True, "Data validation passed"
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
