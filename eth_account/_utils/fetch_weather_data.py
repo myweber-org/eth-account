@@ -85,3 +85,95 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import json
+from datetime import datetime
+import logging
+
+class WeatherFetcher:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
+        self.logger = self._setup_logger()
+
+    def _setup_logger(self):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return logger
+
+    def get_weather(self, city_name):
+        try:
+            params = {
+                'q': city_name,
+                'appid': self.api_key,
+                'units': 'metric'
+            }
+            response = requests.get(self.base_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            return self._parse_weather_data(data)
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Request failed for {city_name}: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Invalid JSON response for {city_name}: {e}")
+            return None
+        except KeyError as e:
+            self.logger.error(f"Unexpected data structure for {city_name}: {e}")
+            return None
+
+    def _parse_weather_data(self, data):
+        weather_info = {
+            'city': data['name'],
+            'country': data['sys']['country'],
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'pressure': data['main']['pressure'],
+            'weather': data['weather'][0]['main'],
+            'description': data['weather'][0]['description'],
+            'wind_speed': data['wind']['speed'],
+            'timestamp': datetime.fromtimestamp(data['dt']).isoformat(),
+            'sunrise': datetime.fromtimestamp(data['sys']['sunrise']).isoformat(),
+            'sunset': datetime.fromtimestamp(data['sys']['sunset']).isoformat()
+        }
+        return weather_info
+
+    def save_to_file(self, weather_data, filename):
+        if weather_data:
+            try:
+                with open(filename, 'w') as f:
+                    json.dump(weather_data, f, indent=2)
+                self.logger.info(f"Weather data saved to {filename}")
+                return True
+            except IOError as e:
+                self.logger.error(f"Failed to save to {filename}: {e}")
+                return False
+        return False
+
+def main():
+    API_KEY = "your_api_key_here"
+    fetcher = WeatherFetcher(API_KEY)
+    
+    cities = ["London", "New York", "Tokyo", "Paris", "Sydney"]
+    
+    for city in cities:
+        print(f"\nFetching weather for {city}...")
+        weather = fetcher.get_weather(city)
+        if weather:
+            print(f"Temperature in {weather['city']}, {weather['country']}: {weather['temperature']}°C")
+            print(f"Weather: {weather['weather']} ({weather['description']})")
+            print(f"Humidity: {weather['humidity']}%")
+            print(f"Wind Speed: {weather['wind_speed']} m/s")
+            
+            filename = f"weather_{city.lower().replace(' ', '_')}.json"
+            fetcher.save_to_file(weather, filename)
+        else:
+            print(f"Failed to fetch weather data for {city}")
+
+if __name__ == "__main__":
+    main()
