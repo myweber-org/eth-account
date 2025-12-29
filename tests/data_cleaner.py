@@ -146,3 +146,78 @@ if __name__ == "__main__":
     print(f"\nRemoved {len(removed_outliers)} outliers at indices: {removed_outliers}")
     print("\nCleaned and Normalized DataFrame:")
     print(cleaned_df)
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Args:
+        data (np.ndarray): Input data array
+        column (int): Column index to process
+    
+    Returns:
+        np.ndarray: Data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
+    
+    col_data = data[:, column]
+    
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    
+    return data[mask]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the data.
+    
+    Args:
+        data (np.ndarray): Input data array
+    
+    Returns:
+        dict: Dictionary containing statistics
+    """
+    stats = {
+        'mean': np.mean(data, axis=0),
+        'median': np.median(data, axis=0),
+        'std': np.std(data, axis=0),
+        'min': np.min(data, axis=0),
+        'max': np.max(data, axis=0)
+    }
+    
+    return stats
+
+def normalize_data(data, method='minmax'):
+    """
+    Normalize data using specified method.
+    
+    Args:
+        data (np.ndarray): Input data array
+        method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        np.ndarray: Normalized data
+    """
+    if method == 'minmax':
+        data_min = np.min(data, axis=0)
+        data_max = np.max(data, axis=0)
+        return (data - data_min) / (data_max - data_min + 1e-8)
+    
+    elif method == 'zscore':
+        mean = np.mean(data, axis=0)
+        std = np.std(data, axis=0)
+        return (data - mean) / (std + 1e-8)
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
