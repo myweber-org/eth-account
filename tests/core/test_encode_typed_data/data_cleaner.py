@@ -1,59 +1,42 @@
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def clean_dataset(df):
-    """
-    Clean a pandas DataFrame by removing null values and duplicates.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to be cleaned.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
-    """
-    # Remove rows with any null values
-    df_cleaned = df.dropna()
-    
-    # Remove duplicate rows
-    df_cleaned = df_cleaned.drop_duplicates()
-    
-    # Reset index after cleaning
-    df_cleaned = df_cleaned.reset_index(drop=True)
-    
-    return df_cleaned
+def load_data(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
 
-def clean_dataset_columns(df, columns_to_clean):
-    """
-    Clean specific columns in a pandas DataFrame.
+def remove_outliers_iqr(df, column):
+    """Remove outliers using IQR method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_column(df, column):
+    """Normalize column using min-max scaling."""
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(input_file, output_file):
+    """Main function to clean dataset."""
+    df = load_data(input_file)
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        columns_to_clean (list): List of column names to clean.
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
     
-    Returns:
-        pd.DataFrame: DataFrame with cleaned columns.
-    """
-    df_cleaned = df.copy()
+    for col in numeric_columns:
+        df = remove_outliers_iqr(df, col)
+        df = normalize_column(df, col)
     
-    for column in columns_to_clean:
-        if column in df_cleaned.columns:
-            # Remove null values in specific column
-            df_cleaned = df_cleaned[df_cleaned[column].notna()]
-    
-    return df_cleaned
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    return df
 
 if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'name': ['Alice', 'Bob', 'Charlie', None, 'Alice'],
-        'age': [25, 30, None, 40, 25],
-        'city': ['NYC', 'LA', 'Chicago', 'Miami', 'NYC']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n")
-    
-    cleaned_df = clean_dataset(df)
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
+    input_path = "raw_data.csv"
+    output_path = "cleaned_data.csv"
+    cleaned_df = clean_dataset(input_path, output_path)
