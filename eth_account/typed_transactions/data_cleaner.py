@@ -1,59 +1,53 @@
 import pandas as pd
 import numpy as np
+import sys
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-
-    def handle_missing_values(self, strategy='drop', fill_value=None):
-        if strategy == 'drop':
-            self.df = self.df.dropna()
-        elif strategy == 'fill':
-            if fill_value is not None:
-                self.df = self.df.fillna(fill_value)
-            else:
-                for col in self.df.select_dtypes(include=[np.number]).columns:
-                    self.df[col] = self.df[col].fillna(self.df[col].median())
-                for col in self.df.select_dtypes(exclude=[np.number]).columns:
-                    self.df[col] = self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else 'Unknown')
-        return self
-
-    def remove_duplicates(self, subset=None, keep='first'):
-        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
-        return self
-
-    def normalize_text_columns(self, columns):
-        for col in columns:
-            if col in self.df.columns:
-                self.df[col] = self.df[col].astype(str).str.lower().str.strip()
-        return self
-
-    def get_cleaned_data(self):
-        return self.df
-
-    def get_cleaning_report(self):
-        final_shape = self.df.shape
-        rows_removed = self.original_shape[0] - final_shape[0]
-        cols_removed = self.original_shape[1] - final_shape[1]
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing duplicates, handling missing values,
+    and converting data types.
+    """
+    try:
+        df = pd.read_csv(input_file)
         
-        report = {
-            'original_rows': self.original_shape[0],
-            'original_columns': self.original_shape[1],
-            'final_rows': final_shape[0],
-            'final_columns': final_shape[1],
-            'rows_removed': rows_removed,
-            'columns_removed': cols_removed,
-            'missing_values': self.df.isnull().sum().sum(),
-            'duplicates': self.df.duplicated().sum()
-        }
-        return report
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Original rows: {len(pd.read_csv(input_file))}, Cleaned rows: {len(df)}")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        sys.exit(1)
 
-def clean_dataset(df, missing_strategy='fill', remove_duplicates=True):
-    cleaner = DataCleaner(df)
-    cleaner.handle_missing_values(strategy=missing_strategy)
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv>")
+        sys.exit(1)
     
-    if remove_duplicates:
-        cleaner.remove_duplicates()
-    
-    return cleaner.get_cleaned_data(), cleaner.get_cleaning_report()
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_csv(input_file, output_file)
