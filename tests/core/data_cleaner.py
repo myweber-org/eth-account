@@ -381,3 +381,59 @@ if __name__ == "__main__":
     output_file = sys.argv[2] if len(sys.argv) > 2 else None
     
     remove_duplicates(input_file, output_file)
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary to rename columns (old_name: new_name)
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in df_clean.select_dtypes(include=['object']).columns:
+            df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+    
+    return df_clean
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    
+    Args:
+        email: Email string to validate
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def remove_special_characters(text, keep_chars=''):
+    """
+    Remove special characters from text, keeping only alphanumeric and specified characters.
+    
+    Args:
+        text: Input text string
+        keep_chars: Additional characters to keep (e.g., ' _-')
+    
+    Returns:
+        Cleaned text string
+    """
+    pattern = f'[^a-zA-Z0-9{re.escape(keep_chars)}]'
+    return re.sub(pattern, '', str(text))
