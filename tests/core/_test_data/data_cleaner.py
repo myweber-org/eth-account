@@ -142,4 +142,51 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned)
     
-    validate_data(cleaned, required_columns=['A', 'B', 'C'])
+    validate_data(cleaned, required_columns=['A', 'B', 'C'])import pandas as pd
+import numpy as np
+import sys
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing duplicates, handling missing values,
+    and standardizing column names.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'unknown')
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Original rows: {len(pd.read_csv(input_file))}, Cleaned rows: {len(df)}")
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_csv(input_file, output_file)
