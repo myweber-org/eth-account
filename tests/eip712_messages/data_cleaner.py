@@ -1,60 +1,68 @@
 
 import pandas as pd
-import numpy as np
+import re
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def clean_dataframe(df, columns_to_clean=None):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'.
-                        Default is 'mean'.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    Clean a pandas DataFrame by removing duplicate rows and normalizing string columns.
     """
-    cleaned_df = df.copy()
+    df_clean = df.copy()
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    # Remove duplicate rows
+    initial_rows = df_clean.shape[0]
+    df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    removed_duplicates = initial_rows - df_clean.shape[0]
     
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
+    # Normalize specified string columns
+    if columns_to_clean is None:
+        # Automatically detect object/string columns
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    def normalize_string(text):
+        if pd.isna(text):
+            return text
+        # Convert to string, strip whitespace, and lowercase
+        text = str(text).strip().lower()
+        # Remove extra spaces
+        text = re.sub(r'\s+', ' ', text)
+        return text
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns:
+            df_clean[col] = df_clean[col].apply(normalize_string)
+    
+    return df_clean, removed_duplicates
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column and add a validation flag.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    df_validated = df.copy()
+    df_validated['email_valid'] = df_validated[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
+    )
+    
+    valid_count = df_validated['email_valid'].sum()
+    invalid_count = len(df_validated) - valid_count
+    
+    return df_validated, valid_count, invalid_count
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file in specified format.
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'json':
+        df.to_json(output_path, orient='records')
     else:
-        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
-            if cleaned_df[column].isnull().any():
-                if fill_missing == 'mean':
-                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
-                elif fill_missing == 'median':
-                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
-                elif fill_missing == 'mode':
-                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+        raise ValueError(f"Unsupported format: {format}. Use 'csv', 'excel', or 'json'.")
     
-    return cleaned_df
-
-def validate_data(df, required_columns=None, min_rows=1):
-    """
-    Validate the structure and content of a DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    min_rows (int): Minimum number of rows required.
-    
-    Returns:
-    tuple: (is_valid, message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if len(df) < min_rows:
-        return False, f"DataFrame has fewer than {min_rows} rows"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "Data validation passed"
+    return output_path
