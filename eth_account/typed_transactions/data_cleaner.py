@@ -272,4 +272,83 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nStatistics for column A:")
     for key, value in stats['A'].items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import csv
+import re
+
+def clean_csv(input_file, output_file):
+    """
+    Clean a CSV file by removing rows with missing values,
+    stripping whitespace from string fields, and converting
+    numeric strings to appropriate types.
+    """
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            # Skip rows with any empty values
+            if any(value is None or str(value).strip() == '' for value in row.values()):
+                continue
+            
+            cleaned_row = {}
+            for key, value in row.items():
+                # Strip whitespace from string fields
+                if isinstance(value, str):
+                    cleaned_value = value.strip()
+                    
+                    # Convert numeric strings to appropriate types
+                    if re.match(r'^-?\d+$', cleaned_value):
+                        cleaned_value = int(cleaned_value)
+                    elif re.match(r'^-?\d+\.\d+$', cleaned_value):
+                        cleaned_value = float(cleaned_value)
+                    
+                    cleaned_row[key] = cleaned_value
+                else:
+                    cleaned_row[key] = value
+            
+            cleaned_rows.append(cleaned_row)
+    
+    # Write cleaned data to output file
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+    
+    return len(cleaned_rows)
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    Returns True if valid, False otherwise.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(input_file, output_file, key_columns):
+    """
+    Remove duplicate rows from CSV based on specified key columns.
+    """
+    seen = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            # Create a tuple of key column values
+            key_tuple = tuple(str(row[col]) for col in key_columns)
+            
+            if key_tuple not in seen:
+                seen.add(key_tuple)
+                unique_rows.append(row)
+    
+    # Write unique data to output file
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(unique_rows)
+    
+    return len(unique_rows)
