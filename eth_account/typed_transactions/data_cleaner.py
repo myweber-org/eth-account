@@ -258,3 +258,69 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned_df.shape)
     print("Cleaned data statistics:")
     print(cleaned_df.describe())
+def remove_duplicates(data_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    
+    Args:
+        data_list (list): Input list potentially containing duplicates.
+    
+    Returns:
+        list: List with duplicates removed.
+    
+    Examples:
+        >>> remove_duplicates([1, 2, 2, 3, 1])
+        [1, 2, 3]
+        >>> remove_duplicates(['a', 'b', 'a', 'c'])
+        ['a', 'b', 'c']
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to numbers and handling invalid values.
+    
+    Args:
+        values (list): List of values to clean.
+        default (int/float): Default value for invalid entries.
+    
+    Returns:
+        list: Cleaned list of numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        try:
+            if isinstance(value, str):
+                # Try to convert string to float, then to int if possible
+                num = float(value)
+                if num.is_integer():
+                    cleaned.append(int(num))
+                else:
+                    cleaned.append(num)
+            elif isinstance(value, (int, float)):
+                cleaned.append(value)
+            else:
+                cleaned.append(default)
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    
+    return cleaned
+
+if __name__ == "__main__":
+    # Test the functions
+    test_data = [1, 2, 2, 3, 1, 4, 2]
+    print(f"Original: {test_data}")
+    print(f"Cleaned: {remove_duplicates(test_data)}")
+    
+    mixed_data = ["5", "3.14", "invalid", 7, "2.5", None]
+    print(f"\nMixed data: {mixed_data}")
+    print(f"Cleaned numeric: {clean_numeric_data(mixed_data)}")
