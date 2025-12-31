@@ -137,4 +137,61 @@ def remove_outliers_iqr(df, columns=None, multiplier=1.5):
     removed = initial_count - len(df_clean)
     print(f"Removed {removed} outliers using IQR method")
     
-    return df_clean
+    return df_cleanimport numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_minmax(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return dataframe[column].apply(lambda x: 0.5)
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(dataframe, column):
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    if std_val == 0:
+        return dataframe[column].apply(lambda x: 0)
+    standardized = (dataframe[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(dataframe, strategy='mean'):
+    df_filled = dataframe.copy()
+    numeric_cols = df_filled.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if df_filled[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_filled[col].mean()
+            elif strategy == 'median':
+                fill_value = df_filled[col].median()
+            elif strategy == 'mode':
+                fill_value = df_filled[col].mode()[0]
+            else:
+                fill_value = 0
+            df_filled[col].fillna(fill_value, inplace=True)
+    
+    return df_filled
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 50),
+        'feature_b': np.random.exponential(scale=2.0, size=50),
+        'feature_c': np.random.randint(1, 100, 50)
+    }
+    df = pd.DataFrame(data)
+    df.iloc[5, 0] = np.nan
+    df.iloc[10, 1] = np.nan
+    df.iloc[15, 2] = np.nan
+    return df
