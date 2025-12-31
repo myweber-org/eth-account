@@ -1,62 +1,36 @@
 
 import os
 import shutil
-
-def organize_files(directory):
-    if not os.path.exists(directory):
-        print(f"Directory {directory} does not exist.")
-        return
-
-    for filename in os.listdir(directory):
-        file_path = os.path.join(directory, filename)
-
-        if os.path.isfile(file_path):
-            file_extension = filename.split('.')[-1] if '.' in filename else 'no_extension'
-            target_folder = os.path.join(directory, file_extension)
-
-            if not os.path.exists(target_folder):
-                os.makedirs(target_folder)
-
-            shutil.move(file_path, os.path.join(target_folder, filename))
-            print(f"Moved {filename} to {target_folder}/")
-
-if __name__ == "__main__":
-    target_directory = input("Enter the directory path to organize: ")
-    organize_files(target_directory)
-import os
-import shutil
 from pathlib import Path
 
-def organize_files(directory):
+def organize_files(directory_path):
     """
-    Organize files in the given directory by moving them into folders
+    Organizes files in the given directory by moving them into subfolders
     based on their file extensions.
     """
-    if not os.path.isdir(directory):
-        print(f"Error: {directory} is not a valid directory.")
+    if not os.path.isdir(directory_path):
+        print(f"Error: The path '{directory_path}' is not a valid directory.")
         return
 
-    for item in os.listdir(directory):
-        item_path = os.path.join(directory, item)
-        
-        if os.path.isfile(item_path):
-            file_extension = Path(item).suffix.lower()
-            
-            if file_extension:
-                folder_name = file_extension[1:] + "_files"
+    path = Path(directory_path)
+
+    for item in path.iterdir():
+        if item.is_file():
+            file_extension = item.suffix.lower()
+            if not file_extension:
+                folder_name = "no_extension"
             else:
-                folder_name = "no_extension_files"
-            
-            target_folder = os.path.join(directory, folder_name)
-            os.makedirs(target_folder, exist_ok=True)
-            
+                folder_name = file_extension[1:] + "_files"
+
+            target_folder = path / folder_name
+            target_folder.mkdir(exist_ok=True)
+
             try:
-                shutil.move(item_path, os.path.join(target_folder, item))
-                print(f"Moved: {item} -> {folder_name}/")
+                shutil.move(str(item), str(target_folder / item.name))
+                print(f"Moved: {item.name} -> {folder_name}/")
             except Exception as e:
-                print(f"Failed to move {item}: {e}")
+                print(f"Failed to move {item.name}: {e}")
 
 if __name__ == "__main__":
-    target_directory = input("Enter directory path to organize: ").strip()
+    target_directory = input("Enter the directory path to organize: ").strip()
     organize_files(target_directory)
-    print("File organization complete.")
