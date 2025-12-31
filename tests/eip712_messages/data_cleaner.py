@@ -169,3 +169,112 @@ if __name__ == "__main__":
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> pd.DataFrame:
+        """
+        Remove duplicate rows from the DataFrame.
+        
+        Args:
+            subset: List of column names to consider for identifying duplicates.
+            keep: Which duplicates to keep - 'first', 'last', or False.
+            
+        Returns:
+            Cleaned DataFrame with duplicates removed.
+        """
+        cleaned_df = self.df.drop_duplicates(subset=subset, keep=keep)
+        removed_count = len(self.df) - len(cleaned_df)
+        
+        if removed_count > 0:
+            print(f"Removed {removed_count} duplicate rows.")
+            print(f"Original shape: {self.original_shape}")
+            print(f"New shape: {cleaned_df.shape}")
+        
+        return cleaned_df
+    
+    def remove_nulls(self, threshold: float = 0.5, axis: int = 0) -> pd.DataFrame:
+        """
+        Remove rows or columns with null values above a threshold.
+        
+        Args:
+            threshold: Proportion of nulls allowed (0 to 1).
+            axis: 0 for rows, 1 for columns.
+            
+        Returns:
+            DataFrame with null-heavy rows/columns removed.
+        """
+        if axis == 0:
+            mask = self.df.isnull().mean(axis=1) <= threshold
+            cleaned_df = self.df[mask]
+        else:
+            mask = self.df.isnull().mean(axis=0) <= threshold
+            cleaned_df = self.df.loc[:, mask]
+        
+        return cleaned_df
+    
+    def normalize_text(self, column: str) -> pd.DataFrame:
+        """
+        Normalize text in a specified column.
+        
+        Args:
+            column: Name of the column containing text.
+            
+        Returns:
+            DataFrame with normalized text column.
+        """
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame.")
+        
+        self.df[column] = self.df[column].astype(str).str.lower().str.strip()
+        return self.df
+
+def clean_dataset(file_path: str, output_path: str) -> None:
+    """
+    Complete data cleaning pipeline for a CSV file.
+    
+    Args:
+        file_path: Path to input CSV file.
+        output_path: Path to save cleaned CSV file.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        cleaner = DataCleaner(df)
+        
+        cleaned_df = cleaner.remove_duplicates()
+        cleaned_df = cleaner.remove_nulls(threshold=0.3)
+        
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df = cleaner.normalize_text(col)
+        
+        cleaned_df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'name': ['John', 'Jane', 'Jane', 'Bob', 'Alice'],
+        'value': [10, 20, 20, 30, None],
+        'notes': ['  TEST  ', 'example', 'EXAMPLE', 'demo', 'Demo']
+    })
+    
+    cleaner = DataCleaner(sample_data)
+    result = cleaner.remove_duplicates()
+    result = cleaner.normalize_text('notes')
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nCleaned data:")
+    print(result)
