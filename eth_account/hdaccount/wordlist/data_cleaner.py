@@ -111,4 +111,116 @@ def remove_duplicates_preserve_order(sequence):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from dataset
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using z-score standardization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in dataset
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_filled = data.copy()
+    
+    for col in columns:
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'ffill':
+                data_filled[col] = data[col].fillna(method='ffill')
+                continue
+            elif strategy == 'bfill':
+                data_filled[col] = data[col].fillna(method='bfill')
+                continue
+            else:
+                fill_value = 0
+            
+            data_filled[col] = data[col].fillna(fill_value)
+    
+    return data_filled
+
+def get_data_summary(data):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'shape': data.shape,
+        'columns': list(data.columns),
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'unique_counts': {col: data[col].nunique() for col in data.columns},
+        'basic_stats': data.describe().to_dict()
+    }
+    return summary
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, 
+                  missing_strategy='mean', outlier_threshold=1.5):
+    """
+    Complete dataset cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    # Remove outliers if specified
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = remove_outliers(cleaned_data, col, outlier_threshold)
+    
+    # Normalize columns if specified
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data[col + '_normalized'] = normalize_zscore(cleaned_data, col)
+    
+    return cleaned_data
