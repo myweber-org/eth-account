@@ -63,3 +63,134 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def z_score_normalize(dataframe, columns):
+    """
+    Apply Z-score normalization to specified columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: List of column names to normalize
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in result_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if result_df[col].dtype in [np.float64, np.int64]:
+            mean_val = result_df[col].mean()
+            std_val = result_df[col].std()
+            
+            if std_val > 0:
+                result_df[col] = (result_df[col] - mean_val) / std_val
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def min_max_normalize(dataframe, columns, feature_range=(0, 1)):
+    """
+    Apply Min-Max normalization to specified columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: List of column names to normalize
+        feature_range: Tuple of (min, max) for output range
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    result_df = dataframe.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col not in result_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if result_df[col].dtype in [np.float64, np.int64]:
+            col_min = result_df[col].min()
+            col_max = result_df[col].max()
+            
+            if col_max > col_min:
+                result_df[col] = (result_df[col] - col_min) / (col_max - col_min)
+                result_df[col] = result_df[col] * (max_val - min_val) + min_val
+            else:
+                result_df[col] = min_val
+    
+    return result_df
+
+def detect_missing_patterns(dataframe, threshold=0.3):
+    """
+    Detect columns with high percentage of missing values.
+    
+    Args:
+        dataframe: pandas DataFrame
+        threshold: Missing value percentage threshold
+    
+    Returns:
+        List of column names exceeding the threshold
+    """
+    missing_percentages = dataframe.isnull().sum() / len(dataframe)
+    problematic_columns = missing_percentages[missing_percentages > threshold].index.tolist()
+    
+    return problematic_columns
+
+def clean_dataset(dataframe, numeric_columns, outlier_multiplier=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: Input DataFrame
+        numeric_columns: List of numeric columns to process
+        outlier_multiplier: IQR multiplier for outlier removal
+        normalize_method: 'zscore' or 'minmax' normalization
+    
+    Returns:
+        Cleaned and normalized DataFrame
+    """
+    cleaned_df = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_multiplier)
+    
+    if normalize_method == 'zscore':
+        cleaned_df = z_score_normalize(cleaned_df, numeric_columns)
+    elif normalize_method == 'minmax':
+        cleaned_df = min_max_normalize(cleaned_df, numeric_columns)
+    
+    return cleaned_df
