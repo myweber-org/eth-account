@@ -2,101 +2,88 @@
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
 
-def calculate_summary_statistics(df):
-    """
-    Calculate summary statistics for numeric columns in DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    
-    Returns:
-    pd.DataFrame: Summary statistics
-    """
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    summary = df[numeric_cols].describe()
-    
-    summary.loc['variance'] = df[numeric_cols].var()
-    summary.loc['skewness'] = df[numeric_cols].skew()
-    summary.loc['kurtosis'] = df[numeric_cols].kurtosis()
-    
-    return summary
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
 
-def normalize_column(df, column):
-    """
-    Normalize a column using min-max scaling.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to normalize
-    
-    Returns:
-    pd.Series: Normalized column values
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    col_min = df[column].min()
-    col_max = df[column].max()
-    
-    if col_max == col_min:
-        return pd.Series([0.5] * len(df), index=df.index)
-    
-    normalized = (df[column] - col_min) / (col_max - col_min)
-    return normalized
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+                    continue
+                else:
+                    raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+                
+                self.df[col] = self.df[col].fillna(fill_value)
+        
+        return self
 
-def handle_missing_values(df, strategy='mean'):
-    """
-    Handle missing values in numeric columns.
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+
+        for col in columns:
+            if col in self.df.columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self
+
+    def standardize_columns(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+
+        for col in columns:
+            if col in self.df.columns:
+                mean = self.df[col].mean()
+                std = self.df[col].std()
+                if std != 0:
+                    self.df[col] = (self.df[col] - mean) / std
+        
+        return self
+
+    def get_cleaned_data(self):
+        return self.df
+
+    def get_cleaning_report(self):
+        removed_rows = self.original_shape[0] - self.df.shape[0]
+        removed_cols = self.original_shape[1] - self.df.shape[1]
+        
+        report = {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': removed_rows,
+            'columns_removed': removed_cols,
+            'missing_values': self.df.isnull().sum().sum()
+        }
+        
+        return report
+
+def clean_dataset(df, missing_strategy='mean', remove_outliers=True, standardize=True):
+    cleaner = DataCleaner(df)
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    cleaner.handle_missing_values(strategy=missing_strategy)
     
-    Returns:
-    pd.DataFrame: DataFrame with handled missing values
-    """
-    df_clean = df.copy()
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if remove_outliers:
+        cleaner.remove_outliers_iqr()
     
-    for col in numeric_cols:
-        if df[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = df[col].mean()
-            elif strategy == 'median':
-                fill_value = df[col].median()
-            elif strategy == 'mode':
-                fill_value = df[col].mode()[0]
-            elif strategy == 'drop':
-                df_clean = df_clean.dropna(subset=[col])
-                continue
-            else:
-                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
-            
-            df_clean[col] = df_clean[col].fillna(fill_value)
+    if standardize:
+        cleaner.standardize_columns()
     
-    return df_clean
+    return cleaner.get_cleaned_data(), cleaner.get_cleaning_report()
