@@ -1,103 +1,106 @@
-def remove_duplicates(data_list):
-    seen = set()
-    result = []
-    for item in data_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-import numpy as np
+
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def detect_outliers_iqr(data, column, threshold=1.5):
+def clean_csv_data(input_file, output_file):
     """
-    Detect outliers using Interquartile Range method.
+    Load a CSV file, clean missing values, convert data types,
+    and save the cleaned data to a new file.
     """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - threshold * IQR
-    upper_bound = Q3 + threshold * IQR
-    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
-    return outliers
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Display initial info
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                median_val = df[col].median()
+                df[col] = df[col].fillna(median_val)
+                print(f"Filled missing values in {col} with median: {median_val}")
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                mode_val = df[col].mode()[0]
+                df[col] = df[col].fillna(mode_val)
+                print(f"Filled missing values in {col} with mode: {mode_val}")
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col])
+                print(f"Converted {col} to datetime format")
+            except:
+                print(f"Could not convert {col} to datetime")
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        removed_duplicates = initial_rows - len(df)
+        if removed_duplicates > 0:
+            print(f"Removed {removed_duplicates} duplicate rows")
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Final data shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
 
-def remove_outliers_zscore(data, column, threshold=3):
+def validate_dataframe(df):
     """
-    Remove outliers using Z-score method.
+    Perform basic validation on the cleaned dataframe.
     """
-    z_scores = np.abs(stats.zscore(data[column].dropna()))
-    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
-    return filtered_data
+    if df is None:
+        print("DataFrame is None, cannot validate")
+        return False
+    
+    validation_passed = True
+    
+    # Check for remaining missing values
+    missing_values = df.isnull().sum().sum()
+    if missing_values > 0:
+        print(f"Warning: {missing_values} missing values still present")
+        validation_passed = False
+    
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if np.any(np.isinf(df[col])):
+            print(f"Warning: Infinite values found in column {col}")
+            validation_passed = False
+    
+    # Check data types
+    print("\nData types after cleaning:")
+    print(df.dtypes)
+    
+    return validation_passed
 
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling.
-    """
-    min_val = data[column].min()
-    max_val = data[column].max()
-    if max_val - min_val == 0:
-        return data[column].apply(lambda x: 0.5)
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def normalize_standard(data, column):
-    """
-    Normalize data using Standardization (Z-score normalization).
-    """
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def handle_missing_values(data, strategy='mean', columns=None):
-    """
-    Handle missing values with specified strategy.
-    """
-    if columns is None:
-        columns = data.columns
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
     
-    data_filled = data.copy()
-    for col in columns:
-        if data[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = data[col].mean()
-            elif strategy == 'median':
-                fill_value = data[col].median()
-            elif strategy == 'mode':
-                fill_value = data[col].mode()[0]
-            elif strategy == 'constant':
-                fill_value = 0
-            else:
-                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'constant'")
-            
-            data_filled[col] = data[col].fillna(fill_value)
+    cleaned_df = clean_csv_data(input_csv, output_csv)
     
-    return data_filled
-
-def clean_dataset(data, outlier_method='zscore', normalize_method='standard', missing_strategy='mean'):
-    """
-    Comprehensive data cleaning pipeline.
-    """
-    cleaned_data = data.copy()
-    
-    numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_columns:
-        if outlier_method == 'zscore':
-            cleaned_data = remove_outliers_zscore(cleaned_data, col)
-        elif outlier_method == 'iqr':
-            outliers = detect_outliers_iqr(cleaned_data, col)
-            cleaned_data = cleaned_data.drop(outliers.index)
-    
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy, columns=numeric_columns)
-    
-    for col in numeric_columns:
-        if normalize_method == 'minmax':
-            cleaned_data[col] = normalize_minmax(cleaned_data, col)
-        elif normalize_method == 'standard':
-            cleaned_data[col] = normalize_standard(cleaned_data, col)
-    
-    return cleaned_data
+    if cleaned_df is not None:
+        print("\nData validation results:")
+        is_valid = validate_dataframe(cleaned_df)
+        
+        if is_valid:
+            print("Data validation passed successfully")
+        else:
+            print("Data validation completed with warnings")
