@@ -296,3 +296,85 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import pandas as pd
+
+def clean_dataset(df, missing_strategy='drop', duplicate_strategy='drop_first'):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        missing_strategy (str): Strategy for missing values. 
+                                Options: 'drop', 'fill_mean', 'fill_median', 'fill_mode'.
+        duplicate_strategy (str): Strategy for duplicates.
+                                  Options: 'drop_first', 'drop_last', 'keep_none'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'drop':
+        df_clean = df_clean.dropna()
+    elif missing_strategy == 'fill_mean':
+        df_clean = df_clean.fillna(df_clean.mean(numeric_only=True))
+    elif missing_strategy == 'fill_median':
+        df_clean = df_clean.fillna(df_clean.median(numeric_only=True))
+    elif missing_strategy == 'fill_mode':
+        for col in df_clean.columns:
+            if df_clean[col].dtype == 'object':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else None)
+            else:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+    
+    # Handle duplicates
+    if duplicate_strategy == 'drop_first':
+        df_clean = df_clean.drop_duplicates(keep='first')
+    elif duplicate_strategy == 'drop_last':
+        df_clean = df_clean.drop_duplicates(keep='last')
+    elif duplicate_strategy == 'keep_none':
+        df_clean = df_clean.drop_duplicates(keep=False)
+    
+    return df_clean
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'column_types': df.dtypes.to_dict(),
+        'memory_usage_mb': df.memory_usage(deep=True).sum() / 1024**2
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 5, 5],
+        'B': [10, 20, 30, None, 50, 50],
+        'C': ['x', 'y', 'z', 'x', None, 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataframe(df))
+    
+    cleaned_df = clean_dataset(df, missing_strategy='fill_mean', duplicate_strategy='drop_first')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nCleaned Validation Results:")
+    print(validate_dataframe(cleaned_df))
