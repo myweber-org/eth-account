@@ -1,89 +1,98 @@
-
 import pandas as pd
 import numpy as np
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-
-    def handle_missing_values(self, strategy='mean', columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-
-        for col in columns:
-            if col in self.df.columns:
-                if strategy == 'mean':
-                    fill_value = self.df[col].mean()
-                elif strategy == 'median':
-                    fill_value = self.df[col].median()
-                elif strategy == 'mode':
-                    fill_value = self.df[col].mode()[0]
-                elif strategy == 'drop':
-                    self.df = self.df.dropna(subset=[col])
-                    continue
-                else:
-                    raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
-                
-                self.df[col] = self.df[col].fillna(fill_value)
-        
-        return self
-
-    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-
-        for col in columns:
-            if col in self.df.columns:
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - multiplier * IQR
-                upper_bound = Q3 + multiplier * IQR
-                
-                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
-        
-        return self
-
-    def standardize_columns(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-
-        for col in columns:
-            if col in self.df.columns:
-                mean = self.df[col].mean()
-                std = self.df[col].std()
-                if std != 0:
-                    self.df[col] = (self.df[col] - mean) / std
-        
-        return self
-
-    def get_cleaned_data(self):
-        return self.df
-
-    def get_cleaning_report(self):
-        removed_rows = self.original_shape[0] - self.df.shape[0]
-        removed_cols = self.original_shape[1] - self.df.shape[1]
-        
-        report = {
-            'original_shape': self.original_shape,
-            'cleaned_shape': self.df.shape,
-            'rows_removed': removed_rows,
-            'columns_removed': removed_cols,
-            'missing_values': self.df.isnull().sum().sum()
-        }
-        
-        return report
-
-def clean_dataset(df, missing_strategy='mean', remove_outliers=True, standardize=True):
-    cleaner = DataCleaner(df)
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
     
-    cleaner.handle_missing_values(strategy=missing_strategy)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
-    if remove_outliers:
-        cleaner.remove_outliers_iqr()
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if standardize:
-        cleaner.standardize_columns()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    return cleaner.get_cleaned_data(), cleaner.get_cleaning_report()
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_basic_stats(df, column):
+    """
+    Calculate basic statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
+    cleaned_df = df.copy()
+    
+    for column in columns:
+        if column in cleaned_df.columns:
+            if pd.api.types.is_numeric_dtype(cleaned_df[column]):
+                cleaned_df = remove_outliers_iqr(cleaned_df, column)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.randint(1, 100, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[np.random.choice(df.index, 50), 'A'] = np.random.uniform(500, 1000, 50)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("\nOriginal statistics for column 'A':")
+    print(calculate_basic_stats(df, 'A'))
+    
+    cleaned_df = clean_numeric_data(df, ['A', 'B'])
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned statistics for column 'A':")
+    print(calculate_basic_stats(cleaned_df, 'A'))
