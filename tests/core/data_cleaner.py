@@ -71,3 +71,85 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nValidation: {is_valid}, Message: {message}")
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing string columns.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = cleaned_df.shape[0]
+    cleaned_df = cleaned_df.drop_duplicates()
+    removed_duplicates = initial_rows - cleaned_df.shape[0]
+    
+    # Normalize string columns
+    if columns_to_clean is None:
+        columns_to_clean = cleaned_df.select_dtypes(include=['object']).columns
+    
+    for col in columns_to_clean:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].apply(normalize_string)
+    
+    return cleaned_df, removed_duplicates
+
+def normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if pd.isna(text):
+        return text
+    
+    # Convert to string if not already
+    text = str(text)
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Remove special characters (keep alphanumeric and spaces)
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    
+    return text
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    """
+    if pd.isna(email):
+        return False
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(email_pattern, str(email)))
+
+def main():
+    # Example usage
+    data = {
+        'name': ['John Doe', 'John Doe', 'Jane Smith', '  BOB JONES  '],
+        'email': ['john@example.com', 'john@example.com', 'jane@test.org', 'invalid-email'],
+        'age': [25, 25, 30, 35]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df, duplicates_removed = clean_dataframe(df)
+    print(f"Removed {duplicates_removed} duplicate rows")
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print()
+    
+    # Validate emails
+    df['email_valid'] = df['email'].apply(validate_email)
+    print("Email validation:")
+    print(df[['email', 'email_valid']])
+
+if __name__ == "__main__":
+    main()
