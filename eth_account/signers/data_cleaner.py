@@ -4,7 +4,7 @@ import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
@@ -27,80 +27,76 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df
 
-def clean_numeric_data(df, columns=None):
+def calculate_summary_statistics(df):
     """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, clean all numeric columns.
+    Calculate summary statistics for numeric columns in DataFrame.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: Summary statistics
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns = list(numeric_cols)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    summary = df[numeric_cols].describe()
     
-    cleaned_df = df.copy()
-    for col in columns:
-        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    summary.loc['variance'] = df[numeric_cols].var()
+    summary.loc['skewness'] = df[numeric_cols].skew()
+    summary.loc['kurtosis'] = df[numeric_cols].kurtosis()
     
-    return cleaned_df
+    return summary
 
-def validate_dataframe(df, required_columns=None):
+def normalize_column(df, column):
     """
-    Validate DataFrame structure and content.
+    Normalize a column using min-max scaling.
     
     Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of required column names
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
     
     Returns:
-    dict: Validation results
+    pd.Series: Normalized column values
     """
-    validation_results = {
-        'is_valid': True,
-        'missing_columns': [],
-        'null_counts': {},
-        'data_types': {}
-    }
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if required_columns:
-        missing = [col for col in required_columns if col not in df.columns]
-        if missing:
-            validation_results['is_valid'] = False
-            validation_results['missing_columns'] = missing
+    col_min = df[column].min()
+    col_max = df[column].max()
     
-    for col in df.columns:
-        validation_results['null_counts'][col] = df[col].isnull().sum()
-        validation_results['data_types'][col] = str(df[col].dtype)
+    if col_max == col_min:
+        return pd.Series([0.5] * len(df), index=df.index)
     
-    return validation_results
+    normalized = (df[column] - col_min) / (col_max - col_min)
+    return normalized
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.randint(1, 100, 1000)
-    }
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
     
-    df = pd.DataFrame(sample_data)
-    df.loc[::100, 'A'] = 500
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
     
-    print("Original DataFrame shape:", df.shape)
-    print("Validation results:", validate_dataframe(df))
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_clean = df.copy()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    print("Cleaned DataFrame shape:", cleaned_df.shape)
-    print("Outliers removed:", df.shape[0] - cleaned_df.shape[0])
-def remove_duplicates_preserve_order(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+            
+            df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean
