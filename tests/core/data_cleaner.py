@@ -211,4 +211,104 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nData valid: {is_valid}")
+    print(f"\nData valid: {is_valid}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values and removing columns
+    with excessive missing data.
+    
+    Parameters:
+    file_path (str): Path to the CSV file
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+    drop_threshold (float): Threshold for dropping columns (0.0 to 1.0)
+    
+    Returns:
+    pandas.DataFrame: Cleaned DataFrame
+    """
+    
+    # Load the CSV file
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    except Exception as e:
+        raise Exception(f"Error reading CSV file: {str(e)}")
+    
+    # Calculate missing percentage for each column
+    missing_percentage = df.isnull().sum() / len(df)
+    
+    # Drop columns with missing data above threshold
+    columns_to_drop = missing_percentage[missing_percentage > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    # Fill remaining missing values based on strategy
+    if fill_strategy == 'mean':
+        df = df.fillna(df.mean(numeric_only=True))
+    elif fill_strategy == 'median':
+        df = df.fillna(df.median(numeric_only=True))
+    elif fill_strategy == 'mode':
+        df = df.fillna(df.mode().iloc[0])
+    elif fill_strategy == 'zero':
+        df = df.fillna(0)
+    else:
+        raise ValueError(f"Invalid fill strategy: {fill_strategy}")
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Reset index after cleaning
+    df = df.reset_index(drop=True)
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pandas.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage
+if __name__ == "__main__":
+    # Test with sample data
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, np.nan, np.nan, 4, 5],
+        'C': [1, 2, 3, 4, 5],
+        'D': [1, np.nan, 3, np.nan, 5]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    # Clean the data
+    cleaned_df = clean_csv_data('test_data.csv', fill_strategy='mean', drop_threshold=0.5)
+    
+    print("Original DataFrame:")
+    print(test_df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned_df, required_columns=['A', 'C'])
+    print(f"\nValidation: {message}")
