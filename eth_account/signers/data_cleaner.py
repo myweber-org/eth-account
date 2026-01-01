@@ -96,3 +96,11 @@ if __name__ == "__main__":
     cleaned_df = clean_numeric_data(df, ['A', 'B'])
     print("Cleaned DataFrame shape:", cleaned_df.shape)
     print("Outliers removed:", df.shape[0] - cleaned_df.shape[0])
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
