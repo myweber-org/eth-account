@@ -25,187 +25,66 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     if fill_missing == 'drop':
         cleaned_df = cleaned_df.dropna()
         print("Dropped rows with missing values.")
-    elif fill_missing in ['mean', 'median']:
+    elif fill_missing in ['mean', 'median', 'mode']:
         numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
         for col in numeric_cols:
             if fill_missing == 'mean':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
             elif fill_missing == 'median':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-        print(f"Filled missing numeric values with {fill_missing}.")
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            if cleaned_df[col].dtype == 'object':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
-        print("Filled missing categorical values with mode.")
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+            elif fill_missing == 'mode':
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+        print(f"Filled missing numeric values using {fill_missing}.")
+    
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        cleaned_df[col].fillna('Unknown', inplace=True)
+    print("Filled missing categorical values with 'Unknown'.")
     
     return cleaned_df
 
-def validate_dataset(df, check_duplicates=True, check_missing=True):
+def validate_dataset(df):
     """
-    Validate a DataFrame for duplicates and missing values.
+    Validate the cleaned dataset for basic integrity checks.
     
     Parameters:
     df (pd.DataFrame): DataFrame to validate.
-    check_duplicates (bool): Check for duplicate rows.
-    check_missing (bool): Check for missing values.
     
     Returns:
-    dict: Validation results.
+    dict: Dictionary containing validation results.
     """
-    validation_results = {}
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
+    }
     
-    if check_duplicates:
-        duplicate_count = df.duplicated().sum()
-        validation_results['duplicates'] = duplicate_count
-    
-    if check_missing:
-        missing_counts = df.isnull().sum()
-        missing_total = missing_counts.sum()
-        validation_results['missing_values'] = missing_total
-        validation_results['missing_by_column'] = missing_counts[missing_counts > 0].to_dict()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        validation_results['numeric_stats'] = df[numeric_cols].describe().to_dict()
     
     return validation_results
 
 if __name__ == "__main__":
     sample_data = {
-        'id': [1, 2, 2, 3, 4, 5],
-        'value': [10.5, np.nan, 15.0, 20.0, np.nan, 30.0],
-        'category': ['A', 'B', 'B', 'A', None, 'C']
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Eve', 'Eve', 'Frank'],
+        'age': [25, 30, None, 40, 35, 35, 28],
+        'score': [85.5, 92.0, 78.5, None, 88.0, 88.0, 95.5]
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
+    print("Original dataset:")
     print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    validation = validate_dataset(cleaned_df)
     print("\nValidation results:")
-    print(validate_dataset(df))
-    
-    cleaned = clean_dataset(df, fill_missing='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    print("\nValidation after cleaning:")
-    print(validate_dataset(cleaned))
-import numpy as np
-
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-import numpy as np
-import pandas as pd
-from scipy import stats
-
-def remove_outliers_iqr(data, column, factor=1.5):
-    """
-    Remove outliers using IQR method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - factor * IQR
-    upper_bound = Q3 + factor * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-
-def remove_outliers_zscore(data, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    z_scores = np.abs(stats.zscore(data[column]))
-    filtered_data = data[z_scores < threshold]
-    return filtered_data
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if min_val == max_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def normalize_zscore(data, column):
-    """
-    Normalize data using Z-score standardization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def clean_dataset(data, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    if numeric_columns is None:
-        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_data = data.copy()
-    
-    for column in numeric_columns:
-        if column not in data.columns:
-            continue
-            
-        if outlier_method == 'iqr':
-            cleaned_data = remove_outliers_iqr(cleaned_data, column)
-        elif outlier_method == 'zscore':
-            cleaned_data = remove_outliers_zscore(cleaned_data, column)
-        
-        if normalize_method == 'minmax':
-            cleaned_data[column] = normalize_minmax(cleaned_data, column)
-        elif normalize_method == 'zscore':
-            cleaned_data[column] = normalize_zscore(cleaned_data, column)
-    
-    return cleaned_data
-
-def get_data_summary(data):
-    """
-    Generate statistical summary of the dataset
-    """
-    summary = {
-        'total_rows': len(data),
-        'total_columns': len(data.columns),
-        'numeric_columns': data.select_dtypes(include=[np.number]).columns.tolist(),
-        'categorical_columns': data.select_dtypes(include=['object']).columns.tolist(),
-        'missing_values': data.isnull().sum().to_dict(),
-        'data_types': data.dtypes.to_dict()
-    }
-    
-    for col in data.select_dtypes(include=[np.number]).columns:
-        summary[f'{col}_stats'] = {
-            'mean': data[col].mean(),
-            'median': data[col].median(),
-            'std': data[col].std(),
-            'min': data[col].min(),
-            'max': data[col].max(),
-            'q1': data[col].quantile(0.25),
-            'q3': data[col].quantile(0.75)
-        }
-    
-    return summary
+    for key, value in validation.items():
+        print(f"{key}: {value}")
