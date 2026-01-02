@@ -88,3 +88,5 @@ class DataCleaner:
             'data_types': self.df.dtypes.to_dict()
         }
         return summary
+def filter_none_values(data):
+    return [item for item in data if item is not None]
