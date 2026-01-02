@@ -116,3 +116,43 @@ def validate_data_types(data, expected_types):
         'validation_results': validation_results,
         'all_valid': all_valid
     }
+import numpy as np
+import pandas as pd
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.cleaned_data = None
+        
+    def remove_outliers_iqr(self, column):
+        Q1 = self.data[column].quantile(0.25)
+        Q3 = self.data[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        return self.data[(self.data[column] >= lower_bound) & (self.data[column] <= upper_bound)]
+    
+    def normalize_minmax(self, column):
+        min_val = self.data[column].min()
+        max_val = self.data[column].max()
+        self.data[column] = (self.data[column] - min_val) / (max_val - min_val)
+        return self.data
+    
+    def fill_missing_mean(self, column):
+        mean_val = self.data[column].mean()
+        self.data[column].fillna(mean_val, inplace=True)
+        return self.data
+    
+    def clean_pipeline(self, columns_to_clean):
+        for col in columns_to_clean:
+            self.data = self.remove_outliers_iqr(col)
+            self.data = self.normalize_minmax(col)
+            self.data = self.fill_missing_mean(col)
+        self.cleaned_data = self.data
+        return self.cleaned_data
+    
+    def save_cleaned_data(self, filename):
+        if self.cleaned_data is not None:
+            self.cleaned_data.to_csv(filename, index=False)
+            return True
+        return False
