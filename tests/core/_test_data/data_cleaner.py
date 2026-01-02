@@ -2,111 +2,69 @@
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
     """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def clean_numeric_data(df, columns=None):
-    """
-    Clean numeric data by removing outliers from specified columns.
-    If no columns specified, clean all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns = list(numeric_cols)
-    
     cleaned_df = df.copy()
     
-    for column in columns:
-        if column in cleaned_df.columns:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].median())
+            elif cleaned_df[column].dtype == 'object':
+                cleaned_df[column] = cleaned_df[column].fillna('Unknown')
+        print("Missing values have been filled.")
     
     return cleaned_df
 
-def validate_dataframe(df, required_columns=None):
+def validate_dataframe(df):
     """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate
-    required_columns (list): List of required column names
-    
-    Returns:
-    bool: True if validation passes
+    Validate the DataFrame for common data quality issues.
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    issues = []
     
     if df.empty:
-        raise ValueError("DataFrame is empty")
+        issues.append("DataFrame is empty.")
     
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+    for column in df.columns:
+        if df[column].isnull().all():
+            issues.append(f"Column '{column}' contains only null values.")
     
-    return True
+    duplicate_count = df.duplicated().sum()
+    if duplicate_count > 0:
+        issues.append(f"Found {duplicate_count} duplicate rows.")
+    
+    return issues
 
 def main():
-    """
-    Example usage of data cleaning functions.
-    """
-    np.random.seed(42)
-    
-    data = {
-        'id': range(100),
-        'value': np.random.randn(100) * 100,
-        'category': np.random.choice(['A', 'B', 'C'], 100)
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'age': [25, 30, 25, None, 35],
+        'score': [85.5, 92.0, 85.5, 78.5, None]
     }
     
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
     
-    print("Original DataFrame shape:", df.shape)
-    print("\nOriginal statistics:")
-    print(df['value'].describe())
+    issues = validate_dataframe(df)
+    if issues:
+        print("Data quality issues found:")
+        for issue in issues:
+            print(f"- {issue}")
+    print("\n")
     
-    try:
-        validate_dataframe(df, ['id', 'value', 'category'])
-        
-        cleaned_df = clean_numeric_data(df, ['value'])
-        
-        print("\nCleaned DataFrame shape:", cleaned_df.shape)
-        print("\nCleaned statistics:")
-        print(cleaned_df['value'].describe())
-        
-    except Exception as e:
-        print(f"Error during data cleaning: {e}")
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
 
 if __name__ == "__main__":
     main()
