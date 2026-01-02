@@ -171,3 +171,97 @@ def create_sample_data():
     df.loc[np.random.choice(100, 3, replace=False), 'score'] = np.nan
     
     return df
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to process
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_column(df, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        df[column + '_normalized'] = 0.5
+    else:
+        df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+        numeric_columns: List of numeric column names to process
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.randint(1, 100, 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print(f"Original shape: {df.shape}")
+    
+    cleaned = clean_dataset(df, ['A', 'B'])
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Outliers removed: {len(df) - len(cleaned)}")
+    
+    print("\nSample of cleaned data:")
+    print(cleaned.head())
