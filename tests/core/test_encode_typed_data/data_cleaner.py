@@ -1,90 +1,70 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 from scipy import stats
 
-def remove_outliers_iqr(dataframe, columns):
-    cleaned_df = dataframe.copy()
-    for col in columns:
-        if col in cleaned_df.columns:
-            Q1 = cleaned_df[col].quantile(0.25)
-            Q3 = cleaned_df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
-    return cleaned_df
-
-def normalize_data_minmax(dataframe, columns):
-    normalized_df = dataframe.copy()
-    for col in columns:
-        if col in normalized_df.columns:
-            min_val = normalized_df[col].min()
-            max_val = normalized_df[col].max()
-            if max_val != min_val:
-                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
-    return normalized_df
-
-def clean_dataset(input_path, output_path, outlier_cols=None, normalize_cols=None):
-    try:
-        df = pd.read_csv(input_path)
-        
-        if outlier_cols:
-            df = remove_outliers_iqr(df, outlier_cols)
-        
-        if normalize_cols:
-            df = normalize_data_minmax(df, normalize_cols)
-        
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to {output_path}")
-        return True
-        
-    except Exception as e:
-        print(f"Error during data cleaning: {e}")
-        return False
-
-if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    
-    outlier_columns = ['age', 'income', 'score']
-    normalize_columns = ['income', 'score']
-    
-    clean_dataset(input_file, output_file, outlier_columns, normalize_columns)
-import numpy as np
-
-def remove_outliers_iqr(data, column):
-    """
-    Remove outliers from a specified column using the IQR method.
-    
-    Parameters:
-    data (pd.DataFrame): The input DataFrame.
-    column (str): The column name to process.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
-    """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
 
-def main():
-    # Example usage
-    import pandas as pd
-    np.random.seed(42)
-    sample_data = pd.DataFrame({
-        'value': np.random.normal(100, 15, 1000)
-    })
+def remove_outliers_zscore(dataframe, column, threshold=3):
+    z_scores = np.abs(stats.zscore(dataframe[column]))
+    return dataframe[z_scores < threshold]
+
+def normalize_minmax(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    dataframe[column + '_normalized'] = (dataframe[column] - min_val) / (max_val - min_val)
+    return dataframe
+
+def normalize_zscore(dataframe, column):
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    dataframe[column + '_standardized'] = (dataframe[column] - mean_val) / std_val
+    return dataframe
+
+def handle_missing_values(dataframe, strategy='mean'):
+    if strategy == 'mean':
+        return dataframe.fillna(dataframe.mean())
+    elif strategy == 'median':
+        return dataframe.fillna(dataframe.median())
+    elif strategy == 'mode':
+        return dataframe.fillna(dataframe.mode().iloc[0])
+    elif strategy == 'drop':
+        return dataframe.dropna()
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+
+def clean_dataset(dataframe, numeric_columns):
+    cleaned_df = dataframe.copy()
     
-    print(f"Original data shape: {sample_data.shape}")
-    cleaned_data = remove_outliers_iqr(sample_data, 'value')
-    print(f"Cleaned data shape: {cleaned_data.shape}")
-    print(f"Number of outliers removed: {len(sample_data) - len(cleaned_data)}")
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = normalize_minmax(cleaned_df, col)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy='mean')
+    return cleaned_df
 
 if __name__ == "__main__":
-    main()
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'feature3': np.random.uniform(0, 1, 1000)
+    })
+    
+    sample_data.iloc[::100, 0] = np.nan
+    sample_data.iloc[::50, 1] = 9999
+    
+    numeric_cols = ['feature1', 'feature2', 'feature3']
+    cleaned_data = clean_dataset(sample_data, numeric_cols)
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
+    print(f"Missing values in cleaned data: {cleaned_data.isnull().sum().sum()}")
+    print(f"Cleaned data statistics:")
+    print(cleaned_data.describe())
