@@ -181,4 +181,94 @@ def get_data_summary(data):
             'max': data[col].max()
         }
     
-    return summary
+    return summaryimport pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to process
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of column names or None for all numeric columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    return cleaned_df
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        Dictionary containing statistics
+    """
+    stats = {}
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'count': df[col].count()
+        }
+    
+    return stats
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100),
+        'score': np.random.uniform(0, 100, 100)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[10, 'value'] = 500
+    df.loc[20, 'score'] = 150
+    
+    print("Original data shape:", df.shape)
+    print("Original statistics:")
+    print(calculate_statistics(df))
+    
+    cleaned_df = clean_numeric_data(df)
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("Cleaned statistics:")
+    print(calculate_statistics(cleaned_df))
