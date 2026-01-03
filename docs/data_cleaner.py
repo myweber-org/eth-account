@@ -143,3 +143,32 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase and removing extra whitespace.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x).strip())
+    return df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def validate_email_column(df, column_name):
+    """
+    Validate email format in a column and return a boolean series.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[column_name].astype(str).str.match(email_pattern)
