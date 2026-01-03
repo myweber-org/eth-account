@@ -1,208 +1,79 @@
-
-import numpy as np
-import pandas as pd
-from scipy import stats
-
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-
-def remove_outliers_zscore(data, column, threshold=3):
-    z_scores = np.abs(stats.zscore(data[column]))
-    return data[z_scores < threshold]
-
-def normalize_minmax(data, column):
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
-
-def normalize_zscore(data, column):
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    data[column + '_standardized'] = (data[column] - mean_val) / std_val
-    return data
-
-def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
-    cleaned_df = df.copy()
-    
-    for col in numeric_columns:
-        if outlier_method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif outlier_method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, col)
-        
-        if normalize_method == 'minmax':
-            cleaned_df = normalize_minmax(cleaned_df, col)
-        elif normalize_method == 'zscore':
-            cleaned_df = normalize_zscore(cleaned_df, col)
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns):
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
-    
-    if df.empty:
-        raise ValueError("DataFrame is empty")
-    
-    return True
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, strategy='mean', outlier_threshold=3):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Clean dataset by handling missing values and removing outliers.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Strategy for missing value imputation ('mean', 'median', 'mode')
+    outlier_threshold (float): Z-score threshold for outlier detection
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: Cleaned dataframe
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    df_clean = df.copy()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    # Handle missing values
+    if strategy == 'mean':
+        df_clean = df_clean.fillna(df_clean.mean())
+    elif strategy == 'median':
+        df_clean = df_clean.fillna(df_clean.median())
+    elif strategy == 'mode':
+        df_clean = df_clean.fillna(df_clean.mode().iloc[0])
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    # Remove outliers using Z-score method
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    z_scores = np.abs((df_clean[numeric_cols] - df_clean[numeric_cols].mean()) / df_clean[numeric_cols].std())
+    df_clean = df_clean[(z_scores < outlier_threshold).all(axis=1)]
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    return df_clean.reset_index(drop=True)
 
-def calculate_summary_statistics(df):
+def validate_data(df, required_columns=None):
     """
-    Calculate summary statistics for numeric columns.
+    Validate dataframe structure and content.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
     
     Returns:
-        pd.DataFrame: Summary statistics
-    """
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    summary = df[numeric_cols].describe()
-    
-    summary.loc['skewness'] = df[numeric_cols].skew()
-    summary.loc['kurtosis'] = df[numeric_cols].kurtosis()
-    
-    return summary
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        dict: Validation results
+    dict: Validation results
     """
     validation_results = {
         'is_valid': True,
-        'missing_values': df.isnull().sum().to_dict(),
-        'duplicate_rows': df.duplicated().sum(),
-        'data_types': df.dtypes.to_dict()
+        'missing_columns': [],
+        'empty_rows': 0,
+        'duplicate_rows': 0
     }
     
     if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
             validation_results['is_valid'] = False
-            validation_results['missing_required_columns'] = missing_cols
+            validation_results['missing_columns'] = missing
+    
+    validation_results['empty_rows'] = df.isnull().all(axis=1).sum()
+    validation_results['duplicate_rows'] = df.duplicated().sum()
     
     return validation_results
 
-def example_usage():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100),
-        'category': np.random.choice(['A', 'B', 'C'], 100)
-    }
-    
-    df = pd.DataFrame(data)
-    df.loc[10, 'value'] = 500
-    df.loc[20, 'value'] = -200
-    
-    print("Original DataFrame shape:", df.shape)
-    print("\nValidation results:", validate_dataframe(df))
-    
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    
-    summary_stats = calculate_summary_statistics(cleaned_df)
-    print("\nSummary statistics:")
-    print(summary_stats)
-
 if __name__ == "__main__":
-    example_usage()import pandas as pd
-
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
+    # Example usage
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, np.nan, 7, 8, 9],
+        'C': [10, 11, 12, 13, 14]
+    })
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    subset (list, optional): Column labels to consider for duplicates.
-    keep (str, optional): Determines which duplicates to keep.
+    print("Original data:")
+    print(sample_data)
     
-    Returns:
-    pd.DataFrame: DataFrame with duplicates removed.
-    """
-    if df.empty:
-        return df
+    cleaned_data = clean_dataset(sample_data, strategy='median', outlier_threshold=2)
+    print("\nCleaned data:")
+    print(cleaned_data)
     
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
-
-def validate_dataframe(df):
-    """
-    Basic validation of DataFrame structure.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    
-    Returns:
-    bool: True if valid, False otherwise.
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False
-    if df.columns.empty:
-        return False
-    return True
-
-def clean_numeric_columns(df, columns):
-    """
-    Clean numeric columns by converting to appropriate dtype.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns (list): List of column names to clean.
-    
-    Returns:
-    pd.DataFrame: DataFrame with cleaned numeric columns.
-    """
-    if not validate_dataframe(df):
-        raise ValueError("Invalid DataFrame provided")
-    
-    cleaned_df = df.copy()
-    for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-    
-    return cleaned_df
+    validation = validate_data(cleaned_data, required_columns=['A', 'B', 'C'])
+    print("\nValidation results:")
+    print(validation)
