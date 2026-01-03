@@ -53,3 +53,62 @@ def validate_data(df, required_columns):
         raise ValueError("No numeric columns found in the dataset")
     
     return True
+import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing numeric values with column median.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(
+        df_cleaned[numeric_cols].median()
+    )
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame structure and content.
+    Returns True if valid, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    return True
+
+def process_csv_file(input_path, output_path):
+    """
+    Read CSV file, clean the data, and save to output path.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        if not validate_dataframe(df):
+            raise ValueError("Invalid DataFrame structure")
+        
+        df_cleaned = clean_dataframe(df)
+        df_cleaned.to_csv(output_path, index=False)
+        
+        print(f"Data cleaned successfully. Saved to {output_path}")
+        print(f"Original rows: {len(df)}, Cleaned rows: {len(df_cleaned)}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    process_csv_file(input_file, output_file)
