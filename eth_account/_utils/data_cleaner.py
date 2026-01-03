@@ -99,4 +99,66 @@ if __name__ == "__main__":
         validate_dataframe(cleaned_df, ['temperature', 'humidity'])
         print("\nData validation passed")
     except Exception as e:
-        print(f"\nData validation failed: {e}")
+        print(f"\nData validation failed: {e}")import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to analyze.
+    
+    Returns:
+        dict: Dictionary containing summary statistics.
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    return stats
+
+def main():
+    # Example usage
+    data = {'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 102, 12, 14, 13, 12, 11, 14, 13, 12, 11, 100]}
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame:")
+    print(df)
+    print("\nOriginal Statistics:")
+    print(calculate_summary_statistics(df, 'values'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nCleaned Statistics:")
+    print(calculate_summary_statistics(cleaned_df, 'values'))
+
+if __name__ == "__main__":
+    main()
