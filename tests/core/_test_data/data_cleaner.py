@@ -268,4 +268,11 @@ def remove_outliers_iqr(df, columns=None, multiplier=1.5):
     if removed > 0:
         print(f"Removed {removed} outliers using IQR method")
     
-    return df_clean
+    return df_cleandef remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
