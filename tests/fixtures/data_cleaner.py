@@ -102,3 +102,11 @@ def save_cleaned_data(df, output_path, format='csv'):
     except Exception as e:
         print(f"Error saving data: {e}")
         return False
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
