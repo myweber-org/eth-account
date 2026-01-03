@@ -1,49 +1,61 @@
-import numpy as np
 
-def remove_outliers_iqr(data, column):
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers from a specified column using the IQR method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
     Parameters:
-    data (list or array-like): The dataset.
-    column (int or str): Column index or name if data is structured.
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
-    cleaned_data: Data with outliers removed.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if isinstance(data, list):
-        data = np.array(data)
+    cleaned_df = df.copy()
     
-    if isinstance(column, str):
-        raise ValueError("Column name not supported for simple arrays. Use index.")
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    column_data = data[:, column] if data.ndim > 1 else data
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
     
-    q1 = np.percentile(column_data, 25)
-    q3 = np.percentile(column_data, 75)
-    iqr = q3 - q1
-    
-    lower_bound = q1 - 1.5 * iqr
-    upper_bound = q3 + 1.5 * iqr
-    
-    if data.ndim == 1:
-        mask = (column_data >= lower_bound) & (column_data <= upper_bound)
-        cleaned_data = data[mask]
-    else:
-        mask = (column_data >= lower_bound) & (column_data <= upper_bound)
-        cleaned_data = data[mask]
-    
-    return cleaned_data
+    return cleaned_df
 
-def example_usage():
-    sample_data = np.random.randn(100, 3)
-    sample_data[0, 1] = 100  # Add an outlier
+def validate_dataset(df, check_missing=True, check_types=True):
+    """
+    Validate a DataFrame for common data quality issues.
     
-    print("Original shape:", sample_data.shape)
-    cleaned = remove_outliers_iqr(sample_data, 1)
-    print("Cleaned shape:", cleaned.shape)
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    check_missing (bool): Check for missing values.
+    check_types (bool): Check column data types.
     
-    return cleaned
-
-if __name__ == "__main__":
-    example_usage()
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        validation_results['missing_values'] = missing_counts[missing_counts > 0].to_dict()
+    
+    if check_types:
+        type_counts = df.dtypes.value_counts().to_dict()
+        validation_results['data_types'] = {str(k): v for k, v in type_counts.items()}
+    
+    validation_results['shape'] = df.shape
+    validation_results['columns'] = list(df.columns)
+    
+    return validation_results
