@@ -319,3 +319,50 @@ if __name__ == "__main__":
         print(f"\n{column}:")
         for stat_name, stat_value in column_stats.items():
             print(f"  {stat_name}: {stat_value}")
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: A list of elements that may contain duplicates.
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(data_list):
+    """
+    Clean a list of numeric strings by converting to integers and removing invalid entries.
+    
+    Args:
+        data_list: A list of strings representing numbers.
+    
+    Returns:
+        A list of integers with invalid entries filtered out.
+    """
+    cleaned = []
+    for item in data_list:
+        try:
+            cleaned.append(int(item.strip()))
+        except (ValueError, AttributeError):
+            continue
+    return cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned_data = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned_data}")
+    
+    numeric_strings = ["10", "20", "abc", "30", "40", "50", "xyz"]
+    cleaned_nums = clean_numeric_strings(numeric_strings)
+    print(f"\nOriginal strings: {numeric_strings}")
+    print(f"Cleaned numbers: {cleaned_nums}")
