@@ -157,3 +157,49 @@ def validate_email_column(df, email_column):
     
     email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return df[email_column].apply(lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False)
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x.strip()))
+    return df
+
+def remove_duplicates(df, subset=None):
+    initial_count = len(df)
+    df_cleaned = df.drop_duplicates(subset=subset, keep='first')
+    removed_count = initial_count - len(df_cleaned)
+    return df_cleaned, removed_count
+
+def standardize_dates(df, date_column, target_format='%Y-%m-%d'):
+    try:
+        df[date_column] = pd.to_datetime(df[date_column], errors='coerce')
+        df[date_column] = df[date_column].dt.strftime(target_format)
+    except Exception as e:
+        print(f"Date standardization failed: {e}")
+    return df
+
+def validate_email_column(df, email_column):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    df['email_valid'] = df[email_column].str.match(pattern, na=False)
+    return df
+
+def process_dataframe(df, text_columns=None, date_columns=None, email_columns=None):
+    if text_columns:
+        for col in text_columns:
+            df = clean_text_column(df, col)
+    
+    df, duplicates_removed = remove_duplicates(df)
+    
+    if date_columns:
+        for col in date_columns:
+            df = standardize_dates(df, col)
+    
+    if email_columns:
+        for col in email_columns:
+            df = validate_email_column(df, col)
+    
+    return df, duplicates_removed
