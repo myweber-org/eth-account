@@ -91,3 +91,67 @@ if __name__ == "__main__":
     cleaned_df = clean_data(raw_df, numeric_cols)
     save_cleaned_data(cleaned_df, output_file)
     print(f"Data cleaning completed. Saved to {output_file}")
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: Optional dictionary to rename columns
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+            cleaned_df[col] = cleaned_df[col].replace('nan', pd.NA)
+            cleaned_df[col] = cleaned_df[col].replace('none', pd.NA)
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_email(email_series):
+    """
+    Validate email addresses in a pandas Series.
+    
+    Args:
+        email_series: pandas Series containing email addresses
+    
+    Returns:
+        Series with boolean values indicating valid emails
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return email_series.str.match(pattern, na=False)
+
+def remove_special_characters(text_series, keep_chars='a-zA-Z0-9\s'):
+    """
+    Remove special characters from text, keeping only specified characters.
+    
+    Args:
+        text_series: pandas Series containing text
+        keep_chars: Regex pattern of characters to keep
+    
+    Returns:
+        Series with special characters removed
+    """
+    pattern = f'[^{keep_chars}]'
+    return text_series.str.replace(pattern, '', regex=True)
