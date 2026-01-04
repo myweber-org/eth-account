@@ -1,72 +1,81 @@
-import pandas as pd
-import numpy as np
 
-def clean_csv_data(filepath, fill_strategy='mean', columns_to_drop=None):
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_method='drop'):
     """
-    Load and clean a CSV file by handling missing values and optionally dropping columns.
+    Clean a pandas DataFrame by handling missing values and duplicates.
     
     Parameters:
-    filepath (str): Path to the CSV file.
-    fill_strategy (str): Strategy for filling missing values. Options: 'mean', 'median', 'mode', 'zero'.
-    columns_to_drop (list): List of column names to drop from the dataset.
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_method (str): Method to handle missing values: 'drop', 'fill_mean', 'fill_median', 'fill_mode'.
     
     Returns:
-    pandas.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: Cleaned DataFrame.
     """
-    try:
-        df = pd.read_csv(filepath)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found at path: {filepath}")
+    cleaned_df = df.copy()
     
-    original_shape = df.shape
-    print(f"Original data shape: {original_shape}")
-    
-    if columns_to_drop:
-        df = df.drop(columns=columns_to_drop, errors='ignore')
-        print(f"Dropped columns: {columns_to_drop}")
-    
-    missing_before = df.isnull().sum().sum()
-    print(f"Missing values before cleaning: {missing_before}")
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    if fill_strategy == 'mean':
-        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
-    elif fill_strategy == 'median':
-        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-    elif fill_strategy == 'mode':
-        for col in numeric_cols:
-            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
-    elif fill_strategy == 'zero':
-        df[numeric_cols] = df[numeric_cols].fillna(0)
+    # Handle missing values
+    if fill_method == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif fill_method == 'fill_mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif fill_method == 'fill_median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    elif fill_method == 'fill_mode':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
     else:
-        raise ValueError(f"Unsupported fill strategy: {fill_strategy}")
+        raise ValueError("Invalid fill_method. Choose from 'drop', 'fill_mean', 'fill_median', 'fill_mode'.")
     
-    missing_after = df.isnull().sum().sum()
-    print(f"Missing values after cleaning: {missing_after}")
+    # Remove duplicates if specified
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    final_shape = df.shape
-    print(f"Final data shape: {final_shape}")
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
     
-    return df
+    return cleaned_df
 
-def save_cleaned_data(df, output_path):
+def validate_dataset(df, required_columns=None):
     """
-    Save the cleaned DataFrame to a CSV file.
+    Validate a DataFrame for required columns and data types.
     
     Parameters:
-    df (pandas.DataFrame): Cleaned DataFrame.
-    output_path (str): Path to save the cleaned CSV file.
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (bool, str) indicating validation success and message.
     """
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to: {output_path}")
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    if not numeric_cols.empty:
+        infinite_mask = df[numeric_cols].applymap(lambda x: not pd.isna(x) and not np.isfinite(x))
+        if infinite_mask.any().any():
+            return False, "Dataset contains infinite values in numeric columns"
+    
+    return True, "Dataset validation passed"
 
 if __name__ == "__main__":
-    input_file = "sample_data.csv"
-    output_file = "cleaned_data.csv"
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 5],
+        'B': [5, 6, 7, None, 9],
+        'C': [1, 2, 2, 3, 1]
+    }
     
-    try:
-        cleaned_df = clean_csv_data(input_file, fill_strategy='median', columns_to_drop=['id', 'unused_column'])
-        save_cleaned_data(cleaned_df, output_file)
-    except Exception as e:
-        print(f"Error during data cleaning: {e}")
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_method='fill_mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {is_valid}, Message: {message}")
