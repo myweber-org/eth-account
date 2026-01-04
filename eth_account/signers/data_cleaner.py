@@ -181,4 +181,38 @@ def calculate_summary_statistics(data, column):
         'median': data[column].median(),
         'std': data[column].std()
     }
-    return stats
+    return statsdef remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(data_list):
+    """
+    Convert string representations of numbers to integers where possible.
+    Non-convertible items remain unchanged.
+    """
+    cleaned = []
+    for item in data_list:
+        if isinstance(item, str) and item.isdigit():
+            cleaned.append(int(item))
+        else:
+            cleaned.append(item)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, "4", "4", "abc", 5, 5]
+    print("Original:", sample_data)
+    
+    unique_data = remove_duplicates(sample_data)
+    print("After deduplication:", unique_data)
+    
+    final_data = clean_numeric_strings(unique_data)
+    print("After numeric cleaning:", final_data)
