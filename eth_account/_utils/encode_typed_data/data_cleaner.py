@@ -120,3 +120,73 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_mapping (dict, optional): Dictionary mapping old column names to new ones.
+        drop_duplicates (bool): Whether to remove duplicate rows.
+        normalize_text (bool): Whether to normalize text columns by stripping whitespace and lowercasing.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).apply(
+                lambda x: re.sub(r'\s+', ' ', x.strip()).lower() if pd.notnull(x) else x
+            )
+    
+    return cleaned_df
+
+def validate_email(email):
+    """
+    Validate email format using regex.
+    
+    Args:
+        email (str): Email address to validate.
+    
+    Returns:
+        bool: True if email format is valid, False otherwise.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
+
+def sample_data():
+    """
+    Generate sample data for testing.
+    
+    Returns:
+        pd.DataFrame: Sample DataFrame with mixed data.
+    """
+    data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown'],
+        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.net', 'alice@domain.co'],
+        'age': [25, 30, 25, 35, 28],
+        'city': ['New York', 'Los Angeles', 'New York', 'Chicago', 'Boston']
+    }
+    return pd.DataFrame(data)
+
+if __name__ == '__main__':
+    df = sample_data()
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataframe(df, column_mapping={'city': 'location'})
+    print(cleaned)
+    print("\nValid emails:")
+    df['valid_email'] = df['email'].apply(validate_email)
+    print(df[['email', 'valid_email']])
