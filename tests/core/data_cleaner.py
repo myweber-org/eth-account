@@ -1,104 +1,80 @@
 
 import pandas as pd
 import numpy as np
-from typing import List, Optional
+from scipy import stats
 
-def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
-    """
-    Remove duplicate rows from DataFrame.
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns.tolist()
     
-    Args:
-        df: Input DataFrame
-        subset: Columns to consider for identifying duplicates
-    
-    Returns:
-        DataFrame with duplicates removed
-    """
-    return df.drop_duplicates(subset=subset, keep='first')
-
-def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
-    """
-    Normalize specified column using selected method.
-    
-    Args:
-        df: Input DataFrame
-        column: Column name to normalize
-        method: Normalization method ('minmax' or 'zscore')
-    
-    Returns:
-        DataFrame with normalized column
-    """
-    df = df.copy()
-    
-    if method == 'minmax':
-        min_val = df[column].min()
-        max_val = df[column].max()
-        if max_val > min_val:
-            df[column] = (df[column] - min_val) / (max_val - min_val)
-    
-    elif method == 'zscore':
-        mean_val = df[column].mean()
-        std_val = df[column].std()
-        if std_val > 0:
-            df[column] = (df[column] - mean_val) / std_val
-    
-    return df
-
-def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
-    """
-    Handle missing values in numeric columns.
-    
-    Args:
-        df: Input DataFrame
-        strategy: Imputation strategy ('mean', 'median', or 'drop')
-    
-    Returns:
-        DataFrame with handled missing values
-    """
-    df = df.copy()
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    if strategy == 'drop':
-        return df.dropna(subset=numeric_cols)
-    
-    for col in numeric_cols:
+    def handle_missing_values(self, strategy='mean', fill_value=None):
         if strategy == 'mean':
-            fill_value = df[col].mean()
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].mean()
+            )
         elif strategy == 'median':
-            fill_value = df[col].median()
-        else:
-            continue
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].median()
+            )
+        elif strategy == 'mode':
+            for col in self.categorical_columns:
+                self.df[col] = self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else 'Unknown')
+        elif strategy == 'custom' and fill_value is not None:
+            self.df = self.df.fillna(fill_value)
+        return self
+    
+    def remove_outliers_zscore(self, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[self.numeric_columns]))
+        outlier_mask = (z_scores < threshold).all(axis=1)
+        self.df = self.df[outlier_mask]
+        return self
+    
+    def remove_outliers_iqr(self, multiplier=1.5):
+        for col in self.numeric_columns:
+            Q1 = self.df[col].quantile(0.25)
+            Q3 = self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        return self
+    
+    def normalize_data(self, method='minmax'):
+        if method == 'minmax':
+            for col in self.numeric_columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            for col in self.numeric_columns:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def summary(self):
+        print(f"Original shape: {self.df.shape}")
+        print(f"Numeric columns: {len(self.numeric_columns)}")
+        print(f"Categorical columns: {len(self.categorical_columns)}")
+        print(f"Missing values: {self.df.isnull().sum().sum()}")
         
-        df[col] = df[col].fillna(fill_value)
+def clean_dataset(df, missing_strategy='mean', outlier_method='zscore', normalize=False):
+    cleaner = DataCleaner(df)
+    cleaner.handle_missing_values(strategy=missing_strategy)
     
-    return df
-
-def clean_dataframe(df: pd.DataFrame, 
-                   deduplicate: bool = True,
-                   normalize_cols: Optional[List[str]] = None,
-                   missing_strategy: str = 'mean') -> pd.DataFrame:
-    """
-    Comprehensive data cleaning pipeline.
+    if outlier_method == 'zscore':
+        cleaner.remove_outliers_zscore()
+    elif outlier_method == 'iqr':
+        cleaner.remove_outliers_iqr()
     
-    Args:
-        df: Input DataFrame
-        deduplicate: Whether to remove duplicates
-        normalize_cols: Columns to normalize
-        missing_strategy: Strategy for handling missing values
+    if normalize:
+        cleaner.normalize_data()
     
-    Returns:
-        Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    if deduplicate:
-        cleaned_df = remove_duplicates(cleaned_df)
-    
-    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
-    
-    if normalize_cols:
-        for col in normalize_cols:
-            if col in cleaned_df.columns:
-                cleaned_df = normalize_column(cleaned_df, col)
-    
-    return cleaned_df
+    return cleaner.get_cleaned_data()
