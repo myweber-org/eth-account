@@ -1,72 +1,66 @@
 
 import os
 import sys
-from datetime import datetime
+import argparse
 
-def rename_files_by_date(directory):
+def rename_files_with_sequential_numbering(directory, prefix="file", extension=".txt", start_number=1):
+    """
+    Rename all files in the specified directory with sequential numbering.
+    
+    Args:
+        directory (str): Path to the directory containing files to rename
+        prefix (str): Prefix for renamed files
+        extension (str): File extension to filter and apply
+        start_number (int): Starting number for sequential naming
+    """
     if not os.path.isdir(directory):
-        print(f"Error: {directory} is not a valid directory.")
-        return
-
+        print(f"Error: Directory '{directory}' does not exist.")
+        sys.exit(1)
+    
     files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
     
-    for filename in files:
-        filepath = os.path.join(directory, filename)
-        mod_time = os.path.getmtime(filepath)
-        date_str = datetime.fromtimestamp(mod_time).strftime("%Y%m%d_%H%M%S")
-        
-        name, ext = os.path.splitext(filename)
-        new_filename = f"{date_str}{ext}"
-        new_filepath = os.path.join(directory, new_filename)
-        
-        counter = 1
-        while os.path.exists(new_filepath):
-            new_filename = f"{date_str}_{counter}{ext}"
-            new_filepath = os.path.join(directory, new_filename)
-            counter += 1
-        
-        os.rename(filepath, new_filepath)
-        print(f"Renamed: {filename} -> {new_filename}")
-
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python file_renamer.py <directory_path>")
-        sys.exit(1)
+    if not files:
+        print(f"No files found in directory '{directory}'.")
+        return
     
-    target_dir = sys.argv[1]
-    rename_files_by_date(target_dir)
-import os
-import sys
-
-def rename_files(directory, prefix="file_"):
-    try:
-        files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-        files.sort()
+    filtered_files = [f for f in files if f.endswith(extension)]
+    
+    if not filtered_files:
+        print(f"No files with extension '{extension}' found in directory '{directory}'.")
+        return
+    
+    filtered_files.sort()
+    
+    renamed_count = 0
+    for index, filename in enumerate(filtered_files, start=start_number):
+        old_path = os.path.join(directory, filename)
+        new_filename = f"{prefix}_{index:03d}{extension}"
+        new_path = os.path.join(directory, new_filename)
         
-        for index, filename in enumerate(files, start=1):
-            file_extension = os.path.splitext(filename)[1]
-            new_name = f"{prefix}{index:03d}{file_extension}"
-            old_path = os.path.join(directory, filename)
-            new_path = os.path.join(directory, new_name)
-            
+        try:
             os.rename(old_path, new_path)
-            print(f"Renamed: {filename} -> {new_name}")
-            
-        print(f"Successfully renamed {len(files)} files.")
-        
-    except FileNotFoundError:
-        print(f"Error: Directory '{directory}' not found.")
-    except PermissionError:
-        print(f"Error: Permission denied for directory '{directory}'.")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+            print(f"Renamed: '{filename}' -> '{new_filename}'")
+            renamed_count += 1
+        except OSError as e:
+            print(f"Error renaming '{filename}': {e}")
+    
+    print(f"\nSuccessfully renamed {renamed_count} file(s).")
+
+def main():
+    parser = argparse.ArgumentParser(description="Rename files with sequential numbering.")
+    parser.add_argument("directory", help="Directory containing files to rename")
+    parser.add_argument("-p", "--prefix", default="file", help="Prefix for renamed files (default: file)")
+    parser.add_argument("-e", "--extension", default=".txt", help="File extension to filter (default: .txt)")
+    parser.add_argument("-s", "--start", type=int, default=1, help="Starting number (default: 1)")
+    
+    args = parser.parse_args()
+    
+    rename_files_with_sequential_numbering(
+        directory=args.directory,
+        prefix=args.prefix,
+        extension=args.extension,
+        start_number=args.start
+    )
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python file_renamer.py <directory_path> [prefix]")
-        sys.exit(1)
-    
-    dir_path = sys.argv[1]
-    name_prefix = sys.argv[2] if len(sys.argv) > 2 else "file_"
-    
-    rename_files(dir_path, name_prefix)
+    main()
