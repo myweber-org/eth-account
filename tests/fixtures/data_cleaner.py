@@ -1,101 +1,40 @@
-import numpy as np
+
 import pandas as pd
-from scipy import stats
+import re
 
-def remove_outliers_iqr(df, columns=None, factor=1.5):
+def clean_dataframe(df, text_column='text'):
     """
-    Remove outliers using IQR method
+    Clean a DataFrame by removing duplicates and normalizing text.
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
     
-    df_clean = df.copy()
-    for col in columns:
-        if col in df.columns:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - factor * IQR
-            upper_bound = Q3 + factor * IQR
-            
-            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
-            df_clean = df_clean[mask]
+    # Normalize text: lowercase and remove extra whitespace
+    def normalize_text(text):
+        if pd.isna(text):
+            return text
+        text = str(text).lower()
+        text = re.sub(r'\s+', ' ', text).strip()
+        return text
     
-    return df_clean.reset_index(drop=True)
-
-def normalize_minmax(df, columns=None):
-    """
-    Normalize data using min-max scaling
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_normalized = df.copy()
-    for col in columns:
-        if col in df.columns:
-            min_val = df[col].min()
-            max_val = df[col].max()
-            if max_val > min_val:
-                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
-    
-    return df_normalized
-
-def standardize_zscore(df, columns=None):
-    """
-    Standardize data using z-score normalization
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_standardized = df.copy()
-    for col in columns:
-        if col in df.columns:
-            mean_val = df[col].mean()
-            std_val = df[col].std()
-            if std_val > 0:
-                df_standardized[col] = (df[col] - mean_val) / std_val
-    
-    return df_standardized
-
-def handle_missing_values(df, strategy='mean', columns=None):
-    """
-    Handle missing values using specified strategy
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    df_filled = df.copy()
-    for col in columns:
-        if col in df.columns and df[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = df[col].mean()
-            elif strategy == 'median':
-                fill_value = df[col].median()
-            elif strategy == 'mode':
-                fill_value = df[col].mode()[0]
-            elif strategy == 'zero':
-                fill_value = 0
-            else:
-                continue
-            
-            df_filled[col] = df[col].fillna(fill_value)
-    
-    return df_filled
-
-def clean_dataset(df, outlier_removal=True, normalization='standard', missing_strategy='mean'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    df_clean = df.copy()
-    
-    if outlier_removal:
-        df_clean = remove_outliers_iqr(df_clean)
-    
-    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
-    
-    if normalization == 'minmax':
-        df_clean = normalize_minmax(df_clean)
-    elif normalization == 'standard':
-        df_clean = standardize_zscore(df_clean)
+    df_clean[text_column] = df_clean[text_column].apply(normalize_text)
     
     return df_clean
+
+def save_cleaned_data(df, output_path='cleaned_data.csv'):
+    """
+    Save cleaned DataFrame to a CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    data = {'text': ['Hello World  ', 'hello world', 'Python   Code', 'python code']}
+    df = pd.DataFrame(data)
+    
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    save_cleaned_data(cleaned_df)
