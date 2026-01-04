@@ -1,93 +1,79 @@
+
+import numpy as np
 import pandas as pd
 
-def clean_dataframe(df):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing null values and duplicate rows.
+    Remove outliers from a DataFrame column using the IQR method.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to be cleaned.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    df_cleaned = df.copy()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    df_cleaned = df_cleaned.dropna()
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    df_cleaned = df_cleaned.drop_duplicates()
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
-    df_cleaned = df_cleaned.reset_index(drop=True)
-    
-    return df_cleaned
+    return filtered_df
 
-def validate_dataframe(df, required_columns=None):
+def calculate_summary_stats(df, column):
     """
-    Validate DataFrame structure and required columns.
+    Calculate summary statistics for a column.
     
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of required column names.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name
     
     Returns:
-        bool: True if validation passes.
-    
-    Raises:
-        ValueError: If validation fails.
+    dict: Dictionary containing summary statistics
     """
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            raise ValueError(f"Missing required columns: {missing_columns}")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if df.empty:
-        raise ValueError("DataFrame is empty")
-    
-    return True
-
-def process_data_file(file_path, required_columns=None):
-    """
-    Load and clean data from a CSV file.
-    
-    Args:
-        file_path (str): Path to the CSV file.
-        required_columns (list): List of required column names.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
-    """
-    try:
-        df = pd.read_csv(file_path)
-        
-        validate_dataframe(df, required_columns)
-        
-        df_clean = clean_dataframe(df)
-        
-        print(f"Original shape: {df.shape}")
-        print(f"Cleaned shape: {df_clean.shape}")
-        print(f"Rows removed: {len(df) - len(df_clean)}")
-        
-        return df_clean
-        
-    except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        raise
-    except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        raise
-
-if __name__ == "__main__":
-    sample_data = {
-        'name': ['Alice', 'Bob', 'Charlie', None, 'Alice'],
-        'age': [25, 30, 35, 40, 25],
-        'city': ['NYC', 'LA', 'Chicago', 'Boston', 'NYC']
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
-    df_sample = pd.DataFrame(sample_data)
-    print("Sample DataFrame:")
-    print(df_sample)
-    print("\nCleaned DataFrame:")
-    df_cleaned = clean_dataframe(df_sample)
-    print(df_cleaned)
+    return stats
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean a dataset by removing outliers from all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{col}'")
+    
+    return cleaned_df
