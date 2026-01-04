@@ -150,4 +150,66 @@ def validate_data(df, required_columns, numeric_columns):
             if df[col].isnull().any():
                 df[col] = df[col].fillna(df[col].median())
     
-    return df
+    return dfimport pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing numeric values with column mean.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # For non-numeric columns, fill with mode
+    non_numeric_cols = df_cleaned.select_dtypes(exclude=['number']).columns
+    for col in non_numeric_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown'
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = pd.DataFrame({
+#         'A': [1, 2, None, 4, 1],
+#         'B': [5, 6, 7, None, 5],
+#         'C': ['x', 'y', None, 'z', 'x']
+#     })
+#     
+#     cleaned_data = clean_dataset(sample_data)
+#     print("Original data shape:", sample_data.shape)
+#     print("Cleaned data shape:", cleaned_data.shape)
+#     print("\nCleaned data:")
+#     print(cleaned_data)
