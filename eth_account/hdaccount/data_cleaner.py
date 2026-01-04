@@ -1,42 +1,58 @@
-
 import pandas as pd
 
-def clean_dataset(df):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Clean a pandas DataFrame by removing null values and duplicate rows.
+    Remove duplicate rows from a DataFrame.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to be cleaned.
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: DataFrame with duplicates removed.
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    if df.empty:
+        return df
     
-    cleaned_df = df.copy()
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
     
-    cleaned_df = cleaned_df.dropna()
-    
-    cleaned_df = cleaned_df.drop_duplicates()
-    
-    cleaned_df = cleaned_df.reset_index(drop=True)
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows.")
     
     return cleaned_df
 
-def validate_data(df, required_columns=None):
+def clean_numeric_columns(df, columns):
     """
-    Validate the DataFrame structure and content.
+    Clean numeric columns by converting to appropriate types.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned numeric columns.
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
     
     Args:
         df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of required column names.
+        required_columns (list, optional): List of required columns.
     
     Returns:
         bool: True if validation passes, False otherwise.
     """
-    if df.empty:
-        print("Warning: DataFrame is empty")
+    if df is None or df.empty:
+        print("DataFrame is empty or None.")
         return False
     
     if required_columns:
@@ -47,19 +63,22 @@ def validate_data(df, required_columns=None):
     
     return True
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, None, 4, 2],
-        'B': [5, 6, 7, None, 6],
-        'C': ['x', 'y', 'z', 'x', 'y']
+def get_data_summary(df):
+    """
+    Generate summary statistics for the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+        dict: Dictionary containing summary statistics.
+    """
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict()
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned = clean_dataset(df)
-    print(cleaned)
-    
-    is_valid = validate_data(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nData validation passed: {is_valid}")
+    return summary
