@@ -135,4 +135,65 @@ def remove_duplicates_preserve_order(input_list):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport csv
+import re
+
+def clean_numeric_string(value):
+    """Remove non-numeric characters from a string."""
+    if not isinstance(value, str):
+        return value
+    return re.sub(r'[^\d.-]', '', value)
+
+def standardize_phone_number(phone):
+    """Standardize phone number format to (XXX) XXX-XXXX."""
+    cleaned = clean_numeric_string(str(phone))
+    if len(cleaned) == 10:
+        return f"({cleaned[:3]}) {cleaned[3:6]}-{cleaned[6:]}"
+    return phone
+
+def read_csv_file(filepath):
+    """Read CSV file and return data as list of dictionaries."""
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            return [row for row in reader]
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        return []
+
+def write_csv_file(filepath, data, fieldnames):
+    """Write data to CSV file."""
+    try:
+        with open(filepath, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"Data successfully written to '{filepath}'.")
+    except Exception as e:
+        print(f"Error writing file: {e}")
+
+def clean_csv_data(input_file, output_file):
+    """Clean data in CSV file and save to new file."""
+    data = read_csv_file(input_file)
+    if not data:
+        return
+    
+    cleaned_data = []
+    for row in data:
+        cleaned_row = {}
+        for key, value in row.items():
+            if 'phone' in key.lower():
+                cleaned_row[key] = standardize_phone_number(value)
+            elif any(num_key in key.lower() for num_key in ['amount', 'price', 'quantity']):
+                cleaned_row[key] = clean_numeric_string(value)
+            else:
+                cleaned_row[key] = value.strip() if isinstance(value, str) else value
+        cleaned_data.append(cleaned_row)
+    
+    if cleaned_data:
+        write_csv_file(output_file, cleaned_data, list(cleaned_data[0].keys()))
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    clean_csv_data(input_csv, output_csv)
