@@ -1,137 +1,101 @@
+import numpy as np
 import pandas as pd
+from scipy import stats
 
-def remove_duplicates(dataframe, subset=None, keep='first'):
+def remove_outliers_iqr(df, columns=None, factor=1.5):
     """
-    Remove duplicate rows from a pandas DataFrame.
-    
-    Args:
-        dataframe: pandas DataFrame to process
-        subset: column label or sequence of labels to consider for duplicates
-        keep: determines which duplicates to keep ('first', 'last', False)
-    
-    Returns:
-        DataFrame with duplicates removed
+    Remove outliers using IQR method
     """
-    if dataframe.empty:
-        return dataframe
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
-    
-    removed_count = len(dataframe) - len(cleaned_df)
-    if removed_count > 0:
-        print(f"Removed {removed_count} duplicate row(s)")
-    
-    return cleaned_df
-
-def clean_numeric_columns(dataframe, columns):
-    """
-    Clean numeric columns by converting to appropriate types and handling errors.
-    
-    Args:
-        dataframe: pandas DataFrame
-        columns: list of column names to clean
-    
-    Returns:
-        DataFrame with cleaned numeric columns
-    """
+    df_clean = df.copy()
     for col in columns:
-        if col in dataframe.columns:
-            dataframe[col] = pd.to_numeric(dataframe[col], errors='coerce')
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
     
-    return dataframe
+    return df_clean.reset_index(drop=True)
 
-def validate_dataframe(dataframe, required_columns):
+def normalize_minmax(df, columns=None):
     """
-    Validate that DataFrame contains required columns.
-    
-    Args:
-        dataframe: pandas DataFrame to validate
-        required_columns: list of required column names
-    
-    Returns:
-        bool: True if all required columns are present
+    Normalize data using min-max scaling
     """
-    missing_columns = [col for col in required_columns if col not in dataframe.columns]
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    if missing_columns:
-        print(f"Missing required columns: {missing_columns}")
-        return False
-    
-    return Trueimport pandas as pd
-
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        subset (list, optional): Column labels to consider for duplicates.
-        keep (str, optional): Which duplicates to keep.
-    
-    Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
-    """
-    if df.empty:
-        return df
-    
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
-
-def clean_numeric_columns(df, columns):
-    """
-    Clean numeric columns by converting to float and handling errors.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        columns (list): List of column names to clean.
-    
-    Returns:
-        pd.DataFrame: DataFrame with cleaned numeric columns.
-    """
-    cleaned_df = df.copy()
-    
+    df_normalized = df.copy()
     for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
     
-    return cleaned_df
+    return df_normalized
 
-def validate_dataframe(df, required_columns):
+def standardize_zscore(df, columns=None):
     """
-    Validate that DataFrame contains required columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        required_columns (list): List of required column names.
-    
-    Returns:
-        bool: True if all required columns are present.
+    Standardize data using z-score normalization
     """
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
+    df_standardized = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                df_standardized[col] = (df[col] - mean_val) / std_val
     
-    return True
+    return df_standardized
 
-def get_cleaning_summary(original_df, cleaned_df):
+def handle_missing_values(df, strategy='mean', columns=None):
     """
-    Generate a summary of the cleaning operations performed.
-    
-    Args:
-        original_df (pd.DataFrame): Original DataFrame.
-        cleaned_df (pd.DataFrame): Cleaned DataFrame.
-    
-    Returns:
-        dict: Summary statistics.
+    Handle missing values using specified strategy
     """
-    summary = {
-        'original_rows': len(original_df),
-        'cleaned_rows': len(cleaned_df),
-        'rows_removed': len(original_df) - len(cleaned_df),
-        'columns_original': len(original_df.columns),
-        'columns_cleaned': len(cleaned_df.columns)
-    }
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    return summary
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                continue
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def clean_dataset(df, outlier_removal=True, normalization='standard', missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    df_clean = df.copy()
+    
+    if outlier_removal:
+        df_clean = remove_outliers_iqr(df_clean)
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    
+    if normalization == 'minmax':
+        df_clean = normalize_minmax(df_clean)
+    elif normalization == 'standard':
+        df_clean = standardize_zscore(df_clean)
+    
+    return df_clean
