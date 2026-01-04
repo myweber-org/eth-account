@@ -1,70 +1,61 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
 
-def remove_outliers_iqr(dataframe, column):
-    Q1 = dataframe[column].quantile(0.25)
-    Q3 = dataframe[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
-
-def remove_outliers_zscore(dataframe, column, threshold=3):
-    z_scores = np.abs(stats.zscore(dataframe[column]))
-    return dataframe[z_scores < threshold]
-
-def normalize_minmax(dataframe, column):
-    min_val = dataframe[column].min()
-    max_val = dataframe[column].max()
-    dataframe[column + '_normalized'] = (dataframe[column] - min_val) / (max_val - min_val)
-    return dataframe
-
-def normalize_zscore(dataframe, column):
-    mean_val = dataframe[column].mean()
-    std_val = dataframe[column].std()
-    dataframe[column + '_standardized'] = (dataframe[column] - mean_val) / std_val
-    return dataframe
-
-def handle_missing_values(dataframe, strategy='mean'):
-    if strategy == 'mean':
-        return dataframe.fillna(dataframe.mean())
-    elif strategy == 'median':
-        return dataframe.fillna(dataframe.median())
-    elif strategy == 'mode':
-        return dataframe.fillna(dataframe.mode().iloc[0])
-    elif strategy == 'drop':
-        return dataframe.dropna()
-    else:
-        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
-
-def clean_dataset(dataframe, numeric_columns):
-    cleaned_df = dataframe.copy()
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df = normalize_minmax(cleaned_df, col)
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'.
+                            Default is 'mean'.
     
-    cleaned_df = handle_missing_values(cleaned_df, strategy='mean')
-    return cleaned_df
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if fill_missing == 'drop':
+        df_clean = df_clean.dropna()
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = df_clean.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+            elif fill_missing == 'median':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    elif fill_missing == 'mode':
+        for col in df_clean.columns:
+            mode_val = df_clean[col].mode()
+            if not mode_val.empty:
+                df_clean[col] = df_clean[col].fillna(mode_val.iloc[0])
+    
+    return df_clean
 
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature1': np.random.normal(100, 15, 1000),
-        'feature2': np.random.exponential(50, 1000),
-        'feature3': np.random.uniform(0, 1, 1000)
-    })
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the DataFrame structure and content.
     
-    sample_data.iloc[::100, 0] = np.nan
-    sample_data.iloc[::50, 1] = 9999
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
     
-    numeric_cols = ['feature1', 'feature2', 'feature3']
-    cleaned_data = clean_dataset(sample_data, numeric_cols)
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {cleaned_data.shape}")
-    print(f"Missing values in cleaned data: {cleaned_data.isnull().sum().sum()}")
-    print(f"Cleaned data statistics:")
-    print(cleaned_data.describe())
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
