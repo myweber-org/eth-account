@@ -143,3 +143,54 @@ def validate_data(df, required_columns, min_rows=10):
         raise ValueError(f"Missing required columns: {missing_columns}")
     
     return True
+import pandas as pd
+
+def clean_dataset(df, subset=None, fill_method='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame to clean.
+    subset (list, optional): Column labels to consider for identifying duplicates.
+                             If None, all columns are used.
+    fill_method (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'.
+                       If 'drop', rows with any missing values are removed.
+
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    cleaned_df = df.copy()
+
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates(subset=subset)
+
+    # Handle missing values
+    if fill_method == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    else:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if fill_method == 'mean':
+                    fill_value = cleaned_df[col].mean()
+                elif fill_method == 'median':
+                    fill_value = cleaned_df[col].median()
+                elif fill_method == 'mode':
+                    fill_value = cleaned_df[col].mode()[0]
+                else:
+                    raise ValueError("fill_method must be 'mean', 'median', 'mode', or 'drop'")
+                cleaned_df[col].fillna(fill_value, inplace=True)
+
+        # For non-numeric columns, fill with the mode or a placeholder
+        non_numeric_cols = cleaned_df.select_dtypes(exclude=['number']).columns
+        for col in non_numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if fill_method in ['mean', 'median']:
+                    # For non-numeric, use mode if mean/median is specified
+                    fill_value = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown'
+                elif fill_method == 'mode':
+                    fill_value = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown'
+                cleaned_df[col].fillna(fill_value, inplace=True)
+
+    return cleaned_df
