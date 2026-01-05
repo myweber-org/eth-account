@@ -383,3 +383,104 @@ class DataCleaner:
     
     def get_cleaned_data(self):
         return self.df.copy()
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates()
+        return self
+        
+    def handle_missing_values(self, strategy: str = 'mean', fill_value: Optional[float] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mode().iloc[0])
+        elif strategy == 'constant' and fill_value is not None:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(fill_value)
+        elif strategy == 'drop':
+            self.df = self.df.dropna(subset=numeric_cols)
+            
+        return self
+        
+    def remove_outliers(self, method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        if method == 'iqr':
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+                
+        return self
+        
+    def normalize_data(self, columns: Optional[list] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+                    
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_cleaning_report(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1]
+        }
+
+def clean_csv_file(filepath: str, output_path: Optional[str] = None) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates() \
+           .handle_missing_values(strategy='mean') \
+           .remove_outliers() \
+           .normalize_data()
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    
+    if output_path:
+        cleaned_df.to_csv(output_path, index=False)
+        
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 50, 200],
+        'C': ['x', 'y', 'z', 'x', 'y', 'y', 'z']
+    })
+    
+    cleaner = DataCleaner(sample_data)
+    result = cleaner.remove_duplicates() \
+                    .handle_missing_values() \
+                    .remove_outliers() \
+                    .normalize_data() \
+                    .get_cleaned_data()
+    
+    print("Original data shape:", sample_data.shape)
+    print("Cleaned data shape:", result.shape)
+    print("Cleaning report:", cleaner.get_cleaning_report())
