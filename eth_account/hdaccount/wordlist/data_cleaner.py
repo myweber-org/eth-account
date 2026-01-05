@@ -256,3 +256,131 @@ def validate_dataset(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "Dataset is valid"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mode()[0])
+    elif strategy == 'drop':
+        data = data.dropna(subset=numeric_cols)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    return data
+
+def clean_dataset(data, numeric_columns=None, outlier_factor=1.5, 
+                  normalization='standardize', missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    # Remove outliers from numeric columns
+    total_removed = 0
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data, removed = remove_outliers_iqr(cleaned_data, col, outlier_factor)
+            total_removed += removed
+    
+    # Apply normalization
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            if normalization == 'minmax':
+                cleaned_data[col] = normalize_minmax(cleaned_data, col)
+            elif normalization == 'standardize':
+                cleaned_data[col] = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data, total_removed
+
+def validate_data(data, check_duplicates=True, check_infinite=True):
+    """
+    Validate data quality
+    """
+    validation_results = {}
+    
+    if check_duplicates:
+        duplicate_count = data.duplicated().sum()
+        validation_results['duplicates'] = duplicate_count
+    
+    if check_infinite:
+        numeric_cols = data.select_dtypes(include=[np.number]).columns
+        infinite_count = 0
+        for col in numeric_cols:
+            infinite_count += np.isinf(data[col]).sum()
+        validation_results['infinite_values'] = infinite_count
+    
+    validation_results['null_values'] = data.isnull().sum().sum()
+    validation_results['shape'] = data.shape
+    
+    return validation_results
