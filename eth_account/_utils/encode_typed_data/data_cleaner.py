@@ -1,83 +1,73 @@
 import pandas as pd
 import numpy as np
+from scipy import stats
 
-def clean_missing_data(file_path, strategy='mean', columns=None):
+def load_and_clean_data(filepath):
     """
-    Load a CSV file and handle missing values using specified strategy.
-    
-    Args:
-        file_path (str): Path to the CSV file
-        strategy (str): Method for handling missing values ('mean', 'median', 'mode', 'drop')
-        columns (list): Specific columns to clean, if None cleans all columns
-    
-    Returns:
-        pandas.DataFrame: Cleaned dataframe
+    Load a CSV file and perform basic data cleaning.
     """
     try:
-        df = pd.read_csv(file_path)
-        
-        if columns is None:
-            columns = df.columns
-        
-        for column in columns:
-            if column in df.columns:
-                if df[column].isnull().any():
-                    if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[column]):
-                        df[column].fillna(df[column].mean(), inplace=True)
-                    elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[column]):
-                        df[column].fillna(df[column].median(), inplace=True)
-                    elif strategy == 'mode':
-                        df[column].fillna(df[column].mode()[0], inplace=True)
-                    elif strategy == 'drop':
-                        df.dropna(subset=[column], inplace=True)
-        
-        return df
-    
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
     except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
+        print(f"Error: File not found at {filepath}")
         return None
     except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
+        print(f"Error loading file: {e}")
         return None
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate dataframe structure and content.
-    
-    Args:
-        df (pandas.DataFrame): Dataframe to validate
-        required_columns (list): List of required column names
-    
-    Returns:
-        bool: True if validation passes, False otherwise
-    """
-    if df is None or df.empty:
-        print("Error: Dataframe is empty or None")
-        return False
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Error: Missing required columns: {missing_columns}")
-            return False
-    
-    return True
+    # Remove duplicate rows
+    initial_rows = df.shape[0]
+    df.drop_duplicates(inplace=True)
+    duplicates_removed = initial_rows - df.shape[0]
+    print(f"Removed {duplicates_removed} duplicate rows.")
+
+    # Handle missing values: drop rows where all values are NaN
+    df.dropna(how='all', inplace=True)
+    # For numeric columns, fill missing values with column median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().sum() > 0:
+            df[col].fillna(df[col].median(), inplace=True)
+
+    # Remove outliers using Z-score for numeric columns
+    # Consider values with |Z| > 3 as outliers
+    z_scores = np.abs(stats.zscore(df[numeric_cols]))
+    outlier_mask = (z_scores < 3).all(axis=1)
+    df_clean = df[outlier_mask].copy()
+    outliers_removed = df.shape[0] - df_clean.shape[0]
+    print(f"Removed {outliers_removed} outliers based on Z-score.")
+
+    # Normalize numeric columns to range [0, 1]
+    for col in numeric_cols:
+        if df_clean[col].nunique() > 1:  # Avoid normalizing constant columns
+            min_val = df_clean[col].min()
+            max_val = df_clean[col].max()
+            if max_val != min_val:
+                df_clean[col] = (df_clean[col] - min_val) / (max_val - min_val)
+            else:
+                df_clean[col] = 0.5  # Assign middle value if constant
+
+    print(f"Final cleaned data shape: {df_clean.shape}")
+    return df_clean
 
 def save_cleaned_data(df, output_path):
     """
-    Save cleaned dataframe to CSV file.
-    
-    Args:
-        df (pandas.DataFrame): Cleaned dataframe
-        output_path (str): Path to save the cleaned data
-    
-    Returns:
-        bool: True if save successful, False otherwise
+    Save the cleaned DataFrame to a CSV file.
     """
-    try:
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to {output_path}")
-        return True
-    except Exception as e:
-        print(f"Error saving data: {str(e)}")
-        return False
+    if df is not None:
+        try:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        except Exception as e:
+            print(f"Error saving file: {e}")
+    else:
+        print("No data to save.")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+
+    cleaned_df = load_and_clean_data(input_file)
+    save_cleaned_data(cleaned_df, output_file)
