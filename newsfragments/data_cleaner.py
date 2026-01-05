@@ -185,3 +185,137 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned_df, ['temperature', 'humidity', 'pressure'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, fill_strategy='mean'):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Parameters:
+    file_path (str): Path to input CSV file.
+    output_path (str, optional): Path for cleaned output CSV. If None, returns DataFrame.
+    fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'drop').
+    
+    Returns:
+    pd.DataFrame or None: Cleaned DataFrame if output_path is None, else saves to file.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        duplicates_removed = initial_rows - len(df)
+        print(f"Removed {duplicates_removed} duplicate rows")
+        
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+        
+        if fill_strategy == 'drop':
+            df = df.dropna()
+            print("Removed rows with missing values")
+        else:
+            for col in numeric_cols:
+                if df[col].isnull().any():
+                    if fill_strategy == 'mean':
+                        fill_value = df[col].mean()
+                    elif fill_strategy == 'median':
+                        fill_value = df[col].median()
+                    elif fill_strategy == 'mode':
+                        fill_value = df[col].mode()[0]
+                    else:
+                        fill_value = 0
+                    
+                    df[col].fillna(fill_value, inplace=True)
+                    print(f"Filled missing values in {col} with {fill_strategy}: {fill_value}")
+            
+            for col in categorical_cols:
+                if df[col].isnull().any():
+                    df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+                    print(f"Filled missing values in {col} with mode")
+        
+        print(f"Final data shape: {df.shape}")
+        
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+            return None
+        else:
+            return df
+            
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    dict: Validation results.
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if df is None or df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('DataFrame is empty or None')
+        return validation_results
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_cols}')
+    
+    # Check for all-null columns
+    null_columns = df.columns[df.isnull().all()].tolist()
+    if null_columns:
+        validation_results['warnings'].append(f'Columns with all null values: {null_columns}')
+    
+    # Check for constant columns
+    constant_columns = []
+    for col in df.columns:
+        if df[col].nunique() == 1:
+            constant_columns.append(col)
+    
+    if constant_columns:
+        validation_results['warnings'].append(f'Constant columns (single unique value): {constant_columns}')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'value': [10.5, np.nan, 15.2, 15.2, np.nan, 10.5],
+        'category': ['A', 'B', 'A', np.nan, 'C', 'A'],
+        'score': [100, 90, np.nan, 85, 95, 100]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.to_csv('sample_data.csv', index=False)
+    
+    print("Testing data cleaning utility...")
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='mean')
+    
+    if cleaned_df is not None:
+        validation = validate_dataframe(cleaned_df, required_columns=['id', 'value', 'category'])
+        print(f"Validation results: {validation}")
+        
+        import os
+        if os.path.exists('sample_data.csv'):
+            os.remove('sample_data.csv')
