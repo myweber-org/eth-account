@@ -536,4 +536,87 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     print("\nFirst 5 rows of cleaned data:")
-    print(cleaned_df.head())
+    print(cleaned_df.head())import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_method=None):
+    """
+    Clean a pandas DataFrame by handling missing values and optionally removing duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): If True, remove duplicate rows.
+    fill_method (str or None): Method to fill missing values: 'mean', 'median', 'mode', or None to drop rows.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if fill_method is None:
+        cleaned_df = cleaned_df.dropna()
+    else:
+        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+        if fill_method == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_method == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_method == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+                else:
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+    
+    # Remove duplicates if requested
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_clean_data(df, original_df):
+    """
+    Validate the cleaning process by comparing original and cleaned DataFrames.
+    
+    Parameters:
+    df (pd.DataFrame): Cleaned DataFrame.
+    original_df (pd.DataFrame): Original DataFrame.
+    
+    Returns:
+    dict: Dictionary with validation metrics.
+    """
+    validation = {
+        'original_rows': len(original_df),
+        'cleaned_rows': len(df),
+        'rows_removed': len(original_df) - len(df),
+        'original_columns': len(original_df.columns),
+        'cleaned_columns': len(df.columns),
+        'original_nulls': original_df.isnull().sum().sum(),
+        'cleaned_nulls': df.isnull().sum().sum(),
+        'original_duplicates': original_df.duplicated().sum(),
+        'cleaned_duplicates': df.duplicated().sum()
+    }
+    
+    return validation
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     data = {
+#         'A': [1, 2, None, 4, 5, 5],
+#         'B': [None, 2, 3, 4, 5, 5],
+#         'C': ['x', 'y', None, 'z', 'x', 'x']
+#     }
+#     sample_df = pd.DataFrame(data)
+#     
+#     # Clean the data
+#     cleaned = clean_dataset(sample_df, drop_duplicates=True, fill_method='mean')
+#     
+#     # Validate
+#     metrics = validate_clean_data(cleaned, sample_df)
+#     print("Cleaning Metrics:", metrics)
+#     print("\nCleaned DataFrame:")
+#     print(cleaned)
