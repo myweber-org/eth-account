@@ -1,40 +1,31 @@
 
 import pandas as pd
-import re
+import numpy as np
 
-def clean_dataframe(df, text_column='text'):
-    """
-    Clean a DataFrame by removing duplicates and normalizing text.
-    """
-    # Remove duplicate rows
-    df_clean = df.drop_duplicates().reset_index(drop=True)
-    
-    # Normalize text: lowercase and remove extra whitespace
-    def normalize_text(text):
-        if pd.isna(text):
-            return text
-        text = str(text).lower()
-        text = re.sub(r'\s+', ' ', text).strip()
-        return text
-    
-    df_clean[text_column] = df_clean[text_column].apply(normalize_text)
-    
-    return df_clean
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def save_cleaned_data(df, output_path='cleaned_data.csv'):
-    """
-    Save cleaned DataFrame to a CSV file.
-    """
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
+def clean_dataset(file_path, output_path):
+    try:
+        df = pd.read_csv(file_path)
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_columns:
+            df = remove_outliers_iqr(df, col)
+        
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error during cleaning: {e}")
+        return False
 
 if __name__ == "__main__":
-    # Example usage
-    data = {'text': ['Hello World  ', 'hello world', 'Python   Code', 'python code']}
-    df = pd.DataFrame(data)
-    
-    cleaned_df = clean_dataframe(df)
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
-    
-    save_cleaned_data(cleaned_df)
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    clean_dataset(input_file, output_file)
