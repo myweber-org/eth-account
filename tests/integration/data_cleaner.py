@@ -324,4 +324,92 @@ def get_data_summary(df):
         'data_types': df.dtypes.to_dict()
     }
     
-    return summary
+    return summaryimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns a filtered Series.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    Returns a filtered DataFrame.
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    return data[z_scores < threshold]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data to [0,1] range using min-max scaling.
+    Returns a new Series.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    return (data[column] - min_val) / (max_val - min_val)
+
+def normalize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    Returns a new Series.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    return (data[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Main cleaning function that processes multiple numeric columns.
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+        
+        if normalize_method == 'minmax':
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+        elif normalize_method == 'zscore':
+            cleaned_df[col] = normalize_zscore(cleaned_df, col)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_data(df, required_columns, check_missing=True, check_negative=True):
+    """
+    Validate dataset structure and content.
+    Returns boolean and message tuple.
+    """
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        return False, f"Missing columns: {missing_cols}"
+    
+    if check_missing:
+        missing_values = df.isnull().sum().sum()
+        if missing_values > 0:
+            return False, f"Dataset contains {missing_values} missing values"
+    
+    if check_negative:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        negative_counts = (df[numeric_cols] < 0).sum().sum()
+        if negative_counts > 0:
+            return False, f"Dataset contains {negative_counts} negative values in numeric columns"
+    
+    return True, "Dataset validation passed"
