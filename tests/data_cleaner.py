@@ -120,4 +120,100 @@ if __name__ == "__main__":
     
     cleaned_df = clean_missing_data(df, strategy='mean')
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    print(cleaned_df)import pandas as pd
+import numpy as np
+
+def clean_missing_data(filepath, strategy='mean', columns=None):
+    """
+    Load a CSV file and handle missing values using specified strategy.
+    
+    Args:
+        filepath (str): Path to the CSV file
+        strategy (str): Method for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns (list): Specific columns to clean, if None cleans all columns
+    
+    Returns:
+        pandas.DataFrame: Cleaned dataframe
+    """
+    try:
+        df = pd.read_csv(filepath)
+        
+        if columns is None:
+            columns = df.columns
+        
+        for col in columns:
+            if col in df.columns:
+                if strategy == 'mean':
+                    df[col].fillna(df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    df[col].fillna(df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    df[col].fillna(df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    df.dropna(subset=[col], inplace=True)
+                else:
+                    raise ValueError(f"Unknown strategy: {strategy}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Args:
+        df (pandas.DataFrame): Dataframe to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        bool: True if validation passes, False otherwise
+    """
+    if df is None or df.empty:
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned dataframe to CSV file.
+    
+    Args:
+        df (pandas.DataFrame): Cleaned dataframe
+        output_path (str): Path for output CSV file
+    
+    Returns:
+        bool: True if save successful, False otherwise
+    """
+    try:
+        df.to_csv(output_path, index=False)
+        return True
+    except Exception as e:
+        print(f"Error saving file: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_missing_data(input_file, strategy='median')
+    
+    if cleaned_df is not None and validate_dataframe(cleaned_df):
+        if save_cleaned_data(cleaned_df, output_file):
+            print(f"Data cleaning completed. Saved to {output_file}")
+        else:
+            print("Failed to save cleaned data")
+    else:
+        print("Data cleaning failed")
