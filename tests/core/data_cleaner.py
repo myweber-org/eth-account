@@ -1,54 +1,39 @@
+
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        subset (list, optional): Column labels to consider for duplicates.
-        keep (str, optional): Which duplicates to keep.
-    
-    Returns:
-        pd.DataFrame: DataFrame with duplicates removed.
-    """
-    if df.empty:
-        return df
-    
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    return cleaned_df
+def load_data(filepath):
+    return pd.read_csv(filepath)
 
-def clean_numeric_columns(df, columns):
-    """
-    Clean numeric columns by removing non-numeric characters.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        columns (list): List of column names to clean.
-    
-    Returns:
-        pd.DataFrame: DataFrame with cleaned numeric columns.
-    """
-    for col in columns:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_column(df, column):
+    mean = df[column].mean()
+    std = df[column].std()
+    df[column] = (df[column] - mean) / std
     return df
 
-def validate_data(df, required_columns):
-    """
-    Validate that required columns exist in DataFrame.
+def clean_dataset(input_file, output_file):
+    df = load_data(input_file)
     
-    Args:
-        df (pd.DataFrame): Input DataFrame.
-        required_columns (list): List of required column names.
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
     
-    Returns:
-        bool: True if all required columns exist, False otherwise.
-    """
-    missing_columns = [col for col in required_columns if col not in df.columns]
+    for col in numeric_columns:
+        df = remove_outliers_iqr(df, col)
     
-    if missing_columns:
-        print(f"Missing columns: {missing_columns}")
-        return False
+    for col in numeric_columns:
+        df = normalize_column(df, col)
     
-    return True
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    return df
+
+if __name__ == "__main__":
+    clean_dataset('raw_data.csv', 'cleaned_data.csv')
