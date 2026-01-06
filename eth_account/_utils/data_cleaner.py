@@ -323,4 +323,101 @@ def clean_dataset(df: pd.DataFrame,
             if col in cleaned_df.columns:
                 cleaned_df = filter_outliers(cleaned_df, col)
     
-    return cleaned_df
+    return cleaned_dfimport numpy as np
+import pandas as pd
+
+class DataCleaner:
+    def __init__(self, data):
+        self.data = data
+        self.cleaned_data = None
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.data[column].quantile(0.25)
+        Q3 = self.data[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = self.data[(self.data[column] < lower_bound) | (self.data[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers(self, columns):
+        clean_data = self.data.copy()
+        for col in columns:
+            Q1 = clean_data[col].quantile(0.25)
+            Q3 = clean_data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            clean_data = clean_data[(clean_data[col] >= lower_bound) & (clean_data[col] <= upper_bound)]
+        self.cleaned_data = clean_data
+        return clean_data
+    
+    def normalize_minmax(self, columns):
+        if self.cleaned_data is None:
+            data_to_normalize = self.data.copy()
+        else:
+            data_to_normalize = self.cleaned_data.copy()
+        
+        for col in columns:
+            min_val = data_to_normalize[col].min()
+            max_val = data_to_normalize[col].max()
+            if max_val != min_val:
+                data_to_normalize[col] = (data_to_normalize[col] - min_val) / (max_val - min_val)
+        return data_to_normalize
+    
+    def fill_missing_mean(self, columns):
+        if self.cleaned_data is None:
+            data_to_fill = self.data.copy()
+        else:
+            data_to_fill = self.cleaned_data.copy()
+        
+        for col in columns:
+            if data_to_fill[col].isnull().any():
+                mean_val = data_to_fill[col].mean()
+                data_to_fill[col].fillna(mean_val, inplace=True)
+        return data_to_fill
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.data),
+            'original_columns': len(self.data.columns),
+            'cleaned_rows': len(self.cleaned_data) if self.cleaned_data is not None else len(self.data),
+            'cleaned_columns': len(self.cleaned_data.columns) if self.cleaned_data is not None else len(self.data.columns),
+            'missing_values': self.data.isnull().sum().to_dict() if self.cleaned_data is None else self.cleaned_data.isnull().sum().to_dict()
+        }
+        return summary
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'feature_c': np.random.uniform(0, 1, 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[np.random.choice(100, 5), 'feature_a'] = np.nan
+    df.loc[10:15, 'feature_b'] = df['feature_b'].max() * 3
+    return df
+
+if __name__ == "__main__":
+    sample_data = create_sample_data()
+    cleaner = DataCleaner(sample_data)
+    
+    outliers = cleaner.detect_outliers_iqr('feature_b')
+    print(f"Detected outliers in feature_b: {len(outliers)}")
+    
+    cleaned = cleaner.remove_outliers(['feature_b'])
+    print(f"Data after removing outliers: {len(cleaned)} rows")
+    
+    normalized = cleaner.normalize_minmax(['feature_a', 'feature_b', 'feature_c'])
+    print("Normalized data sample:")
+    print(normalized.head())
+    
+    filled = cleaner.fill_missing_mean(['feature_a'])
+    print("Data after filling missing values:")
+    print(filled.isnull().sum())
+    
+    summary = cleaner.get_summary()
+    print("Data cleaning summary:")
+    for key, value in summary.items():
+        print(f"{key}: {value}")
