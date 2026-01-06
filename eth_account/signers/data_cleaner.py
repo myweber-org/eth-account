@@ -143,3 +143,73 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid, message = validate_data(cleaned, allow_nan=False)
     print(f"Validation: {is_valid}, Message: {message}")
+import pandas as pd
+import hashlib
+
+def remove_duplicates_by_hash(df, columns):
+    """
+    Remove duplicate rows based on a hash of specified columns.
+    """
+    if not columns:
+        raise ValueError("Columns list cannot be empty")
+    
+    df['_hash'] = df[columns].apply(
+        lambda row: hashlib.md5(
+            ''.join(row.astype(str)).encode()
+        ).hexdigest(),
+        axis=1
+    )
+    
+    df_cleaned = df.drop_duplicates(subset=['_hash'])
+    df_cleaned = df_cleaned.drop(columns=['_hash'])
+    
+    return df_cleaned.reset_index(drop=True)
+
+def clean_numeric_columns(df, columns, fill_method='mean'):
+    """
+    Clean numeric columns by filling missing values.
+    """
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if fill_method == 'mean':
+            fill_value = df[col].mean()
+        elif fill_method == 'median':
+            fill_value = df[col].median()
+        elif fill_method == 'mode':
+            fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+        else:
+            fill_value = 0
+        
+        df[col] = df[col].fillna(fill_value)
+    
+    return df
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 3, 4, 5, 3],
+        'name': ['Alice', 'Bob', 'Charlie', 'David', 'Eve', 'Charlie'],
+        'age': [25, 30, None, 35, 40, 35],
+        'score': [85.5, 92.0, 78.5, None, 88.0, 78.5]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    # Remove duplicates
+    df_unique = remove_duplicates_by_hash(df, ['name', 'age', 'score'])
+    print("After removing duplicates:")
+    print(df_unique)
+    print()
+    
+    # Clean numeric columns
+    df_cleaned = clean_numeric_columns(df_unique, ['age', 'score'], fill_method='mean')
+    print("After cleaning numeric columns:")
+    print(df_cleaned)
+
+if __name__ == "__main__":
+    main()
