@@ -348,4 +348,85 @@ def clean_dataframe(df: pd.DataFrame,
         for column in normalize_columns:
             cleaned_df = normalize_column(cleaned_df, column)
     
+    return cleaned_dfimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, convert_types=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and converting data types.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if convert_types:
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype == 'object':
+                try:
+                    cleaned_df[col] = pd.to_datetime(cleaned_df[col])
+                    print(f"Converted column '{col}' to datetime")
+                except (ValueError, TypeError):
+                    try:
+                        cleaned_df[col] = pd.to_numeric(cleaned_df[col])
+                        print(f"Converted column '{col}' to numeric")
+                    except (ValueError, TypeError):
+                        pass
+    
+    cleaned_df = cleaned_df.replace([np.inf, -np.inf], np.nan)
+    cleaned_df = cleaned_df.dropna(how='all')
+    
     return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def sample_data_cleaning():
+    """
+    Example usage of the data cleaning functions.
+    """
+    data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': ['100', '200', '200', '300', 'invalid'],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-02', '2023-01-03', '2023-01-04']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    try:
+        validate_dataframe(df, required_columns=['id', 'value'])
+        cleaned_df = clean_dataset(df)
+        
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+        print("\nCleaned DataFrame info:")
+        print(cleaned_df.info())
+        
+        return cleaned_df
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return None
+
+if __name__ == "__main__":
+    cleaned_data = sample_data_cleaning()
