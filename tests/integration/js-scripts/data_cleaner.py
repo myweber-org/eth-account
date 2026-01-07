@@ -1,70 +1,77 @@
 
-import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(data, column):
     """
-    Remove outliers from a specified column in a DataFrame using the IQR method.
+    Remove outliers from a specified column using the IQR method.
     
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
+    Args:
+        data (list or np.array): Input data
+        column (int): Column index for 2D data, or None for 1D data
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+        np.array: Data with outliers removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if column is not None:
+        column_data = np.array(data)[:, column].astype(float)
+    else:
+        column_data = np.array(data).astype(float)
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    if column is not None:
+        filtered_indices = np.where((column_data >= lower_bound) & (column_data <= upper_bound))[0]
+        return np.array(data)[filtered_indices]
+    else:
+        return column_data[(column_data >= lower_bound) & (column_data <= upper_bound)]
 
-def calculate_basic_stats(df, column):
+def calculate_statistics(data):
     """
-    Calculate basic statistics for a column.
+    Calculate basic statistics for the data.
     
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name.
+    Args:
+        data (list or np.array): Input data
     
     Returns:
-    dict: Dictionary containing statistics.
+        dict: Dictionary containing mean, median, std, min, max
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    data_array = np.array(data).astype(float)
     
     stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
+        'mean': np.mean(data_array),
+        'median': np.median(data_array),
+        'std': np.std(data_array),
+        'min': np.min(data_array),
+        'max': np.max(data_array)
     }
     
     return stats
 
-if __name__ == "__main__":
-    sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 12, 10, 9, 9, 10, 200]
-    }
+def clean_dataset(data, column=None):
+    """
+    Main function to clean dataset by removing outliers.
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nOriginal Statistics:")
-    print(calculate_basic_stats(df, 'values'))
+    Args:
+        data (list or np.array): Input data
+        column (int, optional): Column index for 2D data
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print("\nCleaned Statistics:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    Returns:
+        tuple: (cleaned_data, removed_count, statistics)
+    """
+    original_length = len(data)
+    cleaned_data = remove_outliers_iqr(data, column)
+    removed_count = original_length - len(cleaned_data)
+    
+    if column is not None:
+        stats_data = np.array(cleaned_data)[:, column].astype(float)
+    else:
+        stats_data = cleaned_data
+    
+    statistics = calculate_statistics(stats_data)
+    
+    return cleaned_data, removed_count, statistics
