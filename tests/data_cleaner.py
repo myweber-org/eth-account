@@ -143,4 +143,21 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nData validation result: {is_valid}")
+    print(f"\nData validation result: {is_valid}")def remove_duplicates(data_list):
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_data_with_order(data_list):
+    return list(dict.fromkeys(data_list))
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    print(f"Order preserved: {clean_data_with_order(sample_data)}")
