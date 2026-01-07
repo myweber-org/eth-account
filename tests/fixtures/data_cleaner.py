@@ -542,3 +542,146 @@ if __name__ == "__main__":
     
     is_valid = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nDataFrame is valid: {is_valid}")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class CSVDataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            print(f"Loaded {len(self.df)} rows from {self.file_path.name}")
+            return True
+        except FileNotFoundError:
+            print(f"Error: File {self.file_path} not found")
+            return False
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            return False
+    
+    def remove_duplicates(self):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return 0
+        
+        initial_count = len(self.df)
+        self.df.drop_duplicates(inplace=True)
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return removed
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                elif strategy == 'zero':
+                    fill_value = 0
+                else:
+                    print(f"Unknown strategy: {strategy}")
+                    continue
+                
+                self.df[col].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in column '{col}' with {strategy} value: {fill_value}")
+    
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return 0
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        initial_count = len(self.df)
+        
+        for col in columns:
+            if col in self.df.columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} outliers using IQR method")
+        return removed
+    
+    def standardize_columns(self, columns=None):
+        if self.df is None:
+            print("No data loaded. Call load_data() first.")
+            return
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                mean = self.df[col].mean()
+                std = self.df[col].std()
+                if std > 0:
+                    self.df[col] = (self.df[col] - mean) / std
+                    print(f"Standardized column '{col}' (mean={mean:.2f}, std={std:.2f})")
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            print("No data to save. Call load_data() first.")
+            return False
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+        
+        try:
+            self.df.to_csv(output_path, index=False)
+            print(f"Saved cleaned data to {output_path}")
+            return True
+        except Exception as e:
+            print(f"Error saving file: {e}")
+            return False
+    
+    def get_summary(self):
+        if self.df is None:
+            return "No data loaded"
+        
+        summary = {
+            'rows': len(self.df),
+            'columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(exclude=[np.number]).columns)
+        }
+        
+        return summary
+
+def example_usage():
+    cleaner = CSVDataCleaner("data.csv")
+    
+    if cleaner.load_data():
+        print("Initial data summary:", cleaner.get_summary())
+        
+        cleaner.remove_duplicates()
+        cleaner.handle_missing_values(strategy='mean')
+        cleaner.remove_outliers_iqr()
+        cleaner.standardize_columns()
+        
+        print("Final data summary:", cleaner.get_summary())
+        cleaner.save_cleaned_data()
+
+if __name__ == "__main__":
+    example_usage()
