@@ -32,3 +32,11 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset('sample_data.csv', ['age', 'salary', 'score'])
     cleaned_data.to_csv('cleaned_data.csv', index=False)
     print(f"Data cleaned. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+def deduplicate_list(original_list):
+    seen = set()
+    deduplicated = []
+    for item in original_list:
+        if item not in seen:
+            seen.add(item)
+            deduplicated.append(item)
+    return deduplicated
