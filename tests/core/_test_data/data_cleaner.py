@@ -322,3 +322,91 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a dataset using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array.
+    column (int): Index of the column to process.
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed.
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
+    
+    col_data = data[:, column]
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data[mask]
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the cleaned data.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array.
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation.
+    """
+    if data.size == 0:
+        return {"mean": np.nan, "median": np.nan, "std": np.nan}
+    
+    return {
+        "mean": np.mean(data),
+        "median": np.median(data),
+        "std": np.std(data)
+    }
+
+def process_dataset(data_path, column_index):
+    """
+    Main function to load, clean, and analyze dataset.
+    
+    Parameters:
+    data_path (str): Path to the data file (CSV format).
+    column_index (int): Index of column to analyze.
+    
+    Returns:
+    tuple: Cleaned data and statistics dictionary.
+    """
+    try:
+        raw_data = np.genfromtxt(data_path, delimiter=',', skip_header=1)
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return None, None
+    
+    cleaned_data = remove_outliers_iqr(raw_data, column_index)
+    stats = calculate_statistics(cleaned_data[:, column_index])
+    
+    return cleaned_data, stats
+
+if __name__ == "__main__":
+    sample_data = np.array([
+        [1.0, 10.2],
+        [2.0, 15.3],
+        [3.0, 100.5],
+        [4.0, 12.8],
+        [5.0, 11.1],
+        [6.0, 200.7],
+        [7.0, 13.4]
+    ])
+    
+    cleaned, statistics = process_dataset("sample.csv", 1)
+    
+    if cleaned is not None:
+        print(f"Original shape: {sample_data.shape}")
+        print(f"Cleaned shape: {cleaned.shape}")
+        print(f"Statistics: {statistics}")
