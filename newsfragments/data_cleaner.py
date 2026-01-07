@@ -1,61 +1,87 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    if max_val - min_val == 0:
-        return df[column]
-    return (df[column] - min_val) / (max_val - min_val)
-
-def standardize_zscore(df, column):
-    mean_val = df[column].mean()
-    std_val = df[column].std()
-    if std_val == 0:
-        return df[column]
-    return (df[column] - mean_val) / std_val
-
-def clean_dataset(df, numeric_columns, outlier_removal=True, normalization='standard'):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
     cleaned_df = df.copy()
     
-    if outlier_removal:
-        for col in numeric_columns:
-            if col in cleaned_df.columns:
-                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Dropped {len(df) - len(cleaned_df)} duplicate rows.")
     
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            if normalization == 'minmax':
-                cleaned_df[col] = normalize_minmax(cleaned_df, col)
-            elif normalization == 'standard':
-                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    if fill_missing == 'drop':
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.dropna()
+        print(f"Dropped {initial_rows - len(cleaned_df)} rows with missing values.")
+    elif fill_missing in ['mean', 'median', 'mode']:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif fill_missing == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif fill_missing == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                cleaned_df[column].fillna(fill_value, inplace=True)
+                print(f"Filled missing values in column '{column}' with {fill_missing}: {fill_value}")
     
-    return cleaned_df.reset_index(drop=True)
+    print(f"Data cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
 
-def validate_dataframe(df, required_columns):
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate the structure and content of a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame.")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Error: DataFrame has fewer than {min_rows} rows.")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
+    
+    print("DataFrame validation passed.")
     return True
 
-def get_summary_statistics(df, numeric_columns):
-    summary = {}
-    for col in numeric_columns:
-        if col in df.columns:
-            summary[col] = {
-                'mean': df[col].mean(),
-                'median': df[col].median(),
-                'std': df[col].std(),
-                'min': df[col].min(),
-                'max': df[col].max(),
-                'count': df[col].count()
-            }
-    return pd.DataFrame(summary).T
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, np.nan],
+        'B': [10, np.nan, 30, 40, 50, 60],
+        'C': ['x', 'y', 'y', 'z', 'x', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'], min_rows=3)
+    print(f"\nDataFrame is valid: {is_valid}")
