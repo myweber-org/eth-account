@@ -111,3 +111,65 @@ if __name__ == "__main__":
         print(f"Error: File '{input_file}' not found.")
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = df_clean.shape[0]
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - df_clean.shape[0]
+        print(f"Removed {removed} duplicate rows.")
+    
+    if fill_missing:
+        missing_before = df_clean.isnull().sum().sum()
+        df_clean = df_clean.fillna(fill_value)
+        missing_after = df_clean.isnull().sum().sum()
+        print(f"Filled {missing_before - missing_after} missing values.")
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate the DataFrame structure and content.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        print("Warning: DataFrame is empty.")
+    
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10, 20, 20, np.nan, 40, 50],
+        'category': ['A', 'B', 'B', 'C', None, 'E']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'value'])
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
+
+if __name__ == "__main__":
+    main()
