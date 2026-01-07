@@ -1,142 +1,61 @@
-import re
-import string
-
-def normalize_whitespace(text):
-    """Replace multiple whitespace characters with a single space."""
-    return re.sub(r'\s+', ' ', text).strip()
-
-def remove_punctuation(text):
-    """Remove all punctuation characters from the text."""
-    translator = str.maketrans('', '', string.punctuation)
-    return text.translate(translator)
-
-def clean_text(text, remove_punct=False):
-    """Main cleaning function. Normalizes whitespace and optionally removes punctuation."""
-    cleaned = normalize_whitespace(text)
-    if remove_punct:
-        cleaned = remove_punctuation(cleaned)
-    return cleaned
-
-def tokenize_text(text, lowercase=True):
-    """Tokenize text into words. Optionally converts to lowercase."""
-    if lowercase:
-        text = text.lower()
-    tokens = text.split()
-    return tokens
-
-def process_document(document, remove_punct=True, lowercase=True):
-    """Process a document through the full cleaning and tokenization pipeline."""
-    cleaned = clean_text(document, remove_punct=remove_punct)
-    tokens = tokenize_text(cleaned, lowercase=lowercase)
-    return tokens
-import numpy as np
 import pandas as pd
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str or dict): Method to fill missing values. Can be 'mean', 
+                                   'median', 'mode', or a dictionary of column:value pairs.
+                                   If None, missing values are not filled.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def calculate_statistics(df, column):
-    """
-    Calculate basic statistics for a column after outlier removal.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing statistical measures
-    """
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df)
-    }
-    
-    return stats
-
-def clean_dataset(df, numeric_columns):
-    """
-    Clean dataset by removing outliers from multiple numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each column
+        pd.DataFrame: Cleaned DataFrame.
     """
     cleaned_df = df.copy()
-    all_stats = {}
     
-    for column in numeric_columns:
-        if column in cleaned_df.columns:
-            original_stats = calculate_statistics(cleaned_df, column)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            cleaned_stats = calculate_statistics(cleaned_df, column)
-            
-            all_stats[column] = {
-                'original': original_stats,
-                'cleaned': cleaned_stats,
-                'removed_count': original_stats['count'] - cleaned_stats['count']
-            }
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    return cleaned_df, all_stats
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+                else:
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+    
+    return cleaned_df
 
-if __name__ == "__main__":
-    # Example usage
-    np.random.seed(42)
-    sample_data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100),
-        'score': np.random.uniform(0, 100, 100)
-    }
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate a DataFrame for required columns and minimum row count.
     
-    # Introduce some outliers
-    sample_data['value'][95] = 500
-    sample_data['value'][96] = -200
-    sample_data['score'][97] = 150
-    sample_data['score'][98] = -50
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
     
-    df = pd.DataFrame(sample_data)
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    print("Original dataset shape:", df.shape)
-    print("\nOriginal statistics:")
-    print("Value - Mean:", df['value'].mean(), "Std:", df['value'].std())
-    print("Score - Mean:", df['score'].mean(), "Std:", df['score'].std())
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
     
-    cleaned_df, stats = clean_dataset(df, ['value', 'score'])
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("\nCleaned statistics:")
-    print("Value - Mean:", cleaned_df['value'].mean(), "Std:", cleaned_df['value'].std())
-    print("Score - Mean:", cleaned_df['score'].mean(), "Std:", cleaned_df['score'].std())
-    
-    print("\nRemoved outliers per column:")
-    for col, col_stats in stats.items():
-        print(f"{col}: {col_stats['removed_count']} outliers removed")
+    return True, "Dataset is valid"
