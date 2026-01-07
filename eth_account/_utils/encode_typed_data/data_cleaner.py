@@ -1,143 +1,95 @@
+
 import pandas as pd
 import numpy as np
 
-def remove_duplicates(df, subset=None):
+def clean_dataset(df, text_columns=None, fill_na=True):
     """
-    Remove duplicate rows from a DataFrame.
+    Clean a pandas DataFrame by handling missing values and standardizing text.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        subset (list, optional): Columns to consider for duplicates
+        df: pandas DataFrame to clean
+        text_columns: list of column names containing text data
+        fill_na: boolean indicating whether to fill missing values
     
     Returns:
-        pd.DataFrame: DataFrame with duplicates removed
+        Cleaned pandas DataFrame
     """
-    return df.drop_duplicates(subset=subset, keep='first')
-
-def fill_missing_values(df, strategy='mean', columns=None):
-    """
-    Fill missing values in specified columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        strategy (str): 'mean', 'median', 'mode', or 'constant'
-        columns (list): Columns to fill, None for all numeric columns
-    
-    Returns:
-        pd.DataFrame: DataFrame with filled values
-    """
-    df_filled = df.copy()
-    
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    for col in columns:
-        if col in df.columns:
-            if strategy == 'mean':
-                df_filled[col] = df[col].fillna(df[col].mean())
-            elif strategy == 'median':
-                df_filled[col] = df[col].fillna(df[col].median())
-            elif strategy == 'mode':
-                df_filled[col] = df[col].fillna(df[col].mode()[0])
-            elif strategy == 'constant':
-                df_filled[col] = df[col].fillna(0)
-    
-    return df_filled
-
-def normalize_columns(df, columns=None, method='minmax'):
-    """
-    Normalize specified columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list): Columns to normalize
-        method (str): 'minmax' or 'zscore'
-    
-    Returns:
-        pd.DataFrame: DataFrame with normalized columns
-    """
-    df_normalized = df.copy()
-    
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    for col in columns:
-        if col in df.columns:
-            if method == 'minmax':
-                min_val = df[col].min()
-                max_val = df[col].max()
-                if max_val > min_val:
-                    df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
-            elif method == 'zscore':
-                mean_val = df[col].mean()
-                std_val = df[col].std()
-                if std_val > 0:
-                    df_normalized[col] = (df[col] - mean_val) / std_val
-    
-    return df_normalized
-
-def clean_dataframe(df, 
-                   remove_dups=True, 
-                   fill_na=True, 
-                   normalize=True,
-                   fill_strategy='mean',
-                   norm_method='minmax'):
-    """
-    Complete data cleaning pipeline.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        remove_dups (bool): Remove duplicates
-        fill_na (bool): Fill missing values
-        normalize (bool): Normalize numeric columns
-        fill_strategy (str): Strategy for filling missing values
-        norm_method (str): Normalization method
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    if remove_dups:
-        cleaned_df = remove_duplicates(cleaned_df)
+    df_clean = df.copy()
     
     if fill_na:
-        cleaned_df = fill_missing_values(cleaned_df, strategy=fill_strategy)
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        df_clean[numeric_cols] = df_clean[numeric_cols].fillna(df_clean[numeric_cols].median())
+        
+        categorical_cols = df_clean.select_dtypes(include=['object']).columns
+        df_clean[categorical_cols] = df_clean[categorical_cols].fillna('Unknown')
     
-    if normalize:
-        cleaned_df = normalize_columns(cleaned_df, method=norm_method)
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
     
-    return cleaned_df
+    df_clean = df_clean.drop_duplicates()
+    
+    return df_clean
 
-def validate_dataframe(df, required_columns=None):
+def validate_data(df, required_columns=None):
     """
-    Validate DataFrame structure and content.
+    Validate data integrity by checking for required columns and data types.
     
     Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): Columns that must be present
+        df: pandas DataFrame to validate
+        required_columns: list of required column names
     
     Returns:
-        dict: Validation results
+        tuple: (is_valid, validation_message)
     """
-    validation = {
-        'is_valid': True,
-        'missing_columns': [],
-        'null_counts': {},
-        'data_types': {}
-    }
-    
     if required_columns:
-        missing = [col for col in required_columns if col not in df.columns]
-        if missing:
-            validation['is_valid'] = False
-            validation['missing_columns'] = missing
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    for col in df.columns:
-        null_count = df[col].isnull().sum()
-        if null_count > 0:
-            validation['null_counts'][col] = null_count
-        
-        validation['data_types'][col] = str(df[col].dtype)
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    return validation
+    null_counts = df.isnull().sum()
+    if null_counts.sum() > 0:
+        return False, f"Data contains null values: {null_counts[null_counts > 0].to_dict()}"
+    
+    return True, "Data validation passed"
+
+def sample_data(df, sample_size=1000, random_state=42):
+    """
+    Create a random sample from the dataset for testing purposes.
+    
+    Args:
+        df: pandas DataFrame to sample from
+        sample_size: number of rows to sample
+        random_state: random seed for reproducibility
+    
+    Returns:
+        Sampled pandas DataFrame
+    """
+    if len(df) <= sample_size:
+        return df
+    
+    return df.sample(n=sample_size, random_state=random_state)
+
+if __name__ == "__main__":
+    sample_df = pd.DataFrame({
+        'id': [1, 2, 3, 4, 5],
+        'name': ['John', 'Jane', None, 'Bob', 'Alice'],
+        'age': [25, 30, 35, None, 28],
+        'score': [85.5, 92.0, 78.5, 88.0, 95.5]
+    })
+    
+    cleaned_df = clean_dataset(sample_df, text_columns=['name'])
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    is_valid, message = validate_data(cleaned_df, required_columns=['id', 'name', 'age'])
+    print(f"\nValidation: {is_valid}")
+    print(f"Message: {message}")
+    
+    sampled_df = sample_data(cleaned_df, sample_size=3)
+    print(f"\nSampled DataFrame ({len(sampled_df)} rows):")
+    print(sampled_df)
