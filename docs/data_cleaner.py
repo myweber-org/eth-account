@@ -97,3 +97,137 @@ class DataCleaner:
         print(f"Missing values: {self.df.isnull().sum().sum()}")
         print(f"Numeric columns: {len(self.numeric_columns)}")
         print(f"Categorical columns: {len(self.categorical_columns)}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, columns_to_check=None, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    columns_to_check (list): List of column names to check for duplicates.
+                             If None, uses all columns.
+    fill_strategy (str): Strategy to fill missing values.
+                         Options: 'mean', 'median', 'mode', 'drop', 'zero'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    
+    original_shape = df.shape
+    
+    # Remove duplicate rows
+    if columns_to_check is None:
+        df_cleaned = df.drop_duplicates()
+    else:
+        df_cleaned = df.drop_duplicates(subset=columns_to_check)
+    
+    duplicates_removed = original_shape[0] - df_cleaned.shape[0]
+    
+    # Handle missing values
+    missing_before = df_cleaned.isnull().sum().sum()
+    
+    if fill_strategy == 'drop':
+        df_cleaned = df_cleaned.dropna()
+    elif fill_strategy in ['mean', 'median']:
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_strategy == 'mean':
+                fill_value = df_cleaned[col].mean()
+            else:  # median
+                fill_value = df_cleaned[col].median()
+            df_cleaned[col] = df_cleaned[col].fillna(fill_value)
+    elif fill_strategy == 'mode':
+        for col in df_cleaned.columns:
+            if df_cleaned[col].dtype == 'object':
+                mode_value = df_cleaned[col].mode()
+                if not mode_value.empty:
+                    df_cleaned[col] = df_cleaned[col].fillna(mode_value.iloc[0])
+    elif fill_strategy == 'zero':
+        df_cleaned = df_cleaned.fillna(0)
+    
+    missing_after = df_cleaned.isnull().sum().sum()
+    
+    # Print cleaning summary
+    print(f"Original dataset shape: {original_shape}")
+    print(f"Duplicates removed: {duplicates_removed}")
+    print(f"Missing values before cleaning: {missing_before}")
+    print(f"Missing values after cleaning: {missing_after}")
+    print(f"Cleaned dataset shape: {df_cleaned.shape}")
+    
+    return df_cleaned
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the cleaned DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Validation failed: Less than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing columns: {missing_cols}")
+            return False
+    
+    # Check for remaining missing values
+    remaining_missing = df.isnull().sum().sum()
+    if remaining_missing > 0:
+        print(f"Validation warning: {remaining_missing} missing values remain")
+    
+    print("Data validation passed")
+    return True
+
+# Example usage function
+def process_sample_data():
+    """
+    Create and process sample data to demonstrate the cleaning functions.
+    """
+    # Create sample data with duplicates and missing values
+    np.random.seed(42)
+    sample_data = {
+        'id': [1, 2, 3, 1, 2, 6, 7, 8],
+        'name': ['Alice', 'Bob', 'Charlie', 'Alice', 'Bob', 'Eve', 'Frank', 'Grace'],
+        'age': [25, 30, 35, 25, 30, 28, np.nan, 32],
+        'score': [85.5, 92.0, 78.5, 85.5, 92.0, 88.0, 76.5, np.nan],
+        'department': ['HR', 'IT', 'Sales', 'HR', 'IT', 'IT', 'Sales', 'HR']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Sample data created")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, columns_to_check=['id', 'name'], fill_strategy='mean')
+    
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the cleaned data
+    required_cols = ['id', 'name', 'age', 'score']
+    is_valid = validate_data(cleaned_df, required_columns=required_cols, min_rows=5)
+    
+    if is_valid:
+        print("\nCleaned data is ready for analysis:")
+        print(cleaned_df)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Run the sample data processing
+    result_df = process_sample_data()
