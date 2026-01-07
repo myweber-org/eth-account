@@ -112,3 +112,39 @@ if __name__ == "__main__":
     normalized_data = normalize_column(cleaned_data, 'values', method='zscore')
     print("\nNormalized column sample:")
     print(normalized_data[['values', 'values_normalized']].head())
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(file_path):
+    return pd.read_csv(file_path)
+
+def remove_outliers(df, column, threshold=3):
+    z_scores = np.abs(stats.zscore(df[column]))
+    return df[z_scores < threshold]
+
+def normalize_column(df, column):
+    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
+    return df
+
+def clean_data(df, numeric_columns):
+    for col in numeric_columns:
+        df = remove_outliers(df, col)
+        df = normalize_column(df, col)
+    return df.dropna()
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+
+def main():
+    input_file = 'raw_data.csv'
+    output_file = 'cleaned_data.csv'
+    numeric_cols = ['age', 'income', 'score']
+    
+    raw_df = load_dataset(input_file)
+    cleaned_df = clean_data(raw_df, numeric_cols)
+    save_cleaned_data(cleaned_df, output_file)
+    print(f"Data cleaning completed. Cleaned data saved to {output_file}")
+
+if __name__ == "__main__":
+    main()
