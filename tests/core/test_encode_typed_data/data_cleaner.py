@@ -142,3 +142,11 @@ def validate_dataframe(df, required_columns=None):
         return False, "DataFrame is empty"
     
     return True, "DataFrame is valid"
+def deduplicate_list(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
