@@ -88,4 +88,113 @@ def clean_dataset(file_path, output_path):
 if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
-    cleaned_df = clean_dataset(input_file, output_file)
+    cleaned_df = clean_dataset(input_file, output_file)import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: dictionary for renaming columns (optional)
+        drop_duplicates: boolean to remove duplicate rows
+        fill_missing: boolean to fill missing values with column means
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed_duplicates = initial_rows - len(cleaned_df)
+        print(f"Removed {removed_duplicates} duplicate rows")
+    
+    # Handle missing values
+    if fill_missing:
+        numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_columns:
+            if cleaned_df[col].isnull().any():
+                mean_value = cleaned_df[col].mean()
+                cleaned_df[col] = cleaned_df[col].fillna(mean_value)
+                print(f"Filled missing values in column '{col}' with mean: {mean_value:.2f}")
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the structure and content of a DataFrame.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of column names that must be present
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_columns
+    
+    return validation_results
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Args:
+        df: pandas DataFrame to save
+        output_path: path where to save the file
+        format: file format ('csv' or 'excel')
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Data saved to {output_path}")
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing=True)
+    
+    # Validate the cleaned data
+    validation = validate_data(cleaned_df, required_columns=['id', 'name', 'age', 'score'])
+    print("\nValidation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+    
+    # Display cleaned data
+    print("\nCleaned Data:")
+    print(cleaned_df)
