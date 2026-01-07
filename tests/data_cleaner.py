@@ -90,4 +90,135 @@ if __name__ == "__main__":
     print("Cleaned DataFrame shape:", cleaned_df.shape)
     
     stats = get_cleaning_stats(df, cleaned_df)
-    print("Cleaning Statistics:", stats)
+    print("Cleaning Statistics:", stats)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using min-max scaling
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_min = data[col].min()
+            col_max = data[col].max()
+            
+            if col_max != col_min:
+                normalized_data[col] = (data[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_data[col] = 0
+    
+    return normalized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    processed_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            processed_data[col] = data[col].fillna(fill_value)
+    
+    return processed_data
+
+def clean_dataset(data, config=None):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if config is None:
+        config = {
+            'outlier_columns': None,
+            'normalize_columns': None,
+            'missing_strategy': 'mean'
+        }
+    
+    cleaned_data = data.copy()
+    
+    if config.get('outlier_columns'):
+        for col in config['outlier_columns']:
+            cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    
+    if config.get('missing_strategy'):
+        cleaned_data = handle_missing_values(
+            cleaned_data, 
+            strategy=config['missing_strategy'],
+            columns=config.get('missing_columns')
+        )
+    
+    if config.get('normalize_columns'):
+        cleaned_data = normalize_minmax(
+            cleaned_data,
+            columns=config['normalize_columns']
+        )
+    
+    return cleaned_data
+
+def validate_data(data, required_columns=None, min_rows=1):
+    """
+    Validate data structure and content
+    """
+    if len(data) < min_rows:
+        raise ValueError(f"Data must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.randn(100),
+        'B': np.random.randn(100) * 2 + 5,
+        'C': np.random.randint(0, 100, 100)
+    })
+    
+    sample_data.loc[10:15, 'A'] = np.nan
+    
+    config = {
+        'outlier_columns': ['A', 'B'],
+        'missing_strategy': 'median',
+        'normalize_columns': ['A', 'B', 'C']
+    }
+    
+    cleaned = clean_dataset(sample_data, config)
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Missing values after cleaning: {cleaned.isnull().sum().sum()}")
