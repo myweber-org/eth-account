@@ -383,3 +383,64 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Create a copy to avoid modifying the original DataFrame
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # If specific columns are provided, handle missing values only in those columns
+    if columns_to_check:
+        # Fill missing values with the mean for numeric columns
+        for col in columns_to_check:
+            if pd.api.types.is_numeric_dtype(cleaned_df[col]):
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                # For non-numeric columns, fill with the most frequent value
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+    else:
+        # Handle missing values for all columns
+        for col in cleaned_df.columns:
+            if pd.api.types.is_numeric_dtype(cleaned_df[col]):
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     data = {
+#         'id': [1, 2, 2, 3, 4, 5],
+#         'name': ['Alice', 'Bob', 'Bob', None, 'Eve', None],
+#         'age': [25, 30, 30, None, 35, 40],
+#         'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+#     }
+#     
+#     df = pd.DataFrame(data)
+#     print("Original DataFrame:")
+#     print(df)
+#     print("\nCleaned DataFrame:")
+#     cleaned = clean_dataset(df)
+#     print(cleaned)
