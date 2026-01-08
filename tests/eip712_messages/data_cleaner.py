@@ -1,81 +1,74 @@
 
 import pandas as pd
 import numpy as np
-from datetime import datetime
 
-def clean_csv_data(input_path, output_path):
+def remove_outliers_iqr(df, column):
     """
-    Clean CSV data by handling missing values and converting data types.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
     """
-    try:
-        df = pd.read_csv(input_path)
-        
-        print(f"Original shape: {df.shape}")
-        print(f"Missing values per column:\n{df.isnull().sum()}")
-        
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        categorical_cols = df.select_dtypes(include=['object']).columns
-        
-        for col in numeric_cols:
-            if df[col].isnull().any():
-                df[col].fillna(df[col].median(), inplace=True)
-        
-        for col in categorical_cols:
-            if df[col].isnull().any():
-                df[col].fillna('Unknown', inplace=True)
-        
-        date_columns = [col for col in df.columns if 'date' in col.lower()]
-        for col in date_columns:
-            try:
-                df[col] = pd.to_datetime(df[col], errors='coerce')
-            except:
-                pass
-        
-        df.to_csv(output_path, index=False)
-        
-        print(f"Cleaned data saved to: {output_path}")
-        print(f"Final shape: {df.shape}")
-        print(f"Missing values after cleaning:\n{df.isnull().sum()}")
-        
-        return True
-        
-    except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
-        return False
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def validate_dataframe(df):
+def calculate_basic_stats(df, column):
     """
-    Validate dataframe for common data quality issues.
+    Calculate basic statistics for a DataFrame column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+    
+    Returns:
+        dict: Dictionary containing statistical measures
     """
-    validation_results = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'duplicate_rows': df.duplicated().sum(),
-        'missing_values': df.isnull().sum().sum(),
-        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
-        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
-    for col in validation_results['numeric_columns']:
-        validation_results[f'{col}_stats'] = {
-            'mean': df[col].mean(),
-            'std': df[col].std(),
-            'min': df[col].min(),
-            'max': df[col].max()
-        }
+    return stats
+
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    data = pd.DataFrame({
+        'values': np.random.normal(100, 15, 1000)
+    })
     
-    return validation_results
+    print("Original data shape:", data.shape)
+    print("Original statistics:", calculate_basic_stats(data, 'values'))
+    
+    cleaned_data = remove_outliers_iqr(data, 'values')
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned statistics:", calculate_basic_stats(cleaned_data, 'values'))
 
 if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    
-    success = clean_csv_data(input_file, output_file)
-    
-    if success:
-        cleaned_df = pd.read_csv(output_file)
-        validation = validate_dataframe(cleaned_df)
-        
-        print("\nData Validation Results:")
-        for key, value in validation.items():
-            print(f"{key}: {value}")
+    example_usage()
