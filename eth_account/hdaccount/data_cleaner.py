@@ -154,4 +154,91 @@ if __name__ == "__main__":
     # Clean data
     cleaned = clean_dataset(df, columns_to_check=['id'], fill_na_method='mean')
     print("Cleaned DataFrame:")
-    print(cleaned)
+    print(cleaned)import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def impute_missing_with_median(data, column):
+    median_value = data[column].median()
+    data[column].fillna(median_value, inplace=True)
+    return data
+
+def remove_duplicates(data, subset=None):
+    if subset:
+        data_cleaned = data.drop_duplicates(subset=subset)
+    else:
+        data_cleaned = data.drop_duplicates()
+    return data_cleaned
+
+def standardize_column(data, column):
+    mean = data[column].mean()
+    std = data[column].std()
+    data[column] = (data[column] - mean) / std
+    return data
+
+def clean_dataset(data, numeric_columns, categorical_columns=None):
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if cleaned_data[col].isnull().sum() > 0:
+            cleaned_data = impute_missing_with_median(cleaned_data, col)
+        
+        outliers = detect_outliers_iqr(cleaned_data, col)
+        if not outliers.empty:
+            Q1 = cleaned_data[col].quantile(0.25)
+            Q3 = cleaned_data[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_data[col] = np.clip(cleaned_data[col], lower_bound, upper_bound)
+        
+        cleaned_data = standardize_column(cleaned_data, col)
+    
+    if categorical_columns:
+        for col in categorical_columns:
+            if cleaned_data[col].isnull().sum() > 0:
+                mode_value = cleaned_data[col].mode()[0]
+                cleaned_data[col].fillna(mode_value, inplace=True)
+    
+    cleaned_data = remove_duplicates(cleaned_data)
+    
+    return cleaned_data
+
+def validate_data(data, numeric_columns, categorical_columns=None):
+    validation_report = {}
+    
+    validation_report['total_rows'] = len(data)
+    validation_report['total_columns'] = len(data.columns)
+    
+    missing_values = data.isnull().sum().sum()
+    validation_report['missing_values'] = missing_values
+    
+    duplicate_rows = data.duplicated().sum()
+    validation_report['duplicate_rows'] = duplicate_rows
+    
+    numeric_stats = {}
+    for col in numeric_columns:
+        numeric_stats[col] = {
+            'mean': data[col].mean(),
+            'std': data[col].std(),
+            'min': data[col].min(),
+            'max': data[col].max()
+        }
+    validation_report['numeric_statistics'] = numeric_stats
+    
+    if categorical_columns:
+        categorical_stats = {}
+        for col in categorical_columns:
+            categorical_stats[col] = data[col].value_counts().to_dict()
+        validation_report['categorical_distribution'] = categorical_stats
+    
+    return validation_report
