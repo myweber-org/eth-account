@@ -149,3 +149,54 @@ if __name__ == "__main__":
     input_file = sys.argv[1]
     output_file = sys.argv[2] if len(sys.argv) > 2 else None
     remove_duplicates(input_file, output_file)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, column):
+    """Remove outliers using IQR method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def z_score_normalization(df, column):
+    """Apply z-score normalization to a column."""
+    df[column] = stats.zscore(df[column])
+    return df
+
+def min_max_normalization(df, column):
+    """Apply min-max normalization to a column."""
+    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
+    return df
+
+def clean_data(df, numeric_columns):
+    """Main data cleaning pipeline."""
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = z_score_normalization(cleaned_df, col)
+    
+    return cleaned_df
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned dataframe to CSV."""
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    numeric_cols = ["feature1", "feature2", "feature3"]
+    
+    raw_data = load_dataset(input_file)
+    cleaned_data = clean_data(raw_data, numeric_cols)
+    save_cleaned_data(cleaned_data, output_file)
