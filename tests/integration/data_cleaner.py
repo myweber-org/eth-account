@@ -1,64 +1,78 @@
 
 import pandas as pd
-import sys
+import numpy as np
 
-def remove_duplicates(input_file, output_file=None, subset=None, keep='first'):
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
     """
-    Remove duplicate rows from a CSV file.
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
-    Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path to output CSV file. If None, overwrites input file
-        subset (list, optional): Columns to consider for identifying duplicates
-        keep (str): Which duplicates to keep - 'first', 'last', or False (remove all)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    column_mapping (dict): Optional dictionary to rename columns
+    drop_duplicates (bool): Whether to remove duplicate rows
+    normalize_text (bool): Whether to normalize text columns
     
     Returns:
-        int: Number of duplicates removed
+    pd.DataFrame: Cleaned DataFrame
     """
-    try:
-        df = pd.read_csv(input_file)
-        initial_rows = len(df)
-        
-        df_clean = df.drop_duplicates(subset=subset, keep=keep)
-        final_rows = len(df_clean)
-        
-        duplicates_removed = initial_rows - final_rows
-        
-        if output_file is None:
-            output_file = input_file
-        
-        df_clean.to_csv(output_file, index=False)
-        
-        print(f"Removed {duplicates_removed} duplicate rows")
-        print(f"Original: {initial_rows} rows, Cleaned: {final_rows} rows")
-        print(f"Saved to: {output_file}")
-        
-        return duplicates_removed
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-        return -1
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty")
-        return -1
-    except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        return -1
-
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        print("Example: python data_cleaner.py data.csv cleaned_data.csv")
-        sys.exit(1)
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    df_clean = df.copy()
     
-    remove_duplicates(input_file, output_file)
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        text_columns = df_clean.select_dtypes(include=['object']).columns
+        
+        for col in text_columns:
+            df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+            df_clean[col] = df_clean[col].replace(['nan', 'none', 'null'], np.nan)
+    
+    return df_clean
 
-if __name__ == "__main__":
-    main()
-def remove_duplicates(seq):
-    seen = set()
-    seen_add = seen.add
-    return [x for x in seq if not (x in seen or seen_add(x))]
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def sample_dataframe(df, n_samples=5, random_state=42):
+    """
+    Create a sample of the DataFrame for inspection.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    n_samples (int): Number of samples to return
+    random_state (int): Random seed for reproducibility
+    
+    Returns:
+    pd.DataFrame: Sampled DataFrame
+    """
+    
+    if len(df) <= n_samples:
+        return df
+    
+    return df.sample(n=min(n_samples, len(df)), random_state=random_state)
