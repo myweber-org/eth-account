@@ -99,3 +99,129 @@ if __name__ == "__main__":
         print(f"\nStatistics for {col}:")
         for stat_name, value in col_stats.items():
             print(f"  {stat_name}: {value:.2f}")
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, threshold=0.8):
+    """
+    Remove rows with missing values exceeding the threshold percentage.
+    
+    Args:
+        df: pandas DataFrame
+        threshold: float between 0 and 1, default 0.8
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if not 0 <= threshold <= 1:
+        raise ValueError("Threshold must be between 0 and 1")
+    
+    missing_per_row = df.isnull().mean(axis=1)
+    mask = missing_per_row <= threshold
+    return df[mask].copy()
+
+def fill_missing_with_median(df, columns=None):
+    """
+    Fill missing values with column median.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+    
+    Returns:
+        DataFrame with filled values
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col in df_copy.columns and df_copy[col].dtype in [np.float64, np.int64]:
+            median_val = df_copy[col].median()
+            df_copy[col] = df_copy[col].fillna(median_val)
+    
+    return df_copy
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame without outliers
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    mask = pd.Series([True] * len(df_copy))
+    
+    for col in columns:
+        if col in df_copy.columns and df_copy[col].dtype in [np.float64, np.int64]:
+            Q1 = df_copy[col].quantile(0.25)
+            Q3 = df_copy[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            col_mask = (df_copy[col] >= lower_bound) & (df_copy[col] <= upper_bound)
+            mask = mask & col_mask
+    
+    return df_copy[mask].reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col in df_copy.columns and df_copy[col].dtype in [np.float64, np.int64]:
+            mean_val = df_copy[col].mean()
+            std_val = df_copy[col].std()
+            
+            if std_val > 0:
+                df_copy[col] = (df_copy[col] - mean_val) / std_val
+    
+    return df_copy
+
+def clean_dataset(df, missing_threshold=0.8, outlier_multiplier=1.5, standardize=False):
+    """
+    Complete data cleaning pipeline.
+    
+    Args:
+        df: pandas DataFrame
+        missing_threshold: threshold for removing rows with missing values
+        outlier_multiplier: IQR multiplier for outlier detection
+        standardize: whether to standardize numeric columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = remove_missing_rows(df, threshold=missing_threshold)
+    cleaned_df = fill_missing_with_median(cleaned_df)
+    cleaned_df = remove_outliers_iqr(cleaned_df, multiplier=outlier_multiplier)
+    
+    if standardize:
+        cleaned_df = standardize_columns(cleaned_df)
+    
+    return cleaned_df
