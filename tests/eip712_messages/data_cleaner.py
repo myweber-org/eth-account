@@ -1,73 +1,81 @@
+
 import pandas as pd
+import numpy as np
+from datetime import datetime
 
-def clean_dataframe(df, drop_duplicates=True, fill_missing=None):
+def clean_csv_data(input_path, output_path):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-        fill_missing (str or dict): Method to fill missing values. Can be 'mean', 'median', 
-                                   'mode', or a dictionary of column:value pairs. Default is None.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    Clean CSV data by handling missing values and converting data types.
     """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing is not None:
-        if isinstance(fill_missing, dict):
-            cleaned_df = cleaned_df.fillna(fill_missing)
-        elif fill_missing == 'mean':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
-        elif fill_missing == 'median':
-            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
-        elif fill_missing == 'mode':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None, min_rows=1):
-    """
-    Validate a DataFrame for required columns and minimum row count.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
-        min_rows (int): Minimum number of rows required.
-    
-    Returns:
-        bool: True if validation passes, False otherwise.
-    """
-    if required_columns is not None:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Missing required columns: {missing_columns}")
-            return False
-    
-    if len(df) < min_rows:
-        print(f"DataFrame has fewer than {min_rows} rows")
+    try:
+        df = pd.read_csv(input_path)
+        
+        print(f"Original shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].median(), inplace=True)
+        
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col].fillna('Unknown', inplace=True)
+        
+        date_columns = [col for col in df.columns if 'date' in col.lower()]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        df.to_csv(output_path, index=False)
+        
+        print(f"Cleaned data saved to: {output_path}")
+        print(f"Final shape: {df.shape}")
+        print(f"Missing values after cleaning:\n{df.isnull().sum()}")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
         return False
-    
-    return True
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, None, 5],
-        'B': [10, None, 30, 40, 50],
-        'C': ['x', 'y', 'y', 'z', None]
+def validate_dataframe(df):
+    """
+    Validate dataframe for common data quality issues.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'duplicate_rows': df.duplicated().sum(),
+        'missing_values': df.isnull().sum().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    for col in validation_results['numeric_columns']:
+        validation_results[f'{col}_stats'] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max()
+        }
     
-    cleaned = clean_dataframe(df, fill_missing='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    return validation_results
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    is_valid = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print(f"\nDataFrame validation: {is_valid}")
+    success = clean_csv_data(input_file, output_file)
+    
+    if success:
+        cleaned_df = pd.read_csv(output_file)
+        validation = validate_dataframe(cleaned_df)
+        
+        print("\nData Validation Results:")
+        for key, value in validation.items():
+            print(f"{key}: {value}")
