@@ -34,3 +34,70 @@ def organize_files_by_extension(directory_path):
 if __name__ == "__main__":
     target_directory = input("Enter the directory path to organize: ").strip()
     organize_files_by_extension(target_directory)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files(directory_path):
+    """
+    Organizes files in the given directory by moving them into
+    subfolders based on their file extensions.
+    """
+    # Define file type categories and their associated extensions
+    file_categories = {
+        'Images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
+        'Documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
+        'Audio': ['.mp3', '.wav', '.aac', '.flac'],
+        'Video': ['.mp4', '.avi', '.mov', '.mkv'],
+        'Archives': ['.zip', '.tar', '.gz', '.rar'],
+        'Code': ['.py', '.js', '.html', '.css', '.java', '.cpp'],
+    }
+
+    # Convert the directory path to a Path object for easier handling
+    path = Path(directory_path)
+
+    # Check if the provided path exists and is a directory
+    if not path.exists() or not path.is_dir():
+        print(f"Error: The path '{directory_path}' does not exist or is not a directory.")
+        return
+
+    # Iterate over all items in the directory
+    for item in path.iterdir():
+        # Skip if it's a directory (we only want to organize files)
+        if item.is_dir():
+            continue
+
+        # Get the file extension (lowercase for case-insensitive matching)
+        file_extension = item.suffix.lower()
+
+        # Determine the target category folder
+        target_category = 'Other'  # Default category for unmatched extensions
+        for category, extensions in file_categories.items():
+            if file_extension in extensions:
+                target_category = category
+                break
+
+        # Create the target category folder if it doesn't exist
+        target_folder = path / target_category
+        target_folder.mkdir(exist_ok=True)
+
+        # Construct the destination path
+        destination = target_folder / item.name
+
+        # Check if a file with the same name already exists in the target folder
+        if destination.exists():
+            print(f"Warning: '{item.name}' already exists in '{target_category}'. Skipping.")
+            continue
+
+        # Move the file to the target folder
+        try:
+            shutil.move(str(item), str(destination))
+            print(f"Moved: {item.name} -> {target_category}/")
+        except Exception as e:
+            print(f"Error moving {item.name}: {e}")
+
+if __name__ == "__main__":
+    # Example usage: organize files in the current working directory
+    current_directory = os.getcwd()
+    organize_files(current_directory)
+    print("File organization complete.")
