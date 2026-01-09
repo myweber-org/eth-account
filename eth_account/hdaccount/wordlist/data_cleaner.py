@@ -152,3 +152,46 @@ if __name__ == "__main__":
         print(f"Original shape: {sample_data.shape}")
         print(f"Cleaned shape: {cleaned.shape}")
         print("Data cleaning completed successfully.")
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data_with_key(input_list, key_func=None):
+    """
+    Remove duplicates based on a key function.
+    If key_func is provided, uniqueness is determined by key_func(item).
+    Otherwise, uses the item itself.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        key = key_func(item) if key_func else item
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    
+    sample_objects = [
+        {"id": 1, "name": "Alice"},
+        {"id": 2, "name": "Bob"},
+        {"id": 1, "name": "Alice"},
+        {"id": 3, "name": "Charlie"}
+    ]
+    cleaned_objects = clean_data_with_key(sample_objects, key_func=lambda x: x["id"])
+    print(f"Original objects: {sample_objects}")
+    print(f"Cleaned objects: {cleaned_objects}")
