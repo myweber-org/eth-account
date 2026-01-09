@@ -138,3 +138,77 @@ if __name__ == "__main__":
     print(f"\nOriginal rows: {len(df)}")
     print(f"Cleaned rows: {len(cleaned_df)}")
     print(f"Outliers removed: {len(df) - len(cleaned_df)}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (numpy.ndarray): The dataset.
+    column (int): Index of the column to clean.
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed from the specified column.
+    """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
+    
+    if column >= data.shape[1] or column < 0:
+        raise IndexError("Column index out of bounds")
+    
+    col_data = data[:, column]
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data[mask]
+
+def validate_data_shape(data, expected_rows=None, expected_cols=None):
+    """
+    Validate the shape of the input data.
+    
+    Parameters:
+    data (numpy.ndarray): Data to validate.
+    expected_rows (int): Expected number of rows.
+    expected_cols (int): Expected number of columns.
+    
+    Returns:
+    bool: True if shape matches expectations.
+    """
+    if not isinstance(data, np.ndarray):
+        return False
+    
+    rows, cols = data.shape
+    
+    if expected_rows is not None and rows != expected_rows:
+        return False
+    
+    if expected_cols is not None and cols != expected_cols:
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = np.array([
+        [1.0, 2.0, 100.0],
+        [2.0, 3.0, 101.0],
+        [3.0, 4.0, 102.0],
+        [4.0, 5.0, 1000.0],  # Outlier in column 2
+        [5.0, 6.0, 103.0]
+    ])
+    
+    print("Original data shape:", sample_data.shape)
+    cleaned_data = remove_outliers_iqr(sample_data, 2)
+    print("Cleaned data shape:", cleaned_data.shape)
+    print("Cleaned data:")
+    print(cleaned_data)
+    
+    # Validate shape
+    is_valid = validate_data_shape(cleaned_data, expected_cols=3)
+    print(f"Data shape validation: {is_valid}")
