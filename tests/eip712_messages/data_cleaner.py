@@ -141,3 +141,26 @@ if __name__ == "__main__":
     if result is not None:
         print("Data cleaning completed successfully")
         print(result.head())
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataset(input_file, output_file):
+    df = pd.read_csv(input_file)
+    
+    df.drop_duplicates(inplace=True)
+    
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['date'] = df['date'].dt.strftime('%Y-%m-%d')
+    
+    df['value'] = pd.to_numeric(df['value'], errors='coerce')
+    df['value'].fillna(df['value'].mean(), inplace=True)
+    
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    
+    return df
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    print(f"Data cleaning complete. Processed {len(cleaned_data)} records.")
