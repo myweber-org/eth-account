@@ -1,60 +1,146 @@
+
 import pandas as pd
 import numpy as np
 
-def clean_csv_data(file_path, strategy='mean', columns=None):
+def remove_outliers_iqr(df, column):
     """
-    Clean a CSV file by handling missing values.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Args:
-        file_path (str): Path to the CSV file.
-        strategy (str): Strategy for filling missing values.
-                        Options: 'mean', 'median', 'mode', 'drop'.
-        columns (list): List of column names to apply cleaning to.
-                        If None, applies to all numeric columns.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    try:
-        df = pd.read_csv(file_path)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {file_path}")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns = list(numeric_cols)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    for col in columns:
-        if col not in df.columns:
-            continue
-        
-        if strategy == 'drop':
-            df = df.dropna(subset=[col])
-        elif strategy == 'mean':
-            df[col] = df[col].fillna(df[col].mean())
-        elif strategy == 'median':
-            df[col] = df[col].fillna(df[col].median())
-        elif strategy == 'mode':
-            df[col] = df[col].fillna(df[col].mode()[0])
-        else:
-            raise ValueError(f"Unknown strategy: {strategy}")
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return df
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def save_cleaned_data(df, output_path):
+def calculate_basic_stats(df, column):
     """
-    Save cleaned DataFrame to a new CSV file.
+    Calculate basic statistics for a DataFrame column.
     
-    Args:
-        df (pd.DataFrame): Cleaned DataFrame.
-        output_path (str): Path to save the cleaned CSV file.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
     """
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to: {output_path}")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a DataFrame column using specified method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        col_min = df_copy[column].min()
+        col_max = df_copy[column].max()
+        if col_max != col_min:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - col_min) / (col_max - col_min)
+        else:
+            df_copy[f'{column}_normalized'] = 0.5
+    
+    elif method == 'zscore':
+        col_mean = df_copy[column].mean()
+        col_std = df_copy[column].std()
+        if col_std > 0:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - col_mean) / col_std
+        else:
+            df_copy[f'{column}_normalized'] = 0
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_copy
+
+def handle_missing_values(df, column, strategy='mean'):
+    """
+    Handle missing values in a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    
+    if strategy == 'mean':
+        fill_value = df_copy[column].mean()
+    elif strategy == 'median':
+        fill_value = df_copy[column].median()
+    elif strategy == 'mode':
+        fill_value = df_copy[column].mode()[0] if not df_copy[column].mode().empty else np.nan
+    elif strategy == 'drop':
+        return df_copy.dropna(subset=[column])
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    df_copy[column] = df_copy[column].fillna(fill_value)
+    return df_copy
 
 if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+    sample_data = {
+        'values': [1, 2, 3, 4, 5, 100, 2, 3, 4, 5, np.nan, 6, 7, 8, 9, 10]
+    }
     
-    cleaned_df = clean_csv_data(input_file, strategy='median')
-    save_cleaned_data(cleaned_df, output_file)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nOriginal Statistics:")
+    print(calculate_basic_stats(df, 'values'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nDataFrame after outlier removal:")
+    print(cleaned_df)
+    
+    normalized_df = normalize_column(cleaned_df, 'values', method='minmax')
+    print("\nDataFrame after normalization:")
+    print(normalized_df)
+    
+    final_df = handle_missing_values(normalized_df, 'values', strategy='mean')
+    print("\nFinal DataFrame after handling missing values:")
+    print(final_df)
