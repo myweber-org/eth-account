@@ -77,4 +77,65 @@ if __name__ == "__main__":
     
     validation = validate_data(cleaned, required_columns=['A', 'B'])
     print("\nValidation Result:")
-    print(validation)
+    print(validation)import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None):
+    """
+    Clean CSV data by handling missing values, duplicates, and standardizing formats.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        # Remove duplicate rows
+        df.drop_duplicates(inplace=True)
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col].fillna(df[col].median(), inplace=True)
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+        
+        # Standardize text columns: trim whitespace and convert to lowercase
+        for col in categorical_cols:
+            df[col] = df[col].astype(str).str.strip().str.lower()
+        
+        # Remove rows where all values are null
+        df.dropna(how='all', inplace=True)
+        
+        # Reset index after cleaning
+        df.reset_index(drop=True, inplace=True)
+        
+        # Save cleaned data
+        if output_path:
+            df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        else:
+            base_name = file_path.rsplit('.', 1)[0]
+            cleaned_path = f"{base_name}_cleaned.csv"
+            df.to_csv(cleaned_path, index=False)
+            print(f"Cleaned data saved to: {cleaned_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    cleaned_df = clean_csv_data(input_file)
+    
+    if cleaned_df is not None:
+        print(f"Data cleaning completed successfully.")
+        print(f"Original shape: Not available (file loaded successfully)")
+        print(f"Cleaned shape: {cleaned_df.shape}")
+        print(f"Columns: {list(cleaned_df.columns)}")
