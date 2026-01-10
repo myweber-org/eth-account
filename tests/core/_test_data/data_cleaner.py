@@ -1,31 +1,40 @@
 
-import pandas as pd
 import numpy as np
-from scipy import stats
 
-def load_data(filepath):
-    return pd.read_csv(filepath)
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def remove_outliers(df, column, threshold=3):
-    z_scores = np.abs(stats.zscore(df[column]))
-    return df[z_scores < threshold]
-
-def normalize_column(df, column):
-    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
-    return df
-
-def clean_data(df, numeric_columns):
-    for col in numeric_columns:
-        df = remove_outliers(df, col)
-        df = normalize_column(df, col)
-    return df.dropna()
-
-def main():
-    data = load_data('raw_data.csv')
-    numeric_cols = ['age', 'income', 'score']
-    cleaned_data = clean_data(data, numeric_cols)
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Cleaned data saved. Original: {len(data)} rows, Cleaned: {len(cleaned_data)} rows")
-
-if __name__ == "__main__":
-    main()
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation.
+    """
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std()
+    }
+    return stats
