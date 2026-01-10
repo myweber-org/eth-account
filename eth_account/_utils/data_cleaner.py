@@ -101,3 +101,64 @@ def sample_usage():
 
 if __name__ == "__main__":
     sample_usage()
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: A list of elements (must be hashable).
+    
+    Returns:
+        A new list with duplicates removed.
+    """
+    seen = set()
+    cleaned_list = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            cleaned_list.append(item)
+    
+    return cleaned_list
+
+
+def clean_data_with_key(data_list, key_func=None):
+    """
+    Remove duplicates based on a key function.
+    
+    Args:
+        data_list: A list of elements.
+        key_func: A function that returns a key for each element.
+    
+    Returns:
+        A new list with duplicates removed based on the key.
+    """
+    if key_func is None:
+        return remove_duplicates(data_list)
+    
+    seen = set()
+    cleaned_list = []
+    
+    for item in data_list:
+        key = key_func(item)
+        if key not in seen:
+            seen.add(key)
+            cleaned_list.append(item)
+    
+    return cleaned_list
+
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1, 6]
+    print("Original:", sample_data)
+    print("Cleaned:", remove_duplicates(sample_data))
+    
+    sample_dicts = [
+        {"id": 1, "name": "Alice"},
+        {"id": 2, "name": "Bob"},
+        {"id": 1, "name": "Alice"},
+        {"id": 3, "name": "Charlie"}
+    ]
+    print("\nOriginal dicts:", sample_dicts)
+    print("Cleaned by id:", clean_data_with_key(sample_dicts, lambda x: x["id"]))
