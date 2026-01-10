@@ -195,3 +195,109 @@ if __name__ == "__main__":
     # Validate the cleaned dataset
     validation_passed = validate_dataset(cleaned, required_columns=['id', 'name', 'age'], min_rows=3)
     print(f"\nDataset validation: {'PASSED' if validation_passed else 'FAILED'}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'drop', fill_value: any = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        return df.fillna(fill_value)
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize a column to range [0, 1].
+    
+    Args:
+        df: Input DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    col_min = df[column].min()
+    col_max = df[column].max()
+    
+    if col_max == col_min:
+        df[column] = 0.5
+    else:
+        df[column] = (df[column] - col_min) / (col_max - col_min)
+    
+    return df
+
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   handle_nulls: bool = True,
+                   normalize_cols: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Main function to clean DataFrame with multiple operations.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        handle_nulls: Whether to handle missing values
+        normalize_cols: List of columns to normalize
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if handle_nulls:
+        cleaned_df = handle_missing_values(cleaned_df, strategy='fill', fill_value=0)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'value': [10, 20, 20, None, 40],
+        'score': [100, 200, 200, 300, 400]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, normalize_cols=['score'])
+    print("\nCleaned DataFrame:")
+    print(cleaned)
