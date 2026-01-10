@@ -1,16 +1,16 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     """
     Remove outliers from a DataFrame column using the IQR method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: DataFrame with outliers removed.
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -31,11 +31,11 @@ def calculate_summary_statistics(df, column):
     Calculate summary statistics for a column after outlier removal.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
     
     Returns:
-    dict: Dictionary containing summary statistics
+    dict: Dictionary containing summary statistics.
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -51,19 +51,22 @@ def calculate_summary_statistics(df, column):
     
     return stats
 
-def process_dataframe(df, column):
-    """
-    Main function to process DataFrame by removing outliers and calculating statistics.
+if __name__ == "__main__":
+    sample_data = {
+        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 102, 12, 14, 13, 12, 11, 14, 13, 12, 14, 100]
+    }
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    df = pd.DataFrame(sample_data)
+    print("Original data:")
+    print(df)
+    print(f"\nOriginal shape: {df.shape}")
     
-    Returns:
-    tuple: (cleaned_df, original_stats, cleaned_stats)
-    """
-    original_stats = calculate_summary_statistics(df, column)
-    cleaned_df = remove_outliers_iqr(df, column)
-    cleaned_stats = calculate_summary_statistics(cleaned_df, column)
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nCleaned data:")
+    print(cleaned_df)
+    print(f"\nCleaned shape: {cleaned_df.shape}")
     
-    return cleaned_df, original_stats, cleaned_stats
+    stats = calculate_summary_statistics(cleaned_df, 'values')
+    print("\nSummary statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
