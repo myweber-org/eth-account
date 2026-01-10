@@ -160,3 +160,36 @@ if __name__ == "__main__":
     print("Data Summary:")
     print(f"Shape: {summary['shape']}")
     print(f"Numeric Stats for column A: {summary['numeric_stats']['A']}")
+import re
+
+def clean_string(text):
+    """
+    Cleans and normalizes a string by:
+    - Removing leading/trailing whitespace
+    - Converting to lowercase
+    - Removing extra spaces between words
+    - Removing non-alphanumeric characters except spaces
+    """
+    if not isinstance(text, str):
+        return text
+
+    text = text.strip()
+    text = text.lower()
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    text = re.sub(r'\s+', ' ', text)
+
+    return text
+
+def normalize_names(name_list):
+    """
+    Normalizes a list of names using clean_string function.
+    Returns a list of unique, sorted names.
+    """
+    if not isinstance(name_list, list):
+        return []
+
+    cleaned_names = [clean_string(name) for name in name_list]
+    unique_names = list(set(cleaned_names))
+    unique_names.sort()
+
+    return unique_names
