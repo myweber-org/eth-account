@@ -1,57 +1,89 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-def remove_missing_rows(df, columns=None):
-    if columns is None:
-        columns = df.columns
-    return df.dropna(subset=columns)
-
-def fill_missing_with_mean(df, columns=None):
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    df_filled = df.copy()
-    for col in columns:
-        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
-            df_filled[col] = df[col].fillna(df[col].mean())
-    return df_filled
-
-def remove_outliers_iqr(df, column, multiplier=1.5):
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
     if column not in df.columns:
-        return df
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
-    lower_bound = Q1 - multiplier * IQR
-    upper_bound = Q3 + multiplier * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def standardize_column(df, column):
+def calculate_summary_stats(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
     if column not in df.columns:
-        return df
-    df_standardized = df.copy()
-    mean = df[column].mean()
-    std = df[column].std()
-    if std != 0:
-        df_standardized[column] = (df[column] - mean) / std
-    return df_standardized
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'original_count': len(df),
+        'cleaned_count': len(remove_outliers_iqr(df, column)),
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'q1': df[column].quantile(0.25),
+        'q3': df[column].quantile(0.75)
+    }
+    
+    return stats
 
-def clean_dataset(df, missing_strategy='drop', outlier_columns=None, standardize_columns=None):
-    cleaned_df = df.copy()
+def example_usage():
+    """
+    Example demonstrating the usage of data cleaning functions.
+    """
+    np.random.seed(42)
+    data = {
+        'id': range(100),
+        'value': np.concatenate([
+            np.random.normal(100, 15, 90),
+            np.random.normal(300, 50, 10)
+        ])
+    }
     
-    if missing_strategy == 'drop':
-        cleaned_df = remove_missing_rows(cleaned_df)
-    elif missing_strategy == 'mean':
-        cleaned_df = fill_missing_with_mean(cleaned_df)
+    df = pd.DataFrame(data)
     
-    if outlier_columns:
-        for col in outlier_columns:
-            if col in cleaned_df.columns:
-                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    print("Original DataFrame shape:", df.shape)
+    print("Original summary:")
+    print(df['value'].describe())
     
-    if standardize_columns:
-        for col in standardize_columns:
-            if col in cleaned_df.columns:
-                cleaned_df = standardize_column(cleaned_df, col)
+    cleaned_df = remove_outliers_iqr(df, 'value')
     
-    return cleaned_df
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("Cleaned summary:")
+    print(cleaned_df['value'].describe())
+    
+    stats = calculate_summary_stats(df, 'value')
+    print("\nStatistics summary:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
+
+if __name__ == "__main__":
+    example_usage()
