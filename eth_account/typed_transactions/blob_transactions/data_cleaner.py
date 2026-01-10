@@ -295,3 +295,11 @@ def clean_dataset(df, missing_strategy='mean', outlier_method='zscore', normaliz
         cleaner.normalize_data(method=normalize_method)
     
     return cleaner.get_cleaned_data()
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
