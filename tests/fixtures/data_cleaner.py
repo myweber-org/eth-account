@@ -167,4 +167,104 @@ def remove_outliers_iqr(data, column):
     upper_bound = Q3 + 1.5 * IQR
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return filtered_dataimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    column_mapping (dict): Optional dictionary to rename columns
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str): Strategy to fill missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping is provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Drop duplicate rows if requested
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Handle missing values
+    for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+        if cleaned_df[column].isnull().any():
+            if fill_missing == 'mean':
+                cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+            elif fill_missing == 'median':
+                cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+            elif fill_missing == 'mode':
+                cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+            elif fill_missing == 'drop':
+                cleaned_df = cleaned_df.dropna(subset=[column])
+    
+    # For categorical columns, fill with most frequent value
+    for column in cleaned_df.select_dtypes(include=['object']).columns:
+        if cleaned_df[column].isnull().any():
+            cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of column names that must be present
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"DataFrame has fewer than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 3, 3, 4, 5],
+        'value': [10.5, 20.3, np.nan, 30.1, 40.7, np.nan],
+        'category': ['A', 'B', 'A', 'A', 'C', None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    # Validate
+    is_valid = validate_dataframe(cleaned, required_columns=['id', 'value'], min_rows=3)
+    print(f"\nData validation passed: {is_valid}")
