@@ -119,4 +119,130 @@ class DataCleaner:
             'original_cols': self.original_shape[1],
             'current_cols': final_shape[1],
             'cols_removed': cols_removed
-        }
+        }import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, output_path=None, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Clean CSV data by handling missing values and converting data types.
+    
+    Args:
+        filepath: Path to input CSV file
+        output_path: Path for cleaned output CSV (optional)
+        fill_strategy: Strategy for filling missing values ('mean', 'median', 'mode', 'zero')
+        drop_threshold: Drop columns with missing values above this threshold (0.0-1.0)
+    
+    Returns:
+        pandas.DataFrame: Cleaned dataframe
+    """
+    try:
+        df = pd.read_csv(filepath)
+        original_shape = df.shape
+        
+        # Drop columns with too many missing values
+        missing_ratio = df.isnull().sum() / len(df)
+        cols_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+        df = df.drop(columns=cols_to_drop)
+        
+        # Fill missing values based on strategy
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        if fill_strategy == 'mean':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        elif fill_strategy == 'median':
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif fill_strategy == 'zero':
+            df[numeric_cols] = df[numeric_cols].fillna(0)
+        elif fill_strategy == 'mode':
+            for col in numeric_cols:
+                df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+        
+        # Fill non-numeric columns with 'Unknown'
+        non_numeric_cols = df.select_dtypes(exclude=[np.number]).columns
+        df[non_numeric_cols] = df[non_numeric_cols].fillna('Unknown')
+        
+        # Convert data types to appropriate formats
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                try:
+                    df[col] = pd.to_datetime(df[col], errors='ignore')
+                except:
+                    pass
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Save cleaned data if output path provided
+        if output_path:
+            df.to_csv(output_path, index=False)
+        
+        print(f"Data cleaning complete:")
+        print(f"  Original shape: {original_shape}")
+        print(f"  Cleaned shape: {df.shape}")
+        print(f"  Dropped columns: {len(cols_to_drop)}")
+        print(f"  Removed duplicates: {original_shape[0] - len(df)}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, checks=None):
+    """
+    Validate dataframe for common data quality issues.
+    
+    Args:
+        df: pandas DataFrame to validate
+        checks: List of checks to perform (default: all)
+    
+    Returns:
+        dict: Validation results
+    """
+    if checks is None:
+        checks = ['missing', 'duplicates', 'types', 'outliers']
+    
+    results = {}
+    
+    if 'missing' in checks:
+        missing_counts = df.isnull().sum()
+        results['missing_values'] = missing_counts[missing_counts > 0].to_dict()
+    
+    if 'duplicates' in checks:
+        results['duplicate_rows'] = df.duplicated().sum()
+    
+    if 'types' in checks:
+        results['data_types'] = df.dtypes.astype(str).to_dict()
+    
+    if 'outliers' in checks and len(df.select_dtypes(include=[np.number]).columns) > 0:
+        numeric_df = df.select_dtypes(include=[np.number])
+        q1 = numeric_df.quantile(0.25)
+        q3 = numeric_df.quantile(0.75)
+        iqr = q3 - q1
+        outliers = ((numeric_df < (q1 - 1.5 * iqr)) | (numeric_df > (q3 + 1.5 * iqr))).sum()
+        results['outliers'] = outliers.to_dict()
+    
+    return results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'value': [10.5, None, 15.2, 10.5, 100.0],
+        'category': ['A', 'B', None, 'A', 'C'],
+        'date': ['2023-01-01', '2023-01-02', '2023-01-03', None, '2023-01-01']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', 'cleaned_sample.csv', fill_strategy='mean')
+    
+    if cleaned_df is not None:
+        validation = validate_dataframe(cleaned_df)
+        print("\nValidation results:")
+        for key, value in validation.items():
+            print(f"{key}: {value}")
