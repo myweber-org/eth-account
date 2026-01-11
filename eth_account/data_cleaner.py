@@ -1,118 +1,84 @@
 
-import numpy as np
 import pandas as pd
-from scipy import stats
+import re
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
-                df_clean = df_clean[mask]
-                
-        self.df = df_clean.reset_index(drop=True)
-        return self
-        
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_normalized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val > min_val:
-                    df_normalized[col] = (self.df[col] - min_val) / (max_val - min_val)
-                    
-        self.df = df_normalized
-        return self
-        
-    def standardize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_standardized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                mean_val = self.df[col].mean()
-                std_val = self.df[col].std()
-                if std_val > 0:
-                    df_standardized[col] = (self.df[col] - mean_val) / std_val
-                    
-        self.df = df_standardized
-        return self
-        
-    def fill_missing_median(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                median_val = self.df[col].median()
-                df_filled[col] = self.df[col].fillna(median_val)
-                
-        self.df = df_filled
-        return self
-        
-    def get_cleaned_data(self):
-        return self.df
-        
-    def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
-        
-    def get_summary(self):
-        summary = {
-            'original_rows': self.original_shape[0],
-            'cleaned_rows': self.df.shape[0],
-            'removed_rows': self.get_removed_count(),
-            'columns': self.df.shape[1],
-            'missing_values': self.df.isnull().sum().sum()
-        }
-        return summary
-
-def create_sample_data():
-    np.random.seed(42)
-    data = {
-        'feature_a': np.random.normal(100, 15, 1000),
-        'feature_b': np.random.exponential(50, 1000),
-        'feature_c': np.random.uniform(0, 1, 1000),
-        'category': np.random.choice(['A', 'B', 'C'], 1000)
-    }
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, case_normalization='lower'):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
     
-    df = pd.DataFrame(data)
-    df.loc[np.random.choice(df.index, 50), 'feature_a'] = np.nan
-    df.loc[np.random.choice(df.index, 20), 'feature_b'] = 1000
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    columns_to_clean (list, optional): List of column names to apply string normalization.
+                                       If None, applies to all object dtype columns.
+    remove_duplicates (bool): If True, remove duplicate rows.
+    case_normalization (str): One of 'lower', 'upper', or None for case normalization.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if remove_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if columns_to_clean is None:
+        columns_to_clean = cleaned_df.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in columns_to_clean:
+        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].astype(str)
+            
+            if case_normalization == 'lower':
+                cleaned_df[col] = cleaned_df[col].str.lower()
+            elif case_normalization == 'upper':
+                cleaned_df[col] = cleaned_df[col].str.upper()
+            
+            cleaned_df[col] = cleaned_df[col].apply(lambda x: re.sub(r'\s+', ' ', x.strip()))
+    
+    return cleaned_df
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    email_column (str): Name of the column containing email addresses.
+    
+    Returns:
+    pd.DataFrame: DataFrame with additional 'email_valid' boolean column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    df['email_valid'] = df[email_column].str.match(email_pattern, na=False)
+    
+    valid_count = df['email_valid'].sum()
+    print(f"Found {valid_count} valid email addresses out of {len(df)} rows.")
     
     return df
 
 if __name__ == "__main__":
-    sample_df = create_sample_data()
-    print("Original data shape:", sample_df.shape)
-    print("Missing values:", sample_df.isnull().sum().sum())
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'ALICE WONDER', '  Bob   White  '],
+        'email': ['john@example.com', 'jane@test.org', 'john@example.com', 'invalid-email', 'bob@company.co.uk'],
+        'age': [25, 30, 25, 28, 35]
+    }
     
-    cleaner = DataCleaner(sample_df)
-    cleaner.fill_missing_median().remove_outliers_iqr().standardize_zscore()
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
     
-    cleaned_df = cleaner.get_cleaned_data()
-    print("\nCleaned data shape:", cleaned_df.shape)
-    print("Missing values:", cleaned_df.isnull().sum().sum())
+    cleaned = clean_dataframe(df, columns_to_clean=['name'], case_normalization='lower')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
     
-    summary = cleaner.get_summary()
-    print("\nCleaning Summary:")
-    for key, value in summary.items():
-        print(f"{key}: {value}")
+    validated = validate_email_column(cleaned, 'email')
+    print("DataFrame with email validation:")
+    print(validated)
