@@ -1,10 +1,6 @@
 
-import pandas as pd
 import numpy as np
-from scipy import stats
-
-def load_dataset(filepath):
-    return pd.read_csv(filepath)
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     Q1 = df[column].quantile(0.25)
@@ -12,25 +8,28 @@ def remove_outliers_iqr(df, column):
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
 
-def normalize_column(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_data(df, numeric_columns):
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
     for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_column(df, col)
-    return df
-
-def save_cleaned_data(df, output_path):
-    df.to_csv(output_path, index=False)
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    cleaned_df = cleaned_df.dropna()
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
 
 if __name__ == "__main__":
-    raw_data = load_dataset('raw_dataset.csv')
-    numeric_cols = ['age', 'income', 'score']
-    cleaned_data = clean_data(raw_data, numeric_cols)
-    save_cleaned_data(cleaned_data, 'cleaned_dataset.csv')
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    })
+    sample_data.loc[::100, 'A'] = 500
+    sample_data.loc[::90, 'B'] = 300
+    
+    print("Original shape:", sample_data.shape)
+    cleaned = clean_dataset(sample_data, ['A', 'B', 'C'])
+    print("Cleaned shape:", cleaned.shape)
+    print("Outliers removed:", sample_data.shape[0] - cleaned.shape[0])
