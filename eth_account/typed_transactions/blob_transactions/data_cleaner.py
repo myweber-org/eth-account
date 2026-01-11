@@ -448,4 +448,44 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid = validate_data(cleaned_df, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nData validation result: {is_valid}")
+    print(f"\nData validation result: {is_valid}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+    """
+    Load a CSV file, clean missing values, and save the cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original data shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        if missing_strategy == 'mean':
+            for column in df.select_dtypes(include=[np.number]).columns:
+                df[column].fillna(df[column].mean(), inplace=True)
+        elif missing_strategy == 'median':
+            for column in df.select_dtypes(include=[np.number]).columns:
+                df[column].fillna(df[column].median(), inplace=True)
+        elif missing_strategy == 'drop':
+            df.dropna(inplace=True)
+        else:
+            raise ValueError("Invalid missing_strategy. Use 'mean', 'median', or 'drop'.")
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        print(f"Cleaned data shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    cleaned_df = clean_csv_data('raw_data.csv', 'cleaned_data.csv', 'mean')
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully.")
