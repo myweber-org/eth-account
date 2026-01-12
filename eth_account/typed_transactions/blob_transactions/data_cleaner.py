@@ -205,3 +205,77 @@ def standardize_columns(df, columns=None):
             df_standardized[col] = scaler.fit_transform(df_standardized[[col]])
     
     return df_standardized
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing string columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    columns_to_clean (list, optional): List of column names to apply string normalization.
+                                       If None, all object dtype columns are cleaned.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates().reset_index(drop=True)
+    
+    # Determine columns to normalize
+    if columns_to_clean is None:
+        columns_to_clean = df_cleaned.select_dtypes(include=['object']).columns.tolist()
+    
+    # Apply string normalization
+    for col in columns_to_clean:
+        if col in df_cleaned.columns and df_cleaned[col].dtype == 'object':
+            df_cleaned[col] = df_cleaned[col].apply(_normalize_string)
+    
+    return df_cleaned
+
+def _normalize_string(value):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    
+    Parameters:
+    value (str): Input string.
+    
+    Returns:
+    str: Normalized string.
+    """
+    if not isinstance(value, str):
+        return value
+    
+    # Convert to lowercase
+    normalized = value.lower()
+    
+    # Remove extra whitespace
+    normalized = re.sub(r'\s+', ' ', normalized).strip()
+    
+    # Remove special characters (keep alphanumeric and spaces)
+    normalized = re.sub(r'[^a-z0-9\s]', '', normalized)
+    
+    return normalized
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame for required columns and non-empty rows.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list, optional): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
