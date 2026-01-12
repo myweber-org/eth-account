@@ -69,4 +69,119 @@ class DataCleaner:
         print("\nData types:")
         print(self.df.dtypes.value_counts())
         print("\nMissing values:")
-        print(self.df.isnull().sum())
+        print(self.df.isnull().sum())import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (None for all numeric columns)
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize (None for all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            min_val = df[col].min()
+            max_val = df[col].max()
+            
+            if max_val > min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+    
+    return df_normalized
+
+def clean_dataset(df, outlier_columns=None, normalize_columns=None, outlier_threshold=1.5):
+    """
+    Complete data cleaning pipeline.
+    
+    Args:
+        df: pandas DataFrame
+        outlier_columns: columns for outlier removal
+        normalize_columns: columns for normalization
+        outlier_threshold: IQR threshold for outlier detection
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    df_clean = remove_outliers_iqr(df, outlier_columns, outlier_threshold)
+    df_clean = normalize_minmax(df_clean, normalize_columns)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    cleaned_data = clean_dataset(sample_data)
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
+    
+    is_valid, message = validate_data(cleaned_data, min_rows=10)
+    print(f"Validation: {is_valid} - {message}")
