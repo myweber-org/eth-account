@@ -58,3 +58,52 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}, Cleaned shape: {cleaned_data.shape}")
     print("Cleaned data summary:")
     print(cleaned_data[numeric_cols].describe())
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str or dict): Method to fill missing values.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, str):
+            cleaned_df = cleaned_df.fillna(method=fill_missing)
+        elif isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate the DataFrame for required columns and data types.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
