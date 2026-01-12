@@ -1,143 +1,114 @@
-import pandas as pd
+
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def remove_duplicates(df, subset=None):
+def remove_outliers_iqr(data, column, threshold=1.5):
     """
-    Remove duplicate rows from DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        subset (list, optional): Columns to consider for duplicates
-    
-    Returns:
-        pd.DataFrame: DataFrame with duplicates removed
+    Remove outliers using IQR method
     """
-    return df.drop_duplicates(subset=subset, keep='first')
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
 
-def convert_column_types(df, column_types):
+def remove_outliers_zscore(data, column, threshold=3):
     """
-    Convert specified columns to given data types.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column_types (dict): Dictionary mapping columns to target types
-    
-    Returns:
-        pd.DataFrame: DataFrame with converted columns
+    Remove outliers using Z-score method
     """
-    result_df = df.copy()
-    for column, dtype in column_types.items():
-        if column in result_df.columns:
-            result_df[column] = result_df[column].astype(dtype)
-    return result_df
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
 
-def handle_missing_values(df, strategy='drop', fill_value=None):
+def normalize_minmax(data, column):
     """
-    Handle missing values in DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        strategy (str): 'drop' or 'fill'
-        fill_value: Value to fill missing values with
-    
-    Returns:
-        pd.DataFrame: DataFrame with handled missing values
+    Normalize data using Min-Max scaling
     """
-    if strategy == 'drop':
-        return df.dropna()
-    elif strategy == 'fill':
-        return df.fillna(fill_value)
-    else:
-        raise ValueError("Strategy must be 'drop' or 'fill'")
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
 
-def normalize_column(df, column):
+def normalize_zscore(data, column):
     """
-    Normalize a column to range [0, 1].
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to normalize
-    
-    Returns:
-        pd.DataFrame: DataFrame with normalized column
+    Normalize data using Z-score standardization
     """
-    if column not in df.columns:
-        return df
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    result_df = df.copy()
-    col_min = result_df[column].min()
-    col_max = result_df[column].max()
+    mean_val = data[column].mean()
+    std_val = data[column].std()
     
-    if col_max != col_min:
-        result_df[column] = (result_df[column] - col_min) / (col_max - col_min)
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
     
-    return result_df
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
 
-def clean_dataframe(df, operations):
+def clean_dataset(df, numeric_columns=None, outlier_method='iqr', normalize_method='minmax'):
     """
-    Apply multiple cleaning operations to DataFrame.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        operations (list): List of cleaning operation configurations
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
+    Comprehensive data cleaning pipeline
     """
-    result_df = df.copy()
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    for operation in operations:
-        op_type = operation.get('type')
+    cleaned_df = df.copy()
+    removal_stats = {}
+    
+    for col in numeric_columns:
+        if col not in df.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_df, removed = remove_outliers_iqr(cleaned_df, col)
+        elif outlier_method == 'zscore':
+            cleaned_df, removed = remove_outliers_zscore(cleaned_df, col)
+        else:
+            removed = 0
         
-        if op_type == 'remove_duplicates':
-            result_df = remove_duplicates(result_df, operation.get('subset'))
+        removal_stats[col] = removed
         
-        elif op_type == 'convert_types':
-            result_df = convert_column_types(result_df, operation.get('column_types', {}))
-        
-        elif op_type == 'handle_missing':
-            result_df = handle_missing_values(
-                result_df,
-                strategy=operation.get('strategy', 'drop'),
-                fill_value=operation.get('fill_value')
-            )
-        
-        elif op_type == 'normalize':
-            result_df = normalize_column(result_df, operation.get('column'))
+        if normalize_method == 'minmax':
+            cleaned_df[f'{col}_normalized'] = normalize_minmax(cleaned_df, col)
+        elif normalize_method == 'zscore':
+            cleaned_df[f'{col}_normalized'] = normalize_zscore(cleaned_df, col)
     
-    return result_df
+    return cleaned_df, removal_stats
 
-def validate_dataframe(df, checks):
+def validate_data(df, required_columns=None, allow_nan=False):
     """
-    Validate DataFrame against specified checks.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        checks (dict): Validation checks
-    
-    Returns:
-        dict: Validation results
+    Validate data structure and content
     """
-    results = {}
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
     
-    if 'required_columns' in checks:
-        required = set(checks['required_columns'])
-        present = set(df.columns)
-        results['missing_columns'] = list(required - present)
-        results['has_required_columns'] = len(results['missing_columns']) == 0
+    if not allow_nan:
+        nan_count = df.isna().sum().sum()
+        if nan_count > 0:
+            raise ValueError(f"Dataset contains {nan_count} NaN values")
     
-    if 'no_duplicates' in checks and checks['no_duplicates']:
-        duplicate_count = df.duplicated().sum()
-        results['has_duplicates'] = duplicate_count > 0
-        results['duplicate_count'] = duplicate_count
-    
-    if 'no_null_values' in checks:
-        columns = checks['no_null_values']
-        if columns == 'all':
-            columns = df.columns
-        
-        null_counts = df[columns].isnull().sum()
-        results['null_counts'] = null_counts.to_dict()
-        results['has_nulls'] = null_counts.sum() > 0
-    
-    return results
+    return True
