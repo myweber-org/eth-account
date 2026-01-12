@@ -215,4 +215,11 @@ if __name__ == "__main__":
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
     
     print("\nSummary statistics:")
-    print(cleaned_df['value'].describe())
+    print(cleaned_df['value'].describe())def remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
