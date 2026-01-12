@@ -1,63 +1,61 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a specified column in a DataFrame using the IQR method.
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.df.columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+        
+        self.df = df_clean
+        removed_count = self.original_shape[0] - self.df.shape[0]
+        return removed_count
     
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        return self.df
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+        
+        return self.df
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def clean_dataset(df, columns_to_clean=None):
-    """
-    Clean multiple columns in a DataFrame by removing outliers.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    columns_to_clean (list): List of column names to clean. If None, clean all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    if columns_to_clean is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns_to_clean = numeric_cols
-    
-    cleaned_df = df.copy()
-    for column in columns_to_clean:
-        if column in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print(f"Original shape: {df.shape}")
-    
-    cleaned_df = clean_dataset(df, ['A', 'B'])
-    print(f"Cleaned shape: {cleaned_df.shape}")
-    print(f"Rows removed: {len(df) - len(cleaned_df)}")
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'current_rows': self.df.shape[0],
+            'original_columns': self.original_shape[1],
+            'current_columns': self.df.shape[1],
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns)
+        }
+        return summary
