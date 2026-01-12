@@ -268,3 +268,112 @@ def get_column_statistics(dataframe, column):
     }
     
     return stats_dict
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling to range [0, 1].
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        data[column + '_normalized'] = 0.5
+    else:
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    return data
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        data[column + '_standardized'] = 0
+    else:
+        data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    
+    return data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy.
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_filled = data.copy()
+    
+    for col in columns:
+        if col not in data.columns:
+            continue
+            
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            data_filled[col] = data[col].fillna(fill_value)
+    
+    return data_filled
+
+def validate_dataframe(data):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if data.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def get_data_summary(data):
+    """
+    Generate summary statistics for the DataFrame.
+    """
+    validate_dataframe(data)
+    
+    summary = {
+        'shape': data.shape,
+        'columns': list(data.columns),
+        'dtypes': data.dtypes.to_dict(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'numeric_summary': data.describe().to_dict() if data.select_dtypes(include=[np.number]).shape[1] > 0 else {}
+    }
+    
+    return summary
