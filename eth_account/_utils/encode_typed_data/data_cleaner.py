@@ -113,3 +113,11 @@ def normalize_column(df, column, method='minmax'):
         raise ValueError("Method must be 'minmax' or 'standard'")
     
     return df_copy
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
