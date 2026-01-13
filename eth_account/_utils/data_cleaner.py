@@ -116,3 +116,85 @@ if __name__ == "__main__":
         print("\nData validation passed!")
     except ValueError as e:
         print(f"\nData validation failed: {e}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def normalize_column(data, column_name, method='minmax'):
+    if column_name not in data.columns:
+        raise ValueError(f"Column '{column_name}' not found in data")
+    
+    column_data = data[column_name].values
+    
+    if method == 'minmax':
+        min_val = np.min(column_data)
+        max_val = np.max(column_data)
+        if max_val == min_val:
+            return data
+        normalized = (column_data - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = np.mean(column_data)
+        std_val = np.std(column_data)
+        if std_val == 0:
+            return data
+        normalized = (column_data - mean_val) / std_val
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    data[column_name] = normalized
+    return data
+
+def remove_outliers_iqr(data, column_name):
+    if column_name not in data.columns:
+        raise ValueError(f"Column '{column_name}' not found in data")
+    
+    column_data = data[column_name].values
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    filtered_data = data[(data[column_name] >= lower_bound) & (data[column_name] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column_name, threshold=3):
+    if column_name not in data.columns:
+        raise ValueError(f"Column '{column_name}' not found in data")
+    
+    column_data = data[column_name].values
+    z_scores = np.abs(stats.zscore(column_data))
+    
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def clean_dataset(data, numeric_columns=None, normalization_method='minmax', outlier_method='iqr'):
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = normalize_column(cleaned_data, column, normalization_method)
+            
+            if outlier_method == 'iqr':
+                cleaned_data = remove_outliers_iqr(cleaned_data, column)
+            elif outlier_method == 'zscore':
+                cleaned_data = remove_outliers_zscore(cleaned_data, column)
+            else:
+                raise ValueError("Outlier method must be 'iqr' or 'zscore'")
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    summary = {
+        'original_rows': len(data),
+        'original_columns': len(data.columns),
+        'numeric_columns': data.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': data.select_dtypes(include=['object']).columns.tolist(),
+        'missing_values': data.isnull().sum().sum(),
+        'duplicate_rows': data.duplicated().sum()
+    }
+    return summary
