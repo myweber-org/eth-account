@@ -66,3 +66,72 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_df.shape}")
     cleaned_df = clean_dataset(sample_df)
     print(f"Cleaned shape: {cleaned_df.shape}")
+import pandas as pd
+import numpy as np
+import sys
+
+def load_csv(filepath):
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded {len(df)} rows from {filepath}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File {filepath} not found")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error loading CSV: {e}")
+        sys.exit(1)
+
+def clean_data(df):
+    original_rows = len(df)
+    
+    df.replace('', np.nan, inplace=True)
+    df.replace('NA', np.nan, inplace=True)
+    df.replace('null', np.nan, inplace=True)
+    
+    df.dropna(subset=['id'], inplace=True)
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_columns:
+        if df[col].isna().sum() > 0:
+            df[col].fillna(df[col].median(), inplace=True)
+    
+    text_columns = df.select_dtypes(include=['object']).columns
+    for col in text_columns:
+        if df[col].isna().sum() > 0:
+            df[col].fillna('Unknown', inplace=True)
+    
+    df.drop_duplicates(inplace=True)
+    
+    cleaned_rows = len(df)
+    print(f"Cleaning complete: {original_rows} -> {cleaned_rows} rows")
+    print(f"Removed {original_rows - cleaned_rows} rows")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    except Exception as e:
+        print(f"Error saving cleaned data: {e}")
+        sys.exit(1)
+
+def main():
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    
+    print(f"Starting data cleaning for {input_file}")
+    
+    df = load_csv(input_file)
+    df_cleaned = clean_data(df)
+    save_cleaned_data(df_cleaned, output_file)
+    
+    print("Data cleaning completed successfully")
+
+if __name__ == "__main__":
+    main()
