@@ -395,3 +395,87 @@ if __name__ == "__main__":
     for col in cleaned_df.columns:
         stats = calculate_summary_statistics(cleaned_df, col)
         print(f"\n{col}: {stats}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_df = df.copy()
+        
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                z_scores = np.abs(stats.zscore(self.df[col].fillna(self.df[col].mean())))
+                df_clean = df_clean[z_scores < threshold]
+        self.df = df_clean
+        return self
+        
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                col_min = self.df[col].min()
+                col_max = self.df[col].max()
+                if col_max > col_min:
+                    self.df[col] = (self.df[col] - col_min) / (col_max - col_min)
+        return self
+        
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                self.df[col] = self.df[col].fillna(self.df[col].mean())
+        return self
+        
+    def get_cleaned_data(self):
+        return self.df
+        
+    def reset_to_original(self):
+        self.df = self.original_df.copy()
+        return self
+        
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.original_df),
+            'cleaned_rows': len(self.df),
+            'removed_rows': len(self.original_df) - len(self.df),
+            'original_columns': list(self.original_df.columns),
+            'cleaned_columns': list(self.df.columns)
+        }
+        return summary
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    data['feature1'][np.random.choice(100, 5)] = np.nan
+    data['feature1'][10:12] = [500, 600]
+    
+    df = pd.DataFrame(data)
+    cleaner = DataCleaner(df)
+    
+    print("Original shape:", df.shape)
+    cleaner.fill_missing_mean().remove_outliers_zscore().normalize_minmax()
+    cleaned_df = cleaner.get_cleaned_data()
+    print("Cleaned shape:", cleaned_df.shape)
+    print("Summary:", cleaner.get_summary())
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    result = example_usage()
+    print("Data cleaning completed successfully.")
