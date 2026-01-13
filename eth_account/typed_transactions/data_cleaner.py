@@ -333,3 +333,115 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned_df.shape)
     print("\nCleaned statistics:")
     print(calculate_summary_stats(cleaned_df, 'value'))
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def clean_dataframe(df: pd.DataFrame, 
+                    drop_duplicates: bool = True,
+                    fill_missing: Optional[str] = 'mean',
+                    columns_to_standardize: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Clean a pandas DataFrame by handling duplicates, missing values, and standardizing columns.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing is not None:
+        for col in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[col].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[col].mean()
+                elif fill_missing == 'median':
+                    fill_value = cleaned_df[col].median()
+                elif fill_missing == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = fill_missing
+                
+                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                print(f"Filled missing values in column '{col}' with {fill_value}")
+    
+    if columns_to_standardize:
+        for col in columns_to_standardize:
+            if col in cleaned_df.columns:
+                if cleaned_df[col].dtype in [np.float64, np.int64]:
+                    mean = cleaned_df[col].mean()
+                    std = cleaned_df[col].std()
+                    if std > 0:
+                        cleaned_df[col] = (cleaned_df[col] - mean) / std
+                        print(f"Standardized column '{col}' (mean={mean:.2f}, std={std:.2f})")
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Validate that DataFrame meets basic quality criteria.
+    """
+    checks = []
+    
+    checks.append(('No null values in numeric columns', 
+                  df.select_dtypes(include=[np.number]).isnull().sum().sum() == 0))
+    
+    checks.append(('No infinite values', 
+                  np.isfinite(df.select_dtypes(include=[np.number])).all().all()))
+    
+    checks.append(('Has at least one row', len(df) > 0))
+    
+    checks.append(('Has at least one column', len(df.columns) > 0))
+    
+    all_passed = all(check[1] for check in checks)
+    
+    if not all_passed:
+        print("Data validation failed:")
+        for check_name, passed in checks:
+            status = "PASS" if passed else "FAIL"
+            print(f"  {check_name}: {status}")
+    
+    return all_passed
+
+def export_cleaned_data(df: pd.DataFrame, filename: str, format: str = 'csv'):
+    """
+    Export cleaned DataFrame to file.
+    """
+    if format == 'csv':
+        df.to_csv(filename, index=False)
+    elif format == 'excel':
+        df.to_excel(filename, index=False)
+    elif format == 'json':
+        df.to_json(filename, orient='records')
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Exported cleaned data to {filename} ({format})")
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, np.nan, 40.1, 50.0],
+        'score': [100, 200, 200, 300, 400, 500]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataframe(df, 
+                             drop_duplicates=True,
+                             fill_missing='mean',
+                             columns_to_standardize=['value', 'score'])
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    if validate_dataframe(cleaned):
+        print("\nData validation passed!")
+        export_cleaned_data(cleaned, 'cleaned_data.csv')
+    else:
+        print("\nData validation failed!")
