@@ -1,6 +1,7 @@
 
 import pandas as pd
 import numpy as np
+from scipy import stats
 
 def remove_outliers_iqr(df, column):
     Q1 = df[column].quantile(0.25)
@@ -16,8 +17,8 @@ def normalize_minmax(df, column):
     df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
     return df
 
-def clean_dataset(input_file, output_file):
-    df = pd.read_csv(input_file)
+def clean_dataset(filepath):
+    df = pd.read_csv(filepath)
     
     numeric_columns = df.select_dtypes(include=[np.number]).columns
     
@@ -27,10 +28,9 @@ def clean_dataset(input_file, output_file):
     for col in numeric_columns:
         df = normalize_minmax(df, col)
     
-    df.to_csv(output_file, index=False)
-    print(f"Cleaned data saved to {output_file}")
-    print(f"Original shape: {pd.read_csv(input_file).shape}")
-    print(f"Cleaned shape: {df.shape}")
+    return df
 
 if __name__ == "__main__":
-    clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    cleaned_data = clean_dataset('raw_data.csv')
+    cleaned_data.to_csv('cleaned_data.csv', index=False)
+    print(f"Data cleaned. Original shape: {pd.read_csv('raw_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
