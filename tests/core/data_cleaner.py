@@ -1,154 +1,101 @@
-import numpy as np
-import pandas as pd
 
-def remove_outliers_iqr(data, column, factor=1.5):
+import numpy as np
+
+def remove_outliers_iqr(data, column):
     """
-    Remove outliers using the Interquartile Range method.
+    Remove outliers from a specified column using the IQR method.
     
-    Args:
-        data: pandas DataFrame
-        column: column name to process
-        factor: IQR multiplier (default 1.5)
+    Parameters:
+    data (list or array-like): The dataset
+    column (int or str): Column index or name if using pandas DataFrame
     
     Returns:
-        DataFrame with outliers removed
+    tuple: (cleaned_data, outliers_removed)
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if isinstance(data, list):
+        data_array = np.array(data)
+    else:
+        data_array = data
     
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
+    q1 = np.percentile(data_array, 25)
+    q3 = np.percentile(data_array, 75)
     iqr = q3 - q1
     
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    mask = (data_array >= lower_bound) & (data_array <= upper_bound)
+    cleaned_data = data_array[mask]
+    outliers = data_array[~mask]
+    
+    return cleaned_data, outliers
 
-def normalize_minmax(data, column):
+def calculate_statistics(data):
     """
-    Normalize data to [0, 1] range using min-max scaling.
+    Calculate basic statistics for the dataset.
     
-    Args:
-        data: pandas DataFrame
-        column: column name to normalize
+    Parameters:
+    data (array-like): Input data
     
     Returns:
-        Series with normalized values
+    dict: Dictionary containing statistics
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return pd.Series([0.5] * len(data), index=data.index)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
+    stats = {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data),
+        'count': len(data)
+    }
+    return stats
 
-def standardize_zscore(data, column):
+def clean_dataset(data, columns=None):
     """
-    Standardize data using z-score normalization.
+    Clean dataset by removing outliers from specified columns.
     
-    Args:
-        data: pandas DataFrame
-        column: column name to standardize
+    Parameters:
+    data (array-like or dict): Input data
+    columns (list): List of columns to clean
     
     Returns:
-        Series with standardized values
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return pd.Series([0] * len(data), index=data.index)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def handle_missing_values(data, strategy='mean', columns=None):
-    """
-    Handle missing values in specified columns.
-    
-    Args:
-        data: pandas DataFrame
-        strategy: imputation strategy ('mean', 'median', 'mode', 'zero')
-        columns: list of columns to process (None for all numeric columns)
-    
-    Returns:
-        DataFrame with missing values handled
+    dict: Dictionary with cleaned data and statistics
     """
     if columns is None:
-        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+        if isinstance(data, dict):
+            columns = list(data.keys())
+        else:
+            columns = [0]
     
-    result = data.copy()
+    result = {}
     
     for col in columns:
-        if col not in result.columns:
-            continue
-            
-        if strategy == 'mean':
-            fill_value = result[col].mean()
-        elif strategy == 'median':
-            fill_value = result[col].median()
-        elif strategy == 'mode':
-            fill_value = result[col].mode()[0] if not result[col].mode().empty else 0
-        elif strategy == 'zero':
-            fill_value = 0
+        if isinstance(data, dict):
+            col_data = data[col]
         else:
-            raise ValueError(f"Unknown strategy: {strategy}")
+            col_data = data[:, col] if hasattr(data, 'shape') else data
         
-        result[col] = result[col].fillna(fill_value)
+        cleaned, outliers = remove_outliers_iqr(col_data, col)
+        stats = calculate_statistics(cleaned)
+        
+        result[col] = {
+            'cleaned_data': cleaned,
+            'outliers': outliers,
+            'statistics': stats,
+            'outliers_count': len(outliers)
+        }
     
     return result
 
-def create_sample_data():
-    """
-    Create sample data for testing the cleaning functions.
-    
-    Returns:
-        DataFrame with sample data
-    """
-    np.random.seed(42)
-    n_samples = 100
-    
-    data = pd.DataFrame({
-        'feature_a': np.random.normal(50, 15, n_samples),
-        'feature_b': np.random.exponential(10, n_samples),
-        'feature_c': np.random.uniform(0, 100, n_samples)
-    })
-    
-    # Add some outliers
-    data.loc[5, 'feature_a'] = 200
-    data.loc[10, 'feature_b'] = 150
-    
-    # Add some missing values
-    data.loc[15:20, 'feature_c'] = np.nan
-    
-    return data
-
 if __name__ == "__main__":
     # Example usage
-    sample_data = create_sample_data()
-    print("Original data shape:", sample_data.shape)
-    print("\nOriginal data summary:")
-    print(sample_data.describe())
+    sample_data = np.random.normal(100, 15, 1000)
+    sample_data_with_outliers = np.append(sample_data, [10, 200, 300, -50])
     
-    # Remove outliers
-    cleaned_data = remove_outliers_iqr(sample_data, 'feature_a')
-    print("\nAfter outlier removal shape:", cleaned_data.shape)
+    cleaned, outliers = remove_outliers_iqr(sample_data_with_outliers, 0)
+    print(f"Original data points: {len(sample_data_with_outliers)}")
+    print(f"Cleaned data points: {len(cleaned)}")
+    print(f"Outliers removed: {len(outliers)}")
     
-    # Normalize a column
-    normalized = normalize_minmax(cleaned_data, 'feature_b')
-    print("\nNormalized feature_b stats:")
-    print(f"Min: {normalized.min():.3f}, Max: {normalized.max():.3f}")
-    
-    # Handle missing values
-    filled_data = handle_missing_values(sample_data, strategy='mean')
-    print("\nMissing values after imputation:", filled_data.isnull().sum().sum())
+    stats = calculate_statistics(cleaned)
+    print(f"Statistics after cleaning: {stats}")
