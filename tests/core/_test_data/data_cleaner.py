@@ -284,3 +284,146 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    
+    Parameters:
+    data (pd.Series): Input data series
+    column (str): Column name to process
+    multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.Series: Data with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    series = data[column]
+    q1 = series.quantile(0.25)
+    q3 = series.quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    return data[(series >= lower_bound) & (series <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data to [0, 1] range using min-max scaling.
+    
+    Parameters:
+    data (pd.Series): Input data series
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized data
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    series = data[column]
+    min_val = series.min()
+    max_val = series.max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(series), index=series.index)
+    
+    return (series - min_val) / (max_val - min_val)
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization.
+    
+    Parameters:
+    data (pd.Series): Input data series
+    column (str): Column name to standardize
+    
+    Returns:
+    pd.Series: Standardized data with mean=0, std=1
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    series = data[column]
+    mean_val = series.mean()
+    std_val = series.std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(series), index=series.index)
+    
+    return (series - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns=None, outlier_multiplier=1.5):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    outlier_multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            # Remove outliers
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_multiplier)
+            # Normalize the column
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if len(numeric_cols) == 0:
+        return pd.DataFrame()
+    
+    stats = pd.DataFrame({
+        'mean': df[numeric_cols].mean(),
+        'median': df[numeric_cols].median(),
+        'std': df[numeric_cols].std(),
+        'min': df[numeric_cols].min(),
+        'max': df[numeric_cols].max(),
+        'count': df[numeric_cols].count(),
+        'missing': df[numeric_cols].isnull().sum()
+    })
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nOriginal summary statistics:")
+    print(calculate_summary_statistics(sample_data))
+    
+    cleaned_data = clean_dataset(sample_data, ['feature1', 'feature2'])
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("\nCleaned summary statistics:")
+    print(calculate_summary_statistics(cleaned_data))
