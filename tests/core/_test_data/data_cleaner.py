@@ -224,4 +224,63 @@ def validate_data(data, column, check_nulls=True, check_range=None):
         max_val = data[column].max()
         validation_report['range'] = (min_val, max_val)
     
-    return validation_report
+    return validation_reportimport numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def remove_missing(self, strategy='drop', fill_value=None):
+        if strategy == 'drop':
+            self.df = self.df.dropna()
+        elif strategy == 'fill':
+            if fill_value is not None:
+                self.df = self.df.fillna(fill_value)
+            else:
+                self.df = self.df.fillna(self.df.mean())
+        return self
+    
+    def remove_outliers(self, method='zscore', threshold=3):
+        if method == 'zscore':
+            z_scores = np.abs(stats.zscore(self.df[self.numeric_columns]))
+            self.df = self.df[(z_scores < threshold).all(axis=1)]
+        elif method == 'iqr':
+            for col in self.numeric_columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                self.df = self.df[~((self.df[col] < (Q1 - 1.5 * IQR)) | (self.df[col] > (Q3 + 1.5 * IQR)))]
+        return self
+    
+    def normalize(self, method='minmax'):
+        if method == 'minmax':
+            for col in self.numeric_columns:
+                self.df[col] = (self.df[col] - self.df[col].min()) / (self.df[col].max() - self.df[col].min())
+        elif method == 'standard':
+            for col in self.numeric_columns:
+                self.df[col] = (self.df[col] - self.df[col].mean()) / self.df[col].std()
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+
+def example_usage():
+    data = {'A': [1, 2, 3, 4, 5, 100],
+            'B': [10, 20, 30, 40, 50, 200],
+            'C': [0.1, 0.2, 0.3, 0.4, 0.5, 2.0]}
+    df = pd.DataFrame(data)
+    
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner.remove_outliers(threshold=2.5)
+                         .normalize(method='minmax')
+                         .get_cleaned_data())
+    
+    print("Original shape:", df.shape)
+    print("Cleaned shape:", cleaned_df.shape)
+    print("Cleaned data:\n", cleaned_df)
+
+if __name__ == "__main__":
+    example_usage()
