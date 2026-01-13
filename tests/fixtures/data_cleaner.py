@@ -237,3 +237,123 @@ if __name__ == "__main__":
     print(f"Original shape: {df.shape}")
     cleaned_df = clean_dataset(df)
     print(f"Cleaned shape: {cleaned_df.shape}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mode()[0])
+    elif strategy == 'drop':
+        data = data.dropna(subset=numeric_cols)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    return data
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, 
+                  standardize_columns=None, missing_strategy='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_data = data.copy()
+    
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data[col + '_normalized'] = normalize_minmax(cleaned_data, col)
+    
+    if standardize_columns:
+        for col in standardize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data[col + '_standardized'] = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': [0.1, 0.2, 0.3, 0.4, 0.5, 0.6]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned = clean_dataset(
+        sample_data,
+        outlier_columns=['A'],
+        normalize_columns=['B'],
+        standardize_columns=['C'],
+        missing_strategy='mean'
+    )
+    
+    print("\nCleaned data:")
+    print(cleaned)
