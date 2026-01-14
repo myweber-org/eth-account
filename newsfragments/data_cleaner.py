@@ -1,106 +1,101 @@
-import numpy as np
+
 import pandas as pd
-from scipy import stats
 
-def remove_outliers_iqr(data, column, factor=1.5):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Remove outliers using IQR method
-    """
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-
-def remove_outliers_zscore(data, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    z_scores = np.abs(stats.zscore(data[column]))
-    return data[z_scores < threshold]
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using min-max scaling
-    """
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
-
-def normalize_zscore(data, column):
-    """
-    Normalize data using Z-score standardization
-    """
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    data[column + '_standardized'] = (data[column] - mean_val) / std_val
-    return data
-
-def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
-    """
-    Main cleaning function for datasets
-    """
-    cleaned_df = df.copy()
+    Remove duplicate rows from a DataFrame.
     
-    for col in numeric_columns:
-        if outlier_method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif outlier_method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, col)
-        
-        if normalize_method == 'minmax':
-            cleaned_df = normalize_minmax(cleaned_df, col)
-        elif normalize_method == 'zscore':
-            cleaned_df = normalize_zscore(cleaned_df, col)
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
     
     return cleaned_df
 
-def validate_data(df, required_columns, numeric_ranges=None):
+def clean_numeric_column(df, column_name):
     """
-    Validate data structure and values
+    Clean a numeric column by converting to float and handling errors.
+    
+    Args:
+        df: pandas DataFrame
+        column_name: name of the column to clean
+    
+    Returns:
+        DataFrame with cleaned column
     """
-    missing_cols = [col for col in required_columns if col not in df.columns]
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    if numeric_ranges:
-        for col, (min_val, max_val) in numeric_ranges.items():
-            if col in df.columns:
-                invalid_values = df[(df[col] < min_val) | (df[col] > max_val)]
-                if not invalid_values.empty:
-                    print(f"Warning: Column '{col}' has values outside range [{min_val}, {max_val}]")
+    original_dtype = df[column_name].dtype
+    df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
     
-    return True
+    conversion_count = df[column_name].isna().sum() - df[column_name].isna().sum()
+    print(f"Converted {conversion_count} values in column '{column_name}'")
+    print(f"Original dtype: {original_dtype}, New dtype: {df[column_name].dtype}")
+    
+    return df
 
-def sample_usage():
+def validate_dataframe(df, required_columns=None):
     """
-    Example usage of the data cleaning utilities
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of column names that must be present
+    
+    Returns:
+        tuple: (is_valid, error_message)
     """
-    np.random.seed(42)
-    sample_data = pd.DataFrame({
-        'feature_a': np.random.normal(100, 15, 1000),
-        'feature_b': np.random.exponential(50, 1000),
-        'category': np.random.choice(['A', 'B', 'C'], 1000)
-    })
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    print("Original data shape:", sample_data.shape)
-    print("Original statistics:")
-    print(sample_data[['feature_a', 'feature_b']].describe())
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    cleaned_data = clean_dataset(
-        sample_data, 
-        ['feature_a', 'feature_b'], 
-        outlier_method='iqr',
-        normalize_method='zscore'
-    )
+    if df.isnull().all().any():
+        return False, "Some columns contain only null values"
     
-    print("\nCleaned data shape:", cleaned_data.shape)
-    print("Cleaned statistics:")
-    print(cleaned_data[['feature_a_standardized', 'feature_b_standardized']].describe())
+    return True, "DataFrame validation passed"
+
+def main():
+    """Example usage of data cleaning functions."""
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David', 'Eve'],
+        'score': ['95', '88', '88', '92', 'invalid', '85', '90']
+    }
     
-    return cleaned_data
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    df_no_dupes = remove_duplicates(df, subset=['id', 'name'])
+    print("DataFrame after removing duplicates:")
+    print(df_no_dupes)
+    print()
+    
+    df_clean = clean_numeric_column(df_no_dupes, 'score')
+    print("DataFrame after cleaning numeric column:")
+    print(df_clean)
+    print()
+    
+    is_valid, message = validate_dataframe(df_clean, required_columns=['id', 'name', 'score'])
+    print(f"Validation result: {is_valid}")
+    print(f"Validation message: {message}")
 
 if __name__ == "__main__":
-    cleaned = sample_usage()
+    main()
