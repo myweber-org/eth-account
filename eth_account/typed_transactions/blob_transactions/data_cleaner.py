@@ -1,76 +1,100 @@
 import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove duplicate rows from a DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Strategy to fill missing values. 
-                        Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep ('first', 'last', False).
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: DataFrame with duplicates removed.
     """
-    cleaned_df = df.copy()
+    if df.empty:
+        return df
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
     
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median', 'mode']:
-        for column in cleaned_df.select_dtypes(include=['number']).columns:
-            if cleaned_df[column].isnull().any():
-                if fill_missing == 'mean':
-                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
-                elif fill_missing == 'median':
-                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
-                elif fill_missing == 'mode':
-                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate row(s)")
     
     return cleaned_df
 
-def validate_dataset(df, required_columns=None, min_rows=1):
+def clean_numeric_column(df, column_name):
     """
-    Validate a DataFrame for basic integrity checks.
+    Clean a numeric column by converting to numeric and filling NaN.
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    min_rows (int): Minimum number of rows required.
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to clean.
     
     Returns:
-    tuple: (bool, str) indicating validation result and message.
+        pd.DataFrame: DataFrame with cleaned column.
     """
-    if df.empty:
-        return False, "DataFrame is empty"
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
     
-    if len(df) < min_rows:
-        return False, f"DataFrame has fewer than {min_rows} rows"
+    df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+    mean_value = df[column_name].mean()
+    df[column_name] = df[column_name].fillna(mean_value)
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
     
     if required_columns:
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
+            print(f"Error: Missing required columns: {missing_columns}")
+            return False
     
-    return True, "Dataset validation passed"
+    return True
 
-if __name__ == "__main__":
+def main():
+    """Example usage of data cleaning functions."""
     sample_data = {
-        'A': [1, 2, 2, 3, None],
-        'B': [4, None, 6, 7, 8],
-        'C': [9, 10, 11, 12, 13]
+        'id': [1, 2, 3, 2, 4, 1],
+        'name': ['Alice', 'Bob', 'Charlie', 'Bob', 'David', 'Alice'],
+        'score': [85, 90, None, 90, 95, 85]
     }
     
     df = pd.DataFrame(sample_data)
     print("Original DataFrame:")
     print(df)
+    print()
     
-    cleaned = clean_dataset(df, fill_missing='median')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    cleaned_df = remove_duplicates(df, subset=['id', 'name'])
+    print("After removing duplicates:")
+    print(cleaned_df)
+    print()
     
-    is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {is_valid} - {message}")
+    cleaned_df = clean_numeric_column(cleaned_df, 'score')
+    print("After cleaning numeric column:")
+    print(cleaned_df)
+    print()
+    
+    is_valid = validate_dataframe(cleaned_df, required_columns=['id', 'name', 'score'])
+    print(f"DataFrame validation: {is_valid}")
+
+if __name__ == "__main__":
+    main()
