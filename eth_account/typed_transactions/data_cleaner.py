@@ -189,4 +189,101 @@ class DataCleaner:
         return self.df
         
     def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
+        return self.original_shape[0] - self.df.shape[0]import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(
+    input_path: str,
+    output_path: str,
+    missing_strategy: str = 'drop',
+    fill_value: Optional[float] = None
+) -> pd.DataFrame:
+    """
+    Clean CSV data by handling missing values and standardizing columns.
+    
+    Parameters:
+    input_path: Path to input CSV file
+    output_path: Path where cleaned CSV will be saved
+    missing_strategy: Strategy for handling missing values ('drop', 'fill', 'interpolate')
+    fill_value: Value to fill missing data with (if strategy is 'fill')
+    
+    Returns:
+    Cleaned DataFrame
+    """
+    
+    df = pd.read_csv(input_path)
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    if missing_strategy == 'drop':
+        df_cleaned = df.dropna(subset=numeric_columns)
+    elif missing_strategy == 'fill':
+        if fill_value is not None:
+            df_cleaned = df.fillna({col: fill_value for col in numeric_columns})
+        else:
+            df_cleaned = df.fillna(df[numeric_columns].mean())
+    elif missing_strategy == 'interpolate':
+        df_cleaned = df.interpolate(method='linear', limit_direction='forward')
+    else:
+        raise ValueError(f"Unknown missing strategy: {missing_strategy}")
+    
+    for col in numeric_columns:
+        if df_cleaned[col].std() > 0:
+            df_cleaned[col] = (df_cleaned[col] - df_cleaned[col].mean()) / df_cleaned[col].std()
+    
+    df_cleaned.to_csv(output_path, index=False)
+    
+    print(f"Data cleaning completed. Original shape: {df.shape}, Cleaned shape: {df_cleaned.shape}")
+    print(f"Cleaned data saved to: {output_path}")
+    
+    return df_cleaned
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Validate that DataFrame meets basic quality criteria.
+    
+    Parameters:
+    df: DataFrame to validate
+    
+    Returns:
+    Boolean indicating if DataFrame passes validation
+    """
+    
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if df.isnull().sum().sum() > len(df) * 0.5:
+        print("Validation failed: Too many missing values")
+        return False
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) == 0:
+        print("Validation failed: No numeric columns found")
+        return False
+    
+    for col in numeric_cols:
+        if df[col].std() == 0:
+            print(f"Warning: Column '{col}' has zero variance")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    })
+    
+    sample_data.to_csv('sample_input.csv', index=False)
+    
+    cleaned_df = clean_csv_data(
+        input_path='sample_input.csv',
+        output_path='cleaned_output.csv',
+        missing_strategy='fill',
+        fill_value=0
+    )
+    
+    is_valid = validate_dataframe(cleaned_df)
+    print(f"Data validation result: {is_valid}")
