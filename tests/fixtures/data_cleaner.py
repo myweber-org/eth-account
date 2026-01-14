@@ -206,4 +206,44 @@ def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
         
         filtered_df = filtered_df[mask]
     
+    return filtered_dfimport numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
     return filtered_df
+
+def normalize_minmax(dataframe, columns):
+    df_normalized = dataframe.copy()
+    for col in columns:
+        min_val = df_normalized[col].min()
+        max_val = df_normalized[col].max()
+        if max_val != min_val:
+            df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+        else:
+            df_normalized[col] = 0
+    return df_normalized
+
+def clean_dataset(dataframe, numeric_columns):
+    df_clean = dataframe.copy()
+    for col in numeric_columns:
+        df_clean = remove_outliers_iqr(df_clean, col)
+    df_clean = normalize_minmax(df_clean, numeric_columns)
+    df_clean = df_clean.dropna()
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 200),
+        'feature_b': np.random.exponential(50, 200),
+        'category': np.random.choice(['X', 'Y', 'Z'], 200)
+    })
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print("Cleaning complete.")
