@@ -1,88 +1,62 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_csv_data(file_path, fill_strategy='mean', drop_threshold=0.5):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Load and clean a CSV file by handling missing values.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    file_path (str): Path to the CSV file.
+    fill_strategy (str): Strategy for filling missing values.
+                         Options: 'mean', 'median', 'mode', 'zero'.
+    drop_threshold (float): Drop columns with missing ratio above this threshold.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    df = pd.read_csv(file_path)
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
     
-    return filtered_df
+    if fill_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif fill_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif fill_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    
+    for col in categorical_cols:
+        mode_value = df[col].mode()
+        if not mode_value.empty:
+            df[col] = df[col].fillna(mode_value.iloc[0])
+        else:
+            df[col] = df[col].fillna('Unknown')
+    
+    df = df.reset_index(drop=True)
+    
+    return df
 
-def calculate_summary_statistics(df, column):
+def export_cleaned_data(df, output_path):
     """
-    Calculate summary statistics for a DataFrame column.
+    Export cleaned DataFrame to CSV.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing summary statistics
+    df (pd.DataFrame): Cleaned DataFrame.
+    output_path (str): Path for output CSV file.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data exported to {output_path}")
 
-def normalize_column(df, column, method='minmax'):
-    """
-    Normalize a DataFrame column using specified method.
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to normalize
-    method (str): Normalization method ('minmax' or 'zscore')
-    
-    Returns:
-    pd.DataFrame: DataFrame with normalized column
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    df_copy = df.copy()
-    
-    if method == 'minmax':
-        min_val = df_copy[column].min()
-        max_val = df_copy[column].max()
-        if max_val != min_val:
-            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
-    
-    elif method == 'zscore':
-        mean_val = df_copy[column].mean()
-        std_val = df_copy[column].std()
-        if std_val != 0:
-            df_copy[column] = (df_copy[column] - mean_val) / std_val
-    
-    else:
-        raise ValueError("Method must be 'minmax' or 'zscore'")
-    
-    return df_copy
+    cleaned_df = clean_csv_data(input_file, fill_strategy='mean', drop_threshold=0.5)
+    export_cleaned_data(cleaned_df, output_file)
