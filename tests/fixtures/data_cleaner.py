@@ -133,3 +133,106 @@ def remove_outliers(df, column, threshold=3):
     mask = z_scores < threshold
     
     return df[mask].reset_index(drop=True)
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If columns is None, clean all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): List of column names to clean
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
+    
+    return cleaned_df
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Dictionary containing summary statistics
+    """
+    summary = {
+        'original_rows': len(df),
+        'cleaned_rows': None,
+        'removed_rows': None,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict()
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) > 0:
+        summary['numeric_stats'] = df[numeric_cols].describe().to_dict()
+    
+    return summary
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': range(1, 101),
+        'value': np.random.randn(100) * 10 + 50,
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[0, 'value'] = 200
+    df.loc[1, 'value'] = -100
+    
+    print("Original data shape:", df.shape)
+    print("Original data summary:")
+    print(df['value'].describe())
+    
+    cleaned_df = clean_numeric_data(df, ['value'])
+    
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("Cleaned data summary:")
+    print(cleaned_df['value'].describe())
+    
+    summary = get_data_summary(df)
+    print(f"\nRemoved {len(df) - len(cleaned_df)} outliers")
