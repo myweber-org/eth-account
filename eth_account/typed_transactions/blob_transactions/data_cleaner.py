@@ -57,3 +57,80 @@ def validate_data(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "Data validation passed"
+import pandas as pd
+import numpy as np
+import re
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean and preprocess CSV data by handling missing values,
+    standardizing text, and removing duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df.drop_duplicates(inplace=True)
+        
+        # Standardize column names
+        df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
+        
+        # Handle missing values
+        for col in df.select_dtypes(include=[np.number]).columns:
+            df[col].fillna(df[col].median(), inplace=True)
+        
+        for col in df.select_dtypes(include=['object']).columns:
+            df[col].fillna('unknown', inplace=True)
+        
+        # Clean text columns
+        text_columns = df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            df[col] = df[col].apply(lambda x: re.sub(r'\s+', ' ', str(x)).strip())
+            df[col] = df[col].str.lower()
+        
+        # Remove rows with invalid dates if date column exists
+        date_columns = [col for col in df.columns if 'date' in col]
+        for col in date_columns:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+            df = df.dropna(subset=[col])
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning completed. Cleaned data saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file {input_file} not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure and content.
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    required_columns = ['id', 'name', 'value']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    if df['value'].min() < 0:
+        return False, "Negative values found in 'value' column"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    success = clean_csv_data(input_csv, output_csv)
+    
+    if success:
+        cleaned_df = pd.read_csv(output_csv)
+        is_valid, message = validate_dataframe(cleaned_df)
+        print(f"Validation result: {is_valid} - {message}")
