@@ -1,77 +1,86 @@
 
-import pandas as pd
 import numpy as np
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def remove_outliers_iqr(data, column):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a dataset using the Interquartile Range method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): If True, remove duplicate rows.
-    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
+    data (numpy.ndarray): Input data array
+    column (int): Column index to check for outliers
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+    numpy.ndarray: Data with outliers removed
     """
-    cleaned_df = df.copy()
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
     
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
-            elif fill_missing == 'median':
-                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
+    q1 = np.percentile(data[:, column], 25)
+    q3 = np.percentile(data[:, column], 75)
+    iqr = q3 - q1
     
-    return cleaned_df
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (data[:, column] >= lower_bound) & (data[:, column] <= upper_bound)
+    return data[mask]
 
-def validate_dataframe(df, required_columns=None):
+def calculate_statistics(data):
     """
-    Validate DataFrame structure and content.
+    Calculate basic statistics for the cleaned data.
     
     Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
+    data (numpy.ndarray): Input data array
     
     Returns:
-    tuple: (is_valid, error_message)
+    dict: Dictionary containing mean, median, and std
     """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
+    if data.size == 0:
+        return {"mean": np.nan, "median": np.nan, "std": np.nan}
     
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "DataFrame is valid"
-
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 4, None],
-        'B': [5, None, 7, 8, 9],
-        'C': ['x', 'y', 'x', 'z', None]
+    return {
+        "mean": np.mean(data, axis=0),
+        "median": np.median(data, axis=0),
+        "std": np.std(data, axis=0)
     }
+
+def validate_data(data, expected_columns):
+    """
+    Validate data shape and check for NaN values.
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
+    Parameters:
+    data (numpy.ndarray): Input data array
+    expected_columns (int): Expected number of columns
     
-    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)
+    Returns:
+    bool: True if data is valid, False otherwise
+    """
+    if data.shape[1] != expected_columns:
+        return False
     
-    is_valid, message = validate_dataframe(cleaned)
-    print(f"\nValidation: {message}")
+    if np.any(np.isnan(data)):
+        return False
+    
+    return True
+
+def process_dataset(data, target_column):
+    """
+    Main function to process dataset by removing outliers and calculating statistics.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array
+    target_column (int): Column index for outlier detection
+    
+    Returns:
+    tuple: (cleaned_data, statistics, is_valid)
+    """
+    if not validate_data(data, data.shape[1]):
+        raise ValueError("Invalid data format")
+    
+    cleaned_data = remove_outliers_iqr(data, target_column)
+    stats = calculate_statistics(cleaned_data)
+    
+    return cleaned_data, stats, True
