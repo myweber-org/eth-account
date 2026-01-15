@@ -295,4 +295,94 @@ def validate_dataset(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Dataset is valid"
+    return True, "Dataset is valid"import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate types.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned numeric columns.
+    """
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+    
+    return cleaned_df
+
+def process_dataframe(df, 
+                     remove_dups=True, 
+                     subset=None, 
+                     numeric_columns=None,
+                     required_columns=None):
+    """
+    Main function to process and clean a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        remove_dups (bool): Whether to remove duplicates.
+        subset (list): Columns for duplicate check.
+        numeric_columns (list): Numeric columns to clean.
+        required_columns (list): Required columns for validation.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame or None if validation fails.
+    """
+    if not validate_dataframe(df, required_columns):
+        return None
+    
+    processed_df = df.copy()
+    
+    if remove_dups:
+        processed_df = remove_duplicates(processed_df, subset=subset)
+    
+    if numeric_columns:
+        processed_df = clean_numeric_columns(processed_df, numeric_columns)
+    
+    return processed_df
