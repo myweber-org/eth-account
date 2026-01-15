@@ -271,3 +271,49 @@ def example_usage():
 
 if __name__ == "__main__":
     cleaned_data = example_usage()
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    if columns is None:
+        columns = df.columns
+    return df.dropna(subset=columns)
+
+def fill_missing_with_mean(df, columns=None):
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            df_filled[col] = df[col].fillna(df[col].mean())
+    return df_filled
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    if column not in df.columns:
+        return df
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def standardize_column(df, column):
+    if column not in df.columns:
+        return df
+    df_standardized = df.copy()
+    mean = df[column].mean()
+    std = df[column].std()
+    if std != 0:
+        df_standardized[column] = (df[column] - mean) / std
+    return df_standardized
+
+def normalize_column(df, column):
+    if column not in df.columns:
+        return df
+    df_normalized = df.copy()
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val != min_val:
+        df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
+    return df_normalized
