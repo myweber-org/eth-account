@@ -1,64 +1,53 @@
+
 import pandas as pd
+import numpy as np
+from scipy import stats
 
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
-    
-    Args:
-        df: pandas DataFrame
-        subset: column label or sequence of labels to consider for duplicates
-        keep: {'first', 'last', False} which duplicates to keep
-    
-    Returns:
-        DataFrame with duplicates removed
-    """
-    if df.empty:
-        return df
-    
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    
-    removed_count = len(df) - len(cleaned_df)
-    if removed_count > 0:
-        print(f"Removed {removed_count} duplicate row(s)")
-    
-    return cleaned_df
+def load_data(filepath):
+    return pd.read_csv(filepath)
 
-def clean_numeric_columns(df, columns):
-    """
-    Clean numeric columns by converting to appropriate types and handling errors.
-    
-    Args:
-        df: pandas DataFrame
-        columns: list of column names to clean
-    
-    Returns:
-        DataFrame with cleaned numeric columns
-    """
-    cleaned_df = df.copy()
-    
-    for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-    
-    return cleaned_df
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
+def remove_outliers_zscore(df, column, threshold=3):
+    z_scores = np.abs(stats.zscore(df[column]))
+    return df[z_scores < threshold]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def normalize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    df[column] = (df[column] - mean_val) / std_val
+    return df
+
+def clean_dataset(filepath, outlier_method='iqr', normalize_method='minmax'):
+    df = load_data(filepath)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    Args:
-        df: pandas DataFrame
-        required_columns: list of required column names
+    for col in numeric_cols:
+        if outlier_method == 'iqr':
+            df = remove_outliers_iqr(df, col)
+        elif outlier_method == 'zscore':
+            df = remove_outliers_zscore(df, col)
+        
+        if normalize_method == 'minmax':
+            df = normalize_minmax(df, col)
+        elif normalize_method == 'zscore':
+            df = normalize_zscore(df, col)
     
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
+    return df
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('raw_data.csv', outlier_method='zscore', normalize_method='zscore')
+    cleaned_data.to_csv('cleaned_data.csv', index=False)
+    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")
