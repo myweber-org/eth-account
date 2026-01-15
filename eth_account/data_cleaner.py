@@ -303,4 +303,159 @@ if __name__ == "__main__":
     
     normalized_df = normalize_data(cleaned_df, method='minmax')
     print("\nNormalized DataFrame:")
-    print(normalized_df)
+    print(normalized_df)import pandas as pd
+import numpy as np
+
+def clean_dataset(df, columns=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): Specific columns to clean, if None clean all columns
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if columns is None:
+        columns = cleaned_df.columns.tolist()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        if removed > 0:
+            print(f"Removed {removed} duplicate rows")
+    
+    for col in columns:
+        if col not in cleaned_df.columns:
+            continue
+            
+        missing_count = cleaned_df[col].isnull().sum()
+        if missing_count > 0:
+            print(f"Column '{col}' has {missing_count} missing values")
+            
+            if fill_missing == 'drop':
+                cleaned_df = cleaned_df.dropna(subset=[col])
+                print(f"Dropped rows with missing values in column '{col}'")
+            elif fill_missing == 'mean' and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+                fill_value = cleaned_df[col].mean()
+                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                print(f"Filled missing values in column '{col}' with mean: {fill_value:.2f}")
+            elif fill_missing == 'median' and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+                fill_value = cleaned_df[col].median()
+                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                print(f"Filled missing values in column '{col}' with median: {fill_value:.2f}")
+            elif fill_missing == 'mode':
+                fill_value = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None
+                if fill_value is not None:
+                    cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                    print(f"Filled missing values in column '{col}' with mode: {fill_value}")
+            else:
+                print(f"Warning: Could not fill missing values in column '{col}' with method '{fill_missing}'")
+    
+    print(f"Data cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def detect_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Detect outliers in a specific column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to check for outliers
+    method (str): Detection method ('iqr' or 'zscore')
+    threshold (float): Threshold for outlier detection
+    
+    Returns:
+    pd.Series: Boolean series indicating outliers
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = np.abs((df[column] - mean) / std)
+        outliers = z_scores > threshold
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    outlier_count = outliers.sum()
+    if outlier_count > 0:
+        print(f"Detected {outlier_count} outliers in column '{column}' using {method} method")
+    
+    return outliers
+
+def validate_data_types(df, expected_types):
+    """
+    Validate that columns have expected data types.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    expected_types (dict): Dictionary mapping column names to expected dtypes
+    
+    Returns:
+    dict: Validation results
+    """
+    results = {}
+    for col, expected_type in expected_types.items():
+        if col in df.columns:
+            actual_type = str(df[col].dtype)
+            is_valid = actual_type == expected_type
+            results[col] = {
+                'expected': expected_type,
+                'actual': actual_type,
+                'valid': is_valid
+            }
+            if not is_valid:
+                print(f"Warning: Column '{col}' has type {actual_type}, expected {expected_type}")
+        else:
+            results[col] = {
+                'expected': expected_type,
+                'actual': None,
+                'valid': False,
+                'error': 'Column not found'
+            }
+            print(f"Error: Column '{col}' not found in DataFrame")
+    
+    return results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10.5, 20.3, np.nan, 40.1, 50.0, 50.0, 1000.0],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    outliers = detect_outliers(cleaned, 'value')
+    print(f"\nOutliers in 'value' column: {outliers.sum()}")
+    
+    expected_types = {
+        'id': 'int64',
+        'value': 'float64',
+        'category': 'object'
+    }
+    
+    validation = validate_data_types(cleaned, expected_types)
+    print(f"\nData type validation: {validation}")
