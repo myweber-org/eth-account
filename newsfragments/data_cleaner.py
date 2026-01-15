@@ -198,3 +198,146 @@ def clean_dataframe(df: pd.DataFrame,
                 cleaned_df = normalize_column(cleaned_df, col)
     
     return cleaned_df
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if normalized_df[col].dtype not in [np.int64, np.float64]:
+            raise TypeError(f"Column '{col}' must be numeric")
+        
+        col_min = normalized_df[col].min()
+        col_max = normalized_df[col].max()
+        
+        if col_max == col_min:
+            normalized_df[col] = 0.5
+        else:
+            normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
+    
+    return normalized_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: list of column names to process (default: all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    valid_strategies = ['mean', 'median', 'mode', 'drop']
+    if strategy not in valid_strategies:
+        raise ValueError(f"Strategy must be one of {valid_strategies}")
+    
+    if columns is None:
+        columns = dataframe.columns
+    
+    processed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if processed_df[col].isnull().any():
+            if strategy == 'drop':
+                processed_df = processed_df.dropna(subset=[col])
+            elif strategy == 'mean':
+                processed_df[col].fillna(processed_df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                processed_df[col].fillna(processed_df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                processed_df[col].fillna(processed_df[col].mode()[0], inplace=True)
+    
+    return processed_df
+
+def create_sample_data():
+    """
+    Create sample data for testing the cleaning functions.
+    
+    Returns:
+        pandas DataFrame with sample data
+    """
+    np.random.seed(42)
+    
+    data = {
+        'id': range(1, 101),
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.uniform(0, 1, 100),
+        'feature_c': np.random.exponential(2, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[np.random.choice(100, 5, replace=False), 'feature_a'] = np.nan
+    df.loc[np.random.choice(100, 3, replace=False), 'feature_b'] = np.nan
+    
+    outlier_indices = np.random.choice(100, 10, replace=False)
+    df.loc[outlier_indices, 'feature_c'] = df['feature_c'].max() * 3
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = create_sample_data()
+    print("Original data shape:", sample_data.shape)
+    print("Missing values per column:")
+    print(sample_data.isnull().sum())
+    
+    cleaned_data = handle_missing_values(sample_data, strategy='mean')
+    print("\nAfter handling missing values:", cleaned_data.shape)
+    
+    outlier_removed = remove_outliers_iqr(cleaned_data, 'feature_c')
+    print("After outlier removal:", outlier_removed.shape)
+    
+    normalized_data = normalize_minmax(outlier_removed, ['feature_a', 'feature_b', 'feature_c'])
+    print("After normalization:")
+    print(normalized_data[['feature_a', 'feature_b', 'feature_c']].describe())
