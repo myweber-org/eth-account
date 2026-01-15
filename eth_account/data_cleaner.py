@@ -459,3 +459,111 @@ if __name__ == "__main__":
     
     validation = validate_data_types(cleaned, expected_types)
     print(f"\nData type validation: {validation}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+        
+        removed_count = self.original_shape[0] - df_clean.shape[0]
+        self.df = df_clean
+        return removed_count
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        return self.df
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+        
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'current_rows': self.df.shape[0],
+            'columns': list(self.df.columns),
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'numeric_stats': {}
+        }
+        
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            summary['numeric_stats'][col] = {
+                'mean': self.df[col].mean(),
+                'std': self.df[col].std(),
+                'min': self.df[col].min(),
+                'max': self.df[col].max()
+            }
+        
+        return summary
+    
+    def save_cleaned_data(self, filepath):
+        self.df.to_csv(filepath, index=False)
+        return filepath
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    data['feature_a'][np.random.choice(1000, 10)] = np.nan
+    data['feature_b'][np.random.choice(1000, 5)] = 1000
+    
+    return pd.DataFrame(data)
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Initial shape:", cleaner.original_shape)
+    print("Missing values:", cleaner.df.isnull().sum().sum())
+    
+    removed = cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
+    print(f"Removed {removed} outliers")
+    
+    cleaner.fill_missing_median()
+    cleaner.normalize_minmax(['feature_a', 'feature_b', 'feature_c'])
+    
+    summary = cleaner.get_summary()
+    print(f"Final shape: {summary['current_rows']} rows")
+    print("Numeric stats:", summary['numeric_stats'].keys())
+    
+    cleaner.save_cleaned_data('cleaned_data.csv')
+    print("Data saved to cleaned_data.csv")
