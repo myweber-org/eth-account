@@ -236,3 +236,153 @@ if __name__ == "__main__":
     
     summary = get_data_summary(df)
     print(f"\nRemoved {len(df) - len(cleaned_df)} outliers")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        factor: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        columns: list of columns to normalize (default: all numeric columns)
+    
+    Returns:
+        Normalized DataFrame
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_min = data[col].min()
+            col_max = data[col].max()
+            
+            if col_max != col_min:
+                normalized_data[col] = (data[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_data[col] = 0
+    
+    return normalized_data
+
+def standardize_zscore(data, columns=None):
+    """
+    Standardize data using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        columns: list of columns to standardize (default: all numeric columns)
+    
+    Returns:
+        Standardized DataFrame
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    standardized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_mean = data[col].mean()
+            col_std = data[col].std()
+            
+            if col_std > 0:
+                standardized_data[col] = (data[col] - col_mean) / col_std
+            else:
+                standardized_data[col] = 0
+    
+    return standardized_data
+
+def clean_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: list of columns to process (default: all columns)
+    
+    Returns:
+        DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = data.columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for col in columns:
+        if col not in cleaned_data.columns:
+            continue
+            
+        if cleaned_data[col].isnull().any():
+            if strategy == 'drop':
+                cleaned_data = cleaned_data.dropna(subset=[col])
+            elif strategy == 'mean' and np.issubdtype(cleaned_data[col].dtype, np.number):
+                cleaned_data[col] = cleaned_data[col].fillna(cleaned_data[col].mean())
+            elif strategy == 'median' and np.issubdtype(cleaned_data[col].dtype, np.number):
+                cleaned_data[col] = cleaned_data[col].fillna(cleaned_data[col].median())
+            elif strategy == 'mode':
+                mode_value = cleaned_data[col].mode()
+                if not mode_value.empty:
+                    cleaned_data[col] = cleaned_data[col].fillna(mode_value.iloc[0])
+                else:
+                    cleaned_data[col] = cleaned_data[col].fillna(cleaned_data[col].iloc[0])
+            else:
+                cleaned_data[col] = cleaned_data[col].fillna(cleaned_data[col].iloc[0])
+    
+    return cleaned_data
+
+def validate_dataframe(data, required_columns=None, numeric_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        data: pandas DataFrame to validate
+        required_columns: list of required column names
+        numeric_columns: list of columns that must be numeric
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(data, pd.DataFrame):
+        return False, "Input must be a pandas DataFrame"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if numeric_columns:
+        non_numeric_cols = [col for col in numeric_columns 
+                           if col in data.columns and not np.issubdtype(data[col].dtype, np.number)]
+        if non_numeric_cols:
+            return False, f"Non-numeric columns found: {non_numeric_cols}"
+    
+    return True, "DataFrame validation passed"
