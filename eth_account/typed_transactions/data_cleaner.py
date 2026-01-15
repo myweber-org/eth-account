@@ -93,3 +93,50 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned summary statistics:")
     print(calculate_summary_stats(cleaned_df, 'values'))
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_path, output_path):
+    """
+    Load CSV data, handle missing values, and save cleaned version.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        print(f"Original shape: {df.shape}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].median(), inplace=True)
+        
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+        
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        print(f"Final shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, output_file)
+    
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully")
+        print("\nFirst 5 rows of cleaned data:")
+        print(cleaned_df.head())
