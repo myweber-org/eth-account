@@ -1,56 +1,64 @@
-import csv
-import sys
-from pathlib import Path
+import pandas as pd
 
-def clean_csv(input_path, output_path=None):
+def remove_duplicates(df, subset=None, keep='first'):
     """
-    Clean a CSV file by removing rows with missing values
-    and stripping whitespace from all string fields.
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: {'first', 'last', False} which duplicates to keep
+    
+    Returns:
+        DataFrame with duplicates removed
     """
-    if output_path is None:
-        input_stem = Path(input_path).stem
-        output_path = f"{input_stem}_cleaned.csv"
+    if df.empty:
+        return df
     
-    cleaned_rows = []
-    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        for row in reader:
-            # Skip rows with any empty values
-            if any(value is None or str(value).strip() == '' for value in row.values()):
-                continue
-            
-            # Strip whitespace from all string fields
-            cleaned_row = {
-                key: value.strip() if isinstance(value, str) else value
-                for key, value in row.items()
-            }
-            cleaned_rows.append(cleaned_row)
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
     
-    if cleaned_rows:
-        with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
-            writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(cleaned_rows)
-        
-        print(f"Cleaned data saved to: {output_path}")
-        print(f"Original rows: {len(cleaned_rows) + (len(cleaned_rows) - len(cleaned_rows))}")
-        print(f"Cleaned rows: {len(cleaned_rows)}")
-    else:
-        print("No valid rows found after cleaning")
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate row(s)")
+    
+    return cleaned_df
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_csv> [output_csv]")
-        sys.exit(1)
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to clean
     
-    try:
-        clean_csv(input_file, output_file)
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-    except Exception as e:
-        print(f"Error processing file: {e}")
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
