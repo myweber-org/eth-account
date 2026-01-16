@@ -193,4 +193,30 @@ def clean_sample_data():
     return cleaner.df
 
 if __name__ == "__main__":
-    clean_sample_data()
+    clean_sample_data()import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and standardize column names.
+    """
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    data = pd.DataFrame({
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie'],
+        'Age': [25, 30, 25, 35],
+        'City Name': ['NYC', 'LA', 'NYC', 'Chicago']
+    })
+    
+    cleaned_data = clean_dataframe(data)
+    print("Original DataFrame:")
+    print(data)
+    print("\nCleaned DataFrame:")
+    print(cleaned_data)
