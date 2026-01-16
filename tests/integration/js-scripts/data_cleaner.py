@@ -127,3 +127,70 @@ if __name__ == "__main__":
     cleaned_df = cleaner.remove_outliers_iqr('feature_a')
     print(f"\nCleaned data shape: {cleaned_df.shape}")
     print(f"Outliers removed: {len(sample_df) - len(cleaned_df)}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> pd.DataFrame:
+        """Remove duplicate rows from the dataframe."""
+        before = len(self.df)
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        after = len(self.df)
+        print(f"Removed {before - after} duplicate rows.")
+        return self.df
+
+    def standardize_text(self, columns: List[str]) -> pd.DataFrame:
+        """Standardize text columns to lowercase and strip whitespace."""
+        for col in columns:
+            if col in self.df.columns:
+                self.df[col] = self.df[col].astype(str).str.lower().str.strip()
+        print(f"Standardized text in columns: {columns}")
+        return self.df
+
+    def fill_missing(self, column: str, value: any) -> pd.DataFrame:
+        """Fill missing values in a column with specified value."""
+        if column in self.df.columns:
+            self.df[column] = self.df[column].fillna(value)
+            print(f"Filled missing values in '{column}' with {value}")
+        return self.df
+
+    def get_summary(self) -> dict:
+        """Get summary of cleaning operations."""
+        return {
+            'original_rows': self.original_shape[0],
+            'current_rows': len(self.df),
+            'original_columns': self.original_shape[1],
+            'current_columns': len(self.df.columns),
+            'rows_removed': self.original_shape[0] - len(self.df),
+            'missing_values': self.df.isnull().sum().to_dict()
+        }
+
+def clean_sample_data():
+    """Example usage of the DataCleaner class."""
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'age': [25, 30, 25, 35, 40],
+        'email': ['alice@test.com', 'BOB@TEST.COM', 'alice@test.com', 'charlie@test.com', 'dave@test.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates(subset=['name', 'email'])
+    cleaner.standardize_text(['name', 'email'])
+    cleaner.fill_missing('name', 'Unknown')
+    
+    print("\nCleaned Data:")
+    print(cleaner.df)
+    print("\nSummary:")
+    print(cleaner.get_summary())
+    
+    return cleaner.df
+
+if __name__ == "__main__":
+    clean_sample_data()
