@@ -168,4 +168,41 @@ if __name__ == "__main__":
     
     standardized_df = standardize_columns(cleaned_df, columns=['A', 'B'])
     print("\nStandardized DataFrame:")
-    print(standardized_df)
+    print(standardized_df)import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def clean_numeric_column(series, fill_method='mean'):
+    """
+    Clean a numeric series by filling missing values.
+
+    Args:
+        series (pd.Series): Input series.
+        fill_method (str): Method to fill missing values.
+
+    Returns:
+        pd.Series: Cleaned series.
+    """
+    if series.isnull().all():
+        return series
+    if fill_method == 'mean':
+        fill_value = series.mean()
+    elif fill_method == 'median':
+        fill_value = series.median()
+    else:
+        fill_value = 0
+    return series.fillna(fill_value)
