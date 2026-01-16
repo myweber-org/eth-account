@@ -162,4 +162,83 @@ if __name__ == "__main__":
         validate_data(cleaned_df, required_columns=['id', 'value'], min_rows=3)
         print("Data validation passed.")
     except ValueError as e:
-        print(f"Data validation failed: {e}")
+        print(f"Data validation failed: {e}")import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns.tolist()
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        if strategy == 'mean':
+            for col in self.numeric_columns:
+                self.df[col].fillna(self.df[col].mean(), inplace=True)
+        elif strategy == 'median':
+            for col in self.numeric_columns:
+                self.df[col].fillna(self.df[col].median(), inplace=True)
+        elif strategy == 'mode':
+            for col in self.numeric_columns:
+                self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+        elif strategy == 'constant' and fill_value is not None:
+            self.df.fillna(fill_value, inplace=True)
+        
+        for col in self.categorical_columns:
+            self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+        
+        return self.df
+    
+    def remove_outliers(self, method='zscore', threshold=3):
+        if method == 'zscore':
+            z_scores = np.abs(stats.zscore(self.df[self.numeric_columns]))
+            mask = (z_scores < threshold).all(axis=1)
+            self.df = self.df[mask]
+        elif method == 'iqr':
+            for col in self.numeric_columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self.df
+    
+    def get_clean_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'original_columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': len(self.numeric_columns),
+            'categorical_columns': len(self.categorical_columns)
+        }
+        return summary
+
+def example_usage():
+    data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['X', 'Y', 'X', 'Y', np.nan, 'X']
+    }
+    df = pd.DataFrame(data)
+    
+    cleaner = DataCleaner(df)
+    print("Initial summary:", cleaner.get_summary())
+    
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.remove_outliers(method='zscore', threshold=2.5)
+    
+    clean_df = cleaner.get_clean_data()
+    print("Cleaned data shape:", clean_df.shape)
+    print("Final summary:", cleaner.get_summary())
+    
+    return clean_df
+
+if __name__ == "__main__":
+    result = example_usage()
+    print(result)
