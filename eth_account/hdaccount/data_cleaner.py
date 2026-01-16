@@ -529,3 +529,127 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, text_columns=None):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing text columns to lowercase.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    text_columns (list): List of column names containing text data
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove rows with any null values
+    cleaned_df = cleaned_df.dropna()
+    
+    # Standardize text columns if specified
+    if text_columns:
+        for col in text_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+    
+    # Reset index after dropping rows
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specified column using IQR or Z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to check for outliers
+    method (str): 'iqr' for Interquartile Range or 'zscore' for Z-score
+    threshold (float): Threshold value for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data = df[column].copy()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (data >= lower_bound) & (data <= upper_bound)
+    
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        z_scores = np.abs((data - mean) / std)
+        mask = z_scores <= threshold
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df[mask].reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'name': ['Alice', 'Bob', None, 'Charlie', 'David'],
+        'age': [25, 30, 35, 40, 150],
+        'email': ['ALICE@example.com', 'bob@test.com', 'charlie@demo.com', None, 'david@sample.com']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the data
+    cleaned = clean_dataset(df, text_columns=['name', 'email'])
+    print("After cleaning:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    # Remove outliers from age column
+    no_outliers = remove_outliers(cleaned, 'age', method='iqr')
+    print("After removing outliers from age:")
+    print(no_outliers)
+    print("\n" + "="*50 + "\n")
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(no_outliers, required_columns=['name', 'age', 'email'])
+    print(f"Validation result: {is_valid}")
+    print(f"Message: {message}")
