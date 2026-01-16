@@ -1,33 +1,37 @@
 
 import os
 import shutil
-from pathlib import Path
 
 def organize_files(directory):
-    """Organize files in a directory into subfolders based on file extension."""
     if not os.path.isdir(directory):
-        print(f"Error: Directory '{directory}' does not exist.")
+        print(f"Error: {directory} is not a valid directory.")
         return
 
-    for item in os.listdir(directory):
-        item_path = os.path.join(directory, item)
-
-        if os.path.isfile(item_path):
-            file_extension = Path(item).suffix.lower()
-            if not file_extension:
-                folder_name = "no_extension"
+    for filename in os.listdir(directory):
+        file_path = os.path.join(directory, filename)
+        
+        if os.path.isfile(file_path):
+            _, extension = os.path.splitext(filename)
+            extension = extension.lower()
+            
+            if extension:
+                folder_name = extension[1:] + "_files"
             else:
-                folder_name = file_extension[1:] + "_files"
-
+                folder_name = "no_extension_files"
+            
             target_folder = os.path.join(directory, folder_name)
-            os.makedirs(target_folder, exist_ok=True)
-
-            try:
-                shutil.move(item_path, os.path.join(target_folder, item))
-                print(f"Moved: {item} -> {folder_name}/")
-            except Exception as e:
-                print(f"Failed to move {item}: {e}")
+            
+            if not os.path.exists(target_folder):
+                os.makedirs(target_folder)
+            
+            target_path = os.path.join(target_folder, filename)
+            
+            if not os.path.exists(target_path):
+                shutil.move(file_path, target_path)
+                print(f"Moved: {filename} -> {folder_name}/")
+            else:
+                print(f"Skipped: {filename} already exists in {folder_name}/")
 
 if __name__ == "__main__":
-    target_directory = input("Enter the directory path to organize: ").strip()
+    target_directory = input("Enter directory path to organize: ").strip()
     organize_files(target_directory)
