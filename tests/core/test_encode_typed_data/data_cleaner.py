@@ -132,3 +132,134 @@ def validate_data(df, checks=None):
         results['negative_values'] = negative_counts
     
     return results
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values with different strategies
+    """
+    data_clean = data.copy()
+    
+    for column in data_clean.columns:
+        if data_clean[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = data_clean[column].mean()
+            elif strategy == 'median':
+                fill_value = data_clean[column].median()
+            elif strategy == 'mode':
+                fill_value = data_clean[column].mode()[0]
+            elif strategy == 'drop':
+                data_clean = data_clean.dropna(subset=[column])
+                continue
+            else:
+                fill_value = 0
+            
+            data_clean[column] = data_clean[column].fillna(fill_value)
+    
+    return data_clean
+
+def create_sample_data():
+    """
+    Create sample data for testing
+    """
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'feature_c': np.random.uniform(0, 200, 100)
+    }
+    
+    # Add some outliers
+    data['feature_a'][10] = 500
+    data['feature_b'][20] = 800
+    data['feature_c'][30] = -100
+    
+    # Add some missing values
+    data['feature_a'][5] = np.nan
+    data['feature_b'][15] = np.nan
+    
+    df = pd.DataFrame(data)
+    return df
+
+def main():
+    """
+    Demonstrate the data cleaning functions
+    """
+    print("Creating sample data...")
+    df = create_sample_data()
+    print(f"Original data shape: {df.shape}")
+    print(f"Missing values:\n{df.isnull().sum()}")
+    
+    print("\nHandling missing values...")
+    df_clean = handle_missing_values(df, strategy='mean')
+    print(f"After cleaning shape: {df_clean.shape}")
+    
+    print("\nRemoving outliers using IQR...")
+    df_iqr = remove_outliers_iqr(df_clean, 'feature_a')
+    print(f"After IQR filtering shape: {df_iqr.shape}")
+    
+    print("\nNormalizing feature_a using Min-Max...")
+    df_clean['feature_a_normalized'] = normalize_minmax(df_clean, 'feature_a')
+    print(f"Normalized range: [{df_clean['feature_a_normalized'].min():.3f}, "
+          f"{df_clean['feature_a_normalized'].max():.3f}]")
+    
+    print("\nNormalizing feature_b using Z-score...")
+    df_clean['feature_b_standardized'] = normalize_zscore(df_clean, 'feature_b')
+    print(f"Standardized mean: {df_clean['feature_b_standardized'].mean():.3f}, "
+          f"std: {df_clean['feature_b_standardized'].std():.3f}")
+    
+    return df_clean
+
+if __name__ == "__main__":
+    cleaned_data = main()
+    print(f"\nFinal cleaned data shape: {cleaned_data.shape}")
+    print("Data cleaning completed successfully.")
