@@ -487,3 +487,108 @@ def clean_dataset(df, outlier_threshold=1.5, normalize_method='minmax', missing_
         df_clean = standardize_zscore(df_clean)
     
     return df_clean
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method.
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.5)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using z-score.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def handle_missing_mean(data, column):
+    """
+    Fill missing values with column mean.
+    """
+    mean_val = data[column].mean()
+    filled_data = data[column].fillna(mean_val)
+    return filled_data
+
+def handle_missing_median(data, column):
+    """
+    Fill missing values with column median.
+    """
+    median_val = data[column].median()
+    filled_data = data[column].fillna(median_val)
+    return filled_data
+
+def clean_dataset(data, numeric_columns, outlier_threshold=1.5, normalization_method='zscore', missing_method='mean'):
+    """
+    Main function to clean dataset.
+    """
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_data.columns:
+            continue
+            
+        # Handle missing values
+        if missing_method == 'mean':
+            cleaned_data[col] = handle_missing_mean(cleaned_data, col)
+        elif missing_method == 'median':
+            cleaned_data[col] = handle_missing_median(cleaned_data, col)
+        
+        # Remove outliers
+        cleaned_data = remove_outliers(cleaned_data, col, outlier_threshold)
+        
+        # Normalize data
+        if normalization_method == 'minmax':
+            cleaned_data[col] = normalize_minmax(cleaned_data, col)
+        elif normalization_method == 'zscore':
+            cleaned_data[col] = normalize_zscore(cleaned_data, col)
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    """
+    Generate summary statistics for the dataset.
+    """
+    summary = {
+        'total_rows': len(data),
+        'total_columns': len(data.columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'data_types': data.dtypes.to_dict(),
+        'numeric_summary': data.describe().to_dict() if len(data.select_dtypes(include=[np.number]).columns) > 0 else {}
+    }
+    return summary
