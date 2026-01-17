@@ -1,92 +1,78 @@
+import csv
+import os
+from typing import List, Dict, Any
 
-import pandas as pd
+def read_csv_file(file_path: str) -> List[Dict[str, Any]]:
+    """Read a CSV file and return a list of dictionaries."""
+    data = []
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+    return data
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=None):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str or dict): Method to fill missing values. 
-                                Can be 'mean', 'median', 'mode', or a dictionary of column:value pairs.
-                                Default is None (no filling).
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows.")
-    
-    if fill_missing is not None:
-        if fill_missing == 'mean':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
-        elif fill_missing == 'median':
-            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
-        elif fill_missing == 'mode':
-            for col in cleaned_df.columns:
-                if cleaned_df[col].dtype == 'object':
-                    mode_val = cleaned_df[col].mode()
-                    if not mode_val.empty:
-                        cleaned_df[col] = cleaned_df[col].fillna(mode_val[0])
-        elif isinstance(fill_missing, dict):
-            cleaned_df = cleaned_df.fillna(fill_missing)
-        else:
-            print(f"Warning: Unsupported fill_missing method '{fill_missing}'. No filling performed.")
-    
-    missing_count = cleaned_df.isnull().sum().sum()
-    if missing_count > 0:
-        print(f"Warning: {missing_count} missing values remain in the dataset.")
-    
-    return cleaned_df
+def remove_empty_rows(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Remove rows where all values are empty strings."""
+    cleaned_data = []
+    for row in data:
+        if any(value.strip() for value in row.values()):
+            cleaned_data.append(row)
+    return cleaned_data
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate a DataFrame for basic integrity checks.
+def standardize_column_names(data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Standardize column names to lowercase with underscores."""
+    if not data:
+        return data
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    
-    Returns:
-    bool: True if validation passes, False otherwise.
-    """
-    if not isinstance(df, pd.DataFrame):
-        print("Error: Input is not a pandas DataFrame.")
+    standardized_data = []
+    for row in data:
+        new_row = {}
+        for key, value in row.items():
+            new_key = key.strip().lower().replace(' ', '_')
+            new_row[new_key] = value
+        standardized_data.append(new_row)
+    return standardized_data
+
+def write_csv_file(data: List[Dict[str, Any]], file_path: str) -> bool:
+    """Write data to a CSV file."""
+    if not data:
+        print("No data to write.")
         return False
     
-    if df.empty:
-        print("Warning: DataFrame is empty.")
+    try:
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            fieldnames = data[0].keys()
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
         return True
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            print(f"Error: Missing required columns: {missing_cols}")
-            return False
-    
-    return True
+    except Exception as e:
+        print(f"Error writing CSV file: {e}")
+        return False
 
-if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 3, None],
-        'B': [4, None, 6, 7, 8],
-        'C': ['x', 'y', 'y', 'z', None]
-    }
+def clean_csv_data(input_file: str, output_file: str) -> None:
+    """Main function to clean CSV data."""
+    print(f"Reading data from {input_file}")
+    data = read_csv_file(input_file)
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n")
+    if not data:
+        print("No data loaded. Exiting.")
+        return
     
-    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
-    print("Cleaned DataFrame:")
-    print(cleaned)
+    print(f"Original data: {len(data)} rows")
     
-    is_valid = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print(f"\nDataFrame validation: {is_valid}")
+    data = remove_empty_rows(data)
+    print(f"After removing empty rows: {len(data)} rows")
+    
+    data = standardize_column_names(data)
+    print("Column names standardized")
+    
+    if write_csv_file(data, output_file):
+        print(f"Cleaned data written to {output_file}")
+    else:
+        print("Failed to write cleaned data")
