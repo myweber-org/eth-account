@@ -132,4 +132,78 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from DataFrame.
+    If columns specified, only consider missing values in those columns.
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_with_mean(df, columns):
+    """
+    Fill missing values in specified columns with column mean.
+    """
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            df_filled[col] = df[col].fillna(mean_val)
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using IQR method for a specific column.
+    Returns boolean Series indicating outliers.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def remove_outliers(df, columns):
+    """
+    Remove rows containing outliers in specified columns using IQR method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            outliers = detect_outliers_iqr(df, col)
+            df_clean = df_clean[~outliers]
+    return df_clean
+
+def standardize_column(df, column):
+    """
+    Standardize a column using z-score normalization.
+    """
+    if column in df.columns:
+        mean = df[column].mean()
+        std = df[column].std()
+        if std > 0:
+            df[column] = (df[column] - mean) / std
+    return df
+
+def clean_dataset(df, missing_strategy='remove', outlier_columns=None):
+    """
+    Main function to clean dataset with configurable strategies.
+    """
+    df_clean = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'remove':
+        df_clean = remove_missing_rows(df_clean)
+    elif missing_strategy == 'mean':
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        df_clean = fill_missing_with_mean(df_clean, numeric_cols)
+    
+    # Handle outliers
+    if outlier_columns:
+        df_clean = remove_outliers(df_clean, outlier_columns)
+    
+    return df_clean
