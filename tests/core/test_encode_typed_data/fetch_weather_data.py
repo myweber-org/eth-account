@@ -1,69 +1,101 @@
 import requests
 import json
-import sys
+from datetime import datetime
+import logging
 
-def get_weather(api_key, city):
-    base_url = "http://api.openweathermap.org/data/2.5/weather"
-    params = {
-        'q': city,
-        'appid': api_key,
-        'units': 'metric'
-    }
-    
-    try:
-        response = requests.get(base_url, params=params)
-        response.raise_for_status()
-        data = response.json()
+class WeatherFetcher:
+    def __init__(self, api_key, base_url="http://api.openweathermap.org/data/2.5"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+    def get_current_weather(self, city_name, country_code=None):
+        location = f"{city_name},{country_code}" if country_code else city_name
+        endpoint = f"{self.base_url}/weather"
+        params = {
+            'q': location,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
         
-        if data['cod'] != 200:
-            print(f"Error: {data.get('message', 'Unknown error')}")
-            return None
+        try:
+            response = self.session.get(endpoint, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
             
-        return data
-    except requests.exceptions.RequestException as e:
-        print(f"Network error: {e}")
-        return None
-    except json.JSONDecodeError:
-        print("Error: Invalid response from server")
-        return None
+            if data.get('cod') != 200:
+                logging.error(f"API Error: {data.get('message', 'Unknown error')}")
+                return None
+            
+            return self._parse_weather_data(data)
+            
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Network error occurred: {e}")
+            return None
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to parse JSON response: {e}")
+            return None
 
-def display_weather(data):
-    if not data:
-        return
+    def _parse_weather_data(self, raw_data):
+        parsed = {
+            'location': raw_data.get('name'),
+            'country': raw_data.get('sys', {}).get('country'),
+            'temperature': raw_data.get('main', {}).get('temp'),
+            'feels_like': raw_data.get('main', {}).get('feels_like'),
+            'humidity': raw_data.get('main', {}).get('humidity'),
+            'pressure': raw_data.get('main', {}).get('pressure'),
+            'weather_description': raw_data.get('weather', [{}])[0].get('description'),
+            'wind_speed': raw_data.get('wind', {}).get('speed'),
+            'wind_direction': raw_data.get('wind', {}).get('deg'),
+            'cloudiness': raw_data.get('clouds', {}).get('all'),
+            'visibility': raw_data.get('visibility'),
+            'sunrise': datetime.fromtimestamp(raw_data.get('sys', {}).get('sunrise')).isoformat() if raw_data.get('sys', {}).get('sunrise') else None,
+            'sunset': datetime.fromtimestamp(raw_data.get('sys', {}).get('sunset')).isoformat() if raw_data.get('sys', {}).get('sunset') else None,
+            'timestamp': datetime.now().isoformat()
+        }
+        return parsed
+
+    def save_to_file(self, data, filename="weather_data.json"):
+        if not data:
+            logging.warning("No data to save")
+            return False
         
-    city = data['name']
-    country = data['sys']['country']
-    temp = data['main']['temp']
-    humidity = data['main']['humidity']
-    description = data['weather'][0]['description']
-    wind_speed = data['wind']['speed']
-    
-    print(f"Weather in {city}, {country}:")
-    print(f"Temperature: {temp}°C")
-    print(f"Humidity: {humidity}%")
-    print(f"Conditions: {description}")
-    print(f"Wind Speed: {wind_speed} m/s")
+        try:
+            with open(filename, 'w') as f:
+                json.dump(data, f, indent=2)
+            logging.info(f"Weather data saved to {filename}")
+            return True
+        except IOError as e:
+            logging.error(f"Failed to save data to file: {e}")
+            return False
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python fetch_weather_data.py <city_name>")
-        print("Please set your API key in the OPENWEATHER_API_KEY environment variable")
-        sys.exit(1)
+    API_KEY = "your_api_key_here"  # Replace with actual API key
+    fetcher = WeatherFetcher(API_KEY)
     
-    city = ' '.join(sys.argv[1:])
-    api_key = "YOUR_API_KEY_HERE"
+    cities = [
+        ("London", "UK"),
+        ("New York", "US"),
+        ("Tokyo", "JP")
+    ]
     
-    # In production, get API key from environment variable
-    # import os
-    # api_key = os.getenv('OPENWEATHER_API_KEY')
+    all_weather_data = []
     
-    if api_key == "YOUR_API_KEY_HERE":
-        print("Error: Please replace 'YOUR_API_KEY_HERE' with your actual OpenWeatherMap API key")
-        print("Get a free API key at: https://openweathermap.org/api")
-        sys.exit(1)
+    for city, country in cities:
+        logging.info(f"Fetching weather for {city}, {country}")
+        weather_data = fetcher.get_current_weather(city, country)
+        
+        if weather_data:
+            all_weather_data.append(weather_data)
+            print(f"Weather in {weather_data['location']}, {weather_data['country']}:")
+            print(f"  Temperature: {weather_data['temperature']}°C")
+            print(f"  Conditions: {weather_data['weather_description']}")
+            print(f"  Humidity: {weather_data['humidity']}%")
+            print("-" * 40)
     
-    weather_data = get_weather(api_key, city)
-    display_weather(weather_data)
+    if all_weather_data:
+        fetcher.save_to_file(all_weather_data, "multi_city_weather.json")
 
 if __name__ == "__main__":
     main()
