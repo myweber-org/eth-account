@@ -125,3 +125,120 @@ def clean_dataset(df, numeric_columns, outlier_removal=True, normalization='stan
         elif normalization == 'standard':
             cleaned_df[col] = standardize_zscore(cleaned_df, col)
     return cleaned_df.reset_index(drop=True)
+import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Column labels to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def clean_numeric_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Clean numeric outliers from a DataFrame column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to clean
+        method (str): Method for outlier detection ('iqr' or 'zscore')
+        threshold (float): Threshold for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' is not numeric")
+    
+    original_len = len(df)
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+    
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = (df[column] - mean) / std
+        mask = abs(z_scores) <= threshold
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    cleaned_df = df[mask].copy()
+    
+    removed_count = original_len - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of required column names
+    
+    Returns:
+        dict: Dictionary containing validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': [],
+        'summary': {}
+    }
+    
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['errors'].append('Input is not a pandas DataFrame')
+        return validation_results
+    
+    validation_results['summary']['shape'] = df.shape
+    validation_results['summary']['columns'] = list(df.columns)
+    validation_results['summary']['dtypes'] = df.dtypes.to_dict()
+    
+    if df.empty:
+        validation_results['warnings'].append('DataFrame is empty')
+    
+    missing_values = df.isnull().sum().sum()
+    if missing_values > 0:
+        validation_results['warnings'].append(f'Found {missing_values} missing values')
+        validation_results['summary']['missing_values'] = df.isnull().sum().to_dict()
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    duplicate_rows = df.duplicated().sum()
+    if duplicate_rows > 0:
+        validation_results['warnings'].append(f'Found {duplicate_rows} duplicate rows')
+    
+    return validation_results
