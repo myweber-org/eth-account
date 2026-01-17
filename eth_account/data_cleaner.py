@@ -372,4 +372,39 @@ def clean_dataset(input_file, output_file):
     print(f"Cleaned data saved to {output_file}")
 
 if __name__ == "__main__":
-    clean_dataset('raw_data.csv', 'cleaned_data.csv')
+    clean_dataset('raw_data.csv', 'cleaned_data.csv')import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    filling missing values with appropriate defaults.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing values
+    # For numeric columns, fill with median
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    
+    # For categorical columns, fill with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+    
+    return df_cleaned
+
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic quality requirements.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
