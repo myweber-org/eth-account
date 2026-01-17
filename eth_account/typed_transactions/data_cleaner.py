@@ -102,4 +102,34 @@ if __name__ == "__main__":
     
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
-    print(calculate_statistics(cleaned_df, 'A'))
+    print(calculate_statistics(cleaned_df, 'A'))import pandas as pd
+
+def clean_dataframe(df, column_name):
+    """
+    Clean a specific column in a DataFrame by removing duplicates,
+    stripping whitespace, and converting to lowercase.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str)
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].str.lower()
+    df = df.drop_duplicates(subset=[column_name], keep='first')
+    
+    return df
+
+def validate_email(email_string):
+    """
+    Basic email validation using regex pattern matching.
+    """
+    import re
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email_string))
+
+def save_cleaned_data(df, output_path):
+    """
+    Save the cleaned DataFrame to a CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
