@@ -167,4 +167,34 @@ def main():
         return cleaned_df
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+
+def clean_dataset(df, column_names):
+    """
+    Remove duplicate rows and fill missing values with column mean.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing values with column mean for numeric columns
+    for col in column_names:
+        if df_cleaned[col].dtype in ['int64', 'float64']:
+            df_cleaned[col].fillna(df_cleaned[col].mean(), inplace=True)
+        else:
+            df_cleaned[col].fillna('Unknown', inplace=True)
+    
+    return df_cleaned
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    data = pd.read_csv('raw_data.csv')
+    columns_to_clean = ['age', 'salary', 'department']
+    cleaned_data = clean_dataset(data, columns_to_clean)
+    save_cleaned_data(cleaned_data, 'cleaned_data.csv')
