@@ -169,3 +169,66 @@ def save_cleaned_data(df, output_path, format='csv'):
         raise ValueError(f"Unsupported format: {format}")
     
     print(f"Data saved to {output_path}")
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    
+    Args:
+        input_list (list): The list from which duplicates will be removed.
+    
+    Returns:
+        list: A new list with duplicates removed.
+    
+    Example:
+        >>> remove_duplicates([1, 2, 2, 3, 1, 4])
+        [1, 2, 3, 4]
+    """
+    seen = set()
+    result = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean a list of numeric values by converting strings to numbers
+    and replacing non-numeric values with a default.
+    
+    Args:
+        values (list): List of values to clean.
+        default (int/float): Default value for non-numeric entries.
+    
+    Returns:
+        list: Cleaned list of numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        try:
+            if isinstance(value, str):
+                # Try to convert string to float, then to int if possible
+                num = float(value)
+                if num.is_integer():
+                    cleaned.append(int(num))
+                else:
+                    cleaned.append(num)
+            elif isinstance(value, (int, float)):
+                cleaned.append(value)
+            else:
+                cleaned.append(default)
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    
+    return cleaned
+
+if __name__ == "__main__":
+    # Test the functions
+    test_data = [1, 2, "2", 3, "apple", 4.5, "4.5", None, 1]
+    
+    print("Original data:", test_data)
+    print("Without duplicates:", remove_duplicates(test_data))
+    print("Cleaned numeric:", clean_numeric_data(test_data))
