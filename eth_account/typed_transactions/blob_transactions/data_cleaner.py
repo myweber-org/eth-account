@@ -386,4 +386,11 @@ def remove_outliers_iqr(df, columns=None, multiplier=1.5):
     if outliers_removed > 0:
         print(f"Removed {outliers_removed} rows with outliers")
     
-    return df[mask]
+    return df[mask]def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
