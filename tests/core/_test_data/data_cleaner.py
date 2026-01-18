@@ -1,63 +1,55 @@
 import pandas as pd
-import numpy as np
+import sys
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_dataset(file_path):
-    df = pd.read_csv(file_path)
+def remove_duplicates(input_file, output_file=None, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a CSV file.
     
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    Args:
+        input_file (str): Path to input CSV file
+        output_file (str, optional): Path to output CSV file. If None, overwrites input file
+        subset (list, optional): Columns to consider for identifying duplicates
+        keep (str): Which duplicate to keep - 'first', 'last', or False to drop all duplicates
     
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_minmax(df, col)
-    
-    df.to_csv('cleaned_data.csv', index=False)
-    return df
+    Returns:
+        int: Number of duplicates removed
+    """
+    try:
+        df = pd.read_csv(input_file)
+        initial_rows = len(df)
+        
+        df_clean = df.drop_duplicates(subset=subset, keep=keep)
+        final_rows = len(df_clean)
+        
+        duplicates_removed = initial_rows - final_rows
+        
+        if output_file is None:
+            output_file = input_file
+        
+        df_clean.to_csv(output_file, index=False)
+        
+        print(f"Removed {duplicates_removed} duplicate rows")
+        print(f"Original rows: {initial_rows}, Cleaned rows: {final_rows}")
+        print(f"Saved to: {output_file}")
+        
+        return duplicates_removed
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found")
+        return -1
+    except pd.errors.EmptyDataError:
+        print(f"Error: File '{input_file}' is empty")
+        return -1
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return -1
 
 if __name__ == "__main__":
-    cleaned_df = clean_dataset('raw_data.csv')
-    print(f"Data cleaning complete. Shape: {cleaned_df.shape}")
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_dataset(file_path, numeric_columns):
-    df = pd.read_csv(file_path)
+    if len(sys.argv) < 2:
+        print("Usage: python data_cleaner.py <input_file> [output_file]")
+        sys.exit(1)
     
-    for column in numeric_columns:
-        if column in df.columns:
-            df = remove_outliers_iqr(df, column)
-            df = normalize_minmax(df, column)
+    input_file = sys.argv[1]
+    output_file = sys.argv[2] if len(sys.argv) > 2 else None
     
-    return df
-
-if __name__ == "__main__":
-    cleaned_data = clean_dataset('raw_data.csv', ['age', 'income', 'score'])
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning complete. Processed {len(cleaned_data)} records.")
+    remove_duplicates(input_file, output_file)
