@@ -8,8 +8,8 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     
     Args:
         df (pd.DataFrame): Input DataFrame to clean
-        drop_duplicates (bool): Whether to remove duplicate rows
-        fill_missing (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'drop')
+        drop_duplicates (bool): Whether to drop duplicate rows
+        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
     
     Returns:
         pd.DataFrame: Cleaned DataFrame
@@ -20,8 +20,7 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
         initial_rows = len(cleaned_df)
         cleaned_df = cleaned_df.drop_duplicates()
         removed = initial_rows - len(cleaned_df)
-        if removed > 0:
-            print(f"Removed {removed} duplicate rows")
+        print(f"Removed {removed} duplicate rows")
     
     if cleaned_df.isnull().sum().sum() > 0:
         print(f"Found {cleaned_df.isnull().sum().sum()} missing values")
@@ -29,206 +28,81 @@ def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
         if fill_missing == 'drop':
             cleaned_df = cleaned_df.dropna()
             print("Dropped rows with missing values")
-        elif fill_missing in ['mean', 'median']:
+        elif fill_missing == 'mean':
             numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
             for col in numeric_cols:
-                if fill_missing == 'mean':
+                if cleaned_df[col].isnull().sum() > 0:
                     cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-                else:
+            print("Filled missing values with column means")
+        elif fill_missing == 'median':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                if cleaned_df[col].isnull().sum() > 0:
                     cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-            print(f"Filled missing numeric values with {fill_missing}")
+            print("Filled missing values with column medians")
         elif fill_missing == 'mode':
             for col in cleaned_df.columns:
-                if cleaned_df[col].dtype == 'object':
-                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown')
-            print("Filled missing categorical values with mode")
+                if cleaned_df[col].isnull().sum() > 0:
+                    mode_val = cleaned_df[col].mode()
+                    if not mode_val.empty:
+                        cleaned_df[col] = cleaned_df[col].fillna(mode_val[0])
+            print("Filled missing values with column modes")
     
-    print(f"Cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    print(f"Cleaned dataset shape: {cleaned_df.shape}")
     return cleaned_df
 
-def validate_dataframe(df, required_columns=None, min_rows=1):
+def validate_dataset(df, required_columns=None):
     """
-    Validate DataFrame structure and content.
+    Validate dataset structure and content.
     
     Args:
         df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of column names that must be present
-        min_rows (int): Minimum number of rows required
+        required_columns (list): List of required column names
     
     Returns:
-        bool: True if validation passes, False otherwise
+        dict: Validation results
     """
-    if not isinstance(df, pd.DataFrame):
-        print("Error: Input is not a pandas DataFrame")
-        return False
-    
-    if len(df) < min_rows:
-        print(f"Error: DataFrame has fewer than {min_rows} rows")
-        return False
+    validation_results = {
+        'is_valid': True,
+        'issues': []
+    }
     
     if required_columns:
         missing_cols = [col for col in required_columns if col not in df.columns]
         if missing_cols:
-            print(f"Error: Missing required columns: {missing_cols}")
-            return False
+            validation_results['is_valid'] = False
+            validation_results['issues'].append(f"Missing required columns: {missing_cols}")
     
-    return True
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['issues'].append("DataFrame is empty")
+    
+    duplicate_count = df.duplicated().sum()
+    if duplicate_count > 0:
+        validation_results['issues'].append(f"Found {duplicate_count} duplicate rows")
+    
+    missing_values = df.isnull().sum().sum()
+    if missing_values > 0:
+        validation_results['issues'].append(f"Found {missing_values} missing values")
+    
+    return validation_results
 
 if __name__ == "__main__":
     sample_data = {
-        'A': [1, 2, 2, 4, None],
-        'B': [5, None, 7, 8, 9],
-        'C': ['x', 'y', 'y', 'z', None]
+        'A': [1, 2, 2, 4, 5, None],
+        'B': [10, 20, 20, None, 50, 60],
+        'C': ['x', 'y', 'y', 'z', None, 'x']
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
+    print("Original dataset:")
     print(df)
+    print("\n" + "="*50 + "\n")
     
     cleaned = clean_dataset(df, fill_missing='mean')
-    print("\nCleaned DataFrame:")
-    print(cleaned)import pandas as pd
-import re
-
-def clean_dataframe(df, text_columns=None, drop_duplicates=True, lowercase=True, remove_special=True):
-    """
-    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
+    print("\nCleaned dataset:")
+    print(cleaned)
     
-    Args:
-        df: pandas DataFrame to clean
-        text_columns: list of column names to apply text cleaning to. If None, auto-detect object columns
-        drop_duplicates: whether to remove duplicate rows
-        lowercase: whether to convert text to lowercase
-        remove_special: whether to remove special characters from text
-    
-    Returns:
-        Cleaned pandas DataFrame
-    """
-    df_clean = df.copy()
-    
-    if drop_duplicates:
-        initial_rows = len(df_clean)
-        df_clean = df_clean.drop_duplicates()
-        removed = initial_rows - len(df_clean)
-        print(f"Removed {removed} duplicate rows")
-    
-    if text_columns is None:
-        text_columns = df_clean.select_dtypes(include=['object']).columns.tolist()
-    
-    for col in text_columns:
-        if col in df_clean.columns:
-            if lowercase:
-                df_clean[col] = df_clean[col].astype(str).str.lower()
-            
-            if remove_special:
-                df_clean[col] = df_clean[col].apply(lambda x: re.sub(r'[^\w\s]', '', str(x)))
-            
-            df_clean[col] = df_clean[col].str.strip()
-    
-    return df_clean
-
-def validate_email_column(df, email_column):
-    """
-    Validate email addresses in a DataFrame column.
-    
-    Args:
-        df: pandas DataFrame
-        email_column: name of the column containing email addresses
-    
-    Returns:
-        DataFrame with additional 'email_valid' column
-    """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    df['email_valid'] = df[email_column].astype(str).str.match(email_pattern)
-    
-    valid_count = df['email_valid'].sum()
-    total_count = len(df)
-    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
-    
-    return df
-
-def save_cleaned_data(df, output_path, format='csv'):
-    """
-    Save cleaned DataFrame to file.
-    
-    Args:
-        df: pandas DataFrame to save
-        output_path: path to save the file
-        format: output format ('csv', 'excel', or 'parquet')
-    """
-    if format == 'csv':
-        df.to_csv(output_path, index=False)
-    elif format == 'excel':
-        df.to_excel(output_path, index=False)
-    elif format == 'parquet':
-        df.to_parquet(output_path, index=False)
-    else:
-        raise ValueError(f"Unsupported format: {format}")
-    
-    print(f"Data saved to {output_path}")
-def remove_duplicates(input_list):
-    """
-    Remove duplicate elements from a list while preserving order.
-    
-    Args:
-        input_list (list): The list from which duplicates will be removed.
-    
-    Returns:
-        list: A new list with duplicates removed.
-    
-    Example:
-        >>> remove_duplicates([1, 2, 2, 3, 1, 4])
-        [1, 2, 3, 4]
-    """
-    seen = set()
-    result = []
-    
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    
-    return result
-
-def clean_numeric_data(values, default=0):
-    """
-    Clean a list of numeric values by converting strings to numbers
-    and replacing non-numeric values with a default.
-    
-    Args:
-        values (list): List of values to clean.
-        default (int/float): Default value for non-numeric entries.
-    
-    Returns:
-        list: Cleaned list of numeric values.
-    """
-    cleaned = []
-    
-    for value in values:
-        try:
-            if isinstance(value, str):
-                # Try to convert string to float, then to int if possible
-                num = float(value)
-                if num.is_integer():
-                    cleaned.append(int(num))
-                else:
-                    cleaned.append(num)
-            elif isinstance(value, (int, float)):
-                cleaned.append(value)
-            else:
-                cleaned.append(default)
-        except (ValueError, TypeError):
-            cleaned.append(default)
-    
-    return cleaned
-
-if __name__ == "__main__":
-    # Test the functions
-    test_data = [1, 2, "2", 3, "apple", 4.5, "4.5", None, 1]
-    
-    print("Original data:", test_data)
-    print("Without duplicates:", remove_duplicates(test_data))
-    print("Cleaned numeric:", clean_numeric_data(test_data))
+    validation = validate_dataset(cleaned, required_columns=['A', 'B'])
+    print("\nValidation results:")
+    print(validation)
