@@ -8,7 +8,7 @@ def remove_outliers_iqr(df, column):
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    column (str): Column name to clean
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
@@ -27,68 +27,48 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df.reset_index(drop=True)
 
-def calculate_summary_stats(df, column):
+def clean_numeric_data(df, columns=None):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Clean numeric columns by removing outliers from specified columns or all numeric columns.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    columns (list, optional): List of column names to clean. If None, cleans all numeric columns.
     
     Returns:
-    dict: Dictionary containing summary statistics
+    pd.DataFrame: Cleaned DataFrame
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column])
-    }
-    
-    return stats
-
-def process_numerical_data(df, columns):
-    """
-    Process multiple numerical columns by removing outliers.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to process
-    
-    Returns:
-    pd.DataFrame: Processed DataFrame
-    """
-    processed_df = df.copy()
+    cleaned_df = df.copy()
     
     for col in columns:
-        if col in processed_df.columns and pd.api.types.is_numeric_dtype(processed_df[col]):
-            processed_df = remove_outliers_iqr(processed_df, col)
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
     
-    return processed_df
+    return cleaned_df
 
 if __name__ == "__main__":
     # Example usage
     sample_data = {
-        'id': range(1, 101),
-        'value': np.random.normal(100, 15, 100)
+        'id': range(1, 21),
+        'value': [10, 12, 11, 15, 9, 100, 13, 14, 12, 11, 
+                  10, 9, 8, 12, 13, 200, 14, 15, 11, 10]
     }
     
-    # Add some outliers
-    sample_df = pd.DataFrame(sample_data)
-    sample_df.loc[100] = [101, 500]  # Extreme outlier
-    sample_df.loc[101] = [102, -100] # Negative outlier
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print(f"\nOriginal shape: {df.shape}")
     
-    print("Original data shape:", sample_df.shape)
-    print("Original summary:")
-    print(calculate_summary_stats(sample_df, 'value'))
+    cleaned_df = clean_numeric_data(df, columns=['value'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print(f"\nCleaned shape: {cleaned_df.shape}")
     
-    cleaned_df = remove_outliers_iqr(sample_df, 'value')
-    
-    print("\nCleaned data shape:", cleaned_df.shape)
-    print("Cleaned summary:")
-    print(calculate_summary_stats(cleaned_df, 'value'))
+    print(f"\nOutliers removed: {len(df) - len(cleaned_df)}")
