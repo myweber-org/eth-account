@@ -1,37 +1,88 @@
+
 import pandas as pd
 
-def clean_dataset(df):
+def clean_dataset(df, columns_to_check=None, fill_missing=True):
     """
-    Clean a pandas DataFrame by removing duplicate rows and
-    filling missing values with appropriate defaults.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        columns_to_check (list, optional): Specific columns to check for duplicates. 
+                                          If None, checks all columns.
+        fill_missing (bool): Whether to fill missing values with column mean (numeric)
+                            or mode (categorical)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
     """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
     # Remove duplicate rows
-    df_cleaned = df.drop_duplicates()
+    if columns_to_check:
+        cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+    else:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    # Fill missing numeric values with column mean
-    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
-    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    # Handle missing values
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                # Fill numeric columns with mean
+                mean_value = cleaned_df[column].mean()
+                cleaned_df[column] = cleaned_df[column].fillna(mean_value)
+            else:
+                # Fill categorical columns with mode
+                mode_value = cleaned_df[column].mode()[0] if not cleaned_df[column].mode().empty else 'Unknown'
+                cleaned_df[column] = cleaned_df[column].fillna(mode_value)
     
-    # Fill missing categorical values with mode
-    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
-    for col in categorical_cols:
-        if df_cleaned[col].isnull().any():
-            mode_value = df_cleaned[col].mode()[0]
-            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
     
-    return df_cleaned
+    return cleaned_df
 
-def validate_data(df, required_columns):
+def validate_dataframe(df, required_columns=None):
     """
-    Validate that the DataFrame contains all required columns
-    and has no completely empty columns.
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of columns that must be present
+    
+    Returns:
+        tuple: (is_valid, error_message)
     """
-    missing_columns = [col for col in required_columns if col not in df.columns]
-    if missing_columns:
-        raise ValueError(f"Missing required columns: {missing_columns}")
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    empty_columns = df.columns[df.isnull().all()].tolist()
-    if empty_columns:
-        print(f"Warning: Found empty columns: {empty_columns}")
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    return True
+    return True, "DataFrame is valid"
+
+# Example usage (commented out for production)
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', 'Frank'],
+        'age': [25, 30, 30, 35, None, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
+    
+    # Clean the data
+    cleaned = clean_dataset(df, columns_to_check=['id', 'name'])
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nShape after cleaning:", cleaned.shape)
+    
+    # Validate
+    is_valid, message = validate_dataframe(cleaned, required_columns=['id', 'name', 'age'])
+    print(f"\nValidation: {message}")
