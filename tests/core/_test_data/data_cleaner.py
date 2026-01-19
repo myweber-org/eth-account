@@ -1,79 +1,167 @@
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a DataFrame column using IQR method.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        dataframe: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        DataFrame with outliers removed
     """
-    if column not in df.columns:
+    if column not in dataframe.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.copy()
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
 
-def calculate_summary_statistics(df, column):
+def normalize_minmax(dataframe, columns=None):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Normalize specified columns using min-max scaling.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
     
     Returns:
-    dict: Dictionary containing summary statistics
+        DataFrame with normalized columns
     """
-    if column not in df.columns:
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    result_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and np.issubdtype(dataframe[col].dtype, np.number):
+            col_min = dataframe[col].min()
+            col_max = dataframe[col].max()
+            
+            if col_max != col_min:
+                result_df[col] = (dataframe[col] - col_min) / (col_max - col_min)
+            else:
+                result_df[col] = 0
+    
+    return result_df
+
+def detect_anomalies_zscore(dataframe, column, threshold=3):
+    """
+    Detect anomalies using Z-score method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: column name to analyze
+        threshold: Z-score threshold (default 3)
+    
+    Returns:
+        Boolean Series indicating anomalies
+    """
+    if column not in dataframe.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    z_scores = np.abs(stats.zscore(dataframe[column].dropna()))
+    anomalies = z_scores > threshold
     
-    return stats
+    result_series = pd.Series(False, index=dataframe.index)
+    valid_indices = dataframe[column].dropna().index
+    result_series.loc[valid_indices] = anomalies
+    
+    return result_series
 
-def clean_dataset(df, columns_to_clean=None):
+def clean_missing_values(dataframe, strategy='mean', columns=None):
     """
-    Clean multiple columns in a DataFrame by removing outliers.
+    Handle missing values in DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean. If None, clean all numeric columns.
+    Args:
+        dataframe: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: list of columns to process (default: all columns)
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+        DataFrame with handled missing values
     """
-    if columns_to_clean is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        columns_to_clean = list(numeric_cols)
+    if columns is None:
+        columns = dataframe.columns.tolist()
     
-    cleaned_df = df.copy()
+    result_df = dataframe.copy()
     
-    for column in columns_to_clean:
-        if column in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[column]):
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
+    for col in columns:
+        if col not in result_df.columns:
+            continue
+            
+        if strategy == 'drop':
+            result_df = result_df.dropna(subset=[col])
+        elif strategy == 'mean' and np.issubdtype(result_df[col].dtype, np.number):
+            result_df[col] = result_df[col].fillna(result_df[col].mean())
+        elif strategy == 'median' and np.issubdtype(result_df[col].dtype, np.number):
+            result_df[col] = result_df[col].fillna(result_df[col].median())
+        elif strategy == 'mode':
+            result_df[col] = result_df[col].fillna(result_df[col].mode()[0])
     
-    return cleaned_df
+    return result_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame validation passed"
+
+def process_data_pipeline(dataframe, config):
+    """
+    Execute a data processing pipeline based on configuration.
+    
+    Args:
+        dataframe: input pandas DataFrame
+        config: dictionary with processing steps configuration
+    
+    Returns:
+        Processed DataFrame
+    """
+    result_df = dataframe.copy()
+    
+    if 'missing_values' in config:
+        strategy = config['missing_values'].get('strategy', 'mean')
+        columns = config['missing_values'].get('columns')
+        result_df = clean_missing_values(result_df, strategy, columns)
+    
+    if 'outliers' in config:
+        for col in config['outliers'].get('columns', []):
+            threshold = config['outliers'].get('threshold', 1.5)
+            result_df = remove_outliers_iqr(result_df, col, threshold)
+    
+    if 'normalization' in config:
+        columns = config['normalization'].get('columns')
+        result_df = normalize_minmax(result_df, columns)
+    
+    return result_df
