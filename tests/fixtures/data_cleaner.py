@@ -178,3 +178,46 @@ def get_data_summary(data):
     }
     
     return summary
+def remove_duplicates(input_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    
+    Args:
+        input_list (list): The list to be cleaned.
+    
+    Returns:
+        list: A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data_with_key(input_list, key_func=None):
+    """
+    Remove duplicates based on a key function.
+    
+    Args:
+        input_list (list): The list to be cleaned.
+        key_func (callable, optional): Function to extract comparison key.
+    
+    Returns:
+        list: A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        key = key_func(item) if key_func else item
+        if key not in seen:
+            seen.add(key)
+            result.append(item)
+    return result
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
