@@ -236,4 +236,49 @@ if __name__ == "__main__":
         validate_dataframe(filled_df, required_columns=['customer_id', 'total_amount'])
         print("\nData validation passed.")
     except ValueError as e:
-        print(f"\nData validation failed: {e}")
+        print(f"\nData validation failed: {e}")import re
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, case_sensitive: bool = False):
+        self.case_sensitive = case_sensitive
+
+    def remove_duplicates(self, data: List[str]) -> List[str]:
+        seen = set()
+        result = []
+        for item in data:
+            key = item if self.case_sensitive else item.lower()
+            if key not in seen:
+                seen.add(key)
+                result.append(item)
+        return result
+
+    def standardize_whitespace(self, text: str) -> str:
+        return re.sub(r'\s+', ' ', text).strip()
+
+    def clean_text(self, text: str, remove_punctuation: bool = False) -> str:
+        cleaned = self.standardize_whitespace(text)
+        if remove_punctuation:
+            cleaned = re.sub(r'[^\w\s]', '', cleaned)
+        return cleaned
+
+    def process_list(self, data: List[str], 
+                     remove_dups: bool = True,
+                     clean_texts: bool = True) -> List[str]:
+        processed = data.copy()
+        if clean_texts:
+            processed = [self.clean_text(item) for item in processed]
+        if remove_dups:
+            processed = self.remove_duplicates(processed)
+        return processed
+
+def example_usage():
+    cleaner = DataCleaner(case_sensitive=False)
+    sample_data = ["hello world", "Hello World", "  test  data  ", "test data"]
+    
+    cleaned = cleaner.process_list(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+
+if __name__ == "__main__":
+    example_usage()
