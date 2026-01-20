@@ -105,4 +105,47 @@ def handle_missing_values(df, strategy='mean', columns=None):
         
         df_processed[col] = df_processed[col].fillna(fill_value)
     
-    return df_processed.reset_index(drop=True)
+    return df_processed.reset_index(drop=True)def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_data(values, threshold=None):
+    """
+    Clean numeric data by removing None values and optionally filtering by threshold.
+    """
+    cleaned = [v for v in values if v is not None]
+    
+    if threshold is not None:
+        cleaned = [v for v in cleaned if v >= threshold]
+    
+    return cleaned
+
+def validate_email_format(email_string):
+    """
+    Basic email format validation.
+    Returns True if email contains '@' and '.' in correct positions.
+    """
+    if not isinstance(email_string, str):
+        return False
+    
+    email = email_string.strip()
+    if '@' not in email or '.' not in email:
+        return False
+    
+    parts = email.split('@')
+    if len(parts) != 2:
+        return False
+    
+    if len(parts[1].split('.')) < 2:
+        return False
+    
+    return True
