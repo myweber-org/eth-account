@@ -1,122 +1,59 @@
 import pandas as pd
 import numpy as np
 
-def remove_missing_rows(df, columns=None):
+def remove_outliers_iqr(df, column):
     """
-    Remove rows with missing values from specified columns or entire DataFrame.
+    Remove outliers from a DataFrame column using the IQR method.
     
     Args:
-        df: pandas DataFrame
-        columns: list of column names or None for all columns
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
     
     Returns:
-        Cleaned DataFrame
+        pd.DataFrame: DataFrame with outliers removed
     """
-    if columns:
-        return df.dropna(subset=columns)
-    return df.dropna()
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def fill_missing_with_mean(df, columns=None):
+def clean_dataset(file_path, output_path=None):
     """
-    Fill missing values with column mean.
+    Clean dataset by removing outliers from numerical columns.
     
     Args:
-        df: pandas DataFrame
-        columns: list of column names or None for all numeric columns
+        file_path (str): Path to input CSV file
+        output_path (str, optional): Path to save cleaned data
     
     Returns:
-        DataFrame with filled values
+        pd.DataFrame: Cleaned DataFrame
     """
-    df_filled = df.copy()
+    df = pd.read_csv(file_path)
     
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+    numerical_cols = df.select_dtypes(include=[np.number]).columns
     
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            df_filled[col] = df[col].fillna(df[col].mean())
+    for col in numerical_cols:
+        initial_count = len(df)
+        df = remove_outliers_iqr(df, col)
+        removed_count = initial_count - len(df)
+        print(f"Removed {removed_count} outliers from column '{col}'")
     
-    return df_filled
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df
 
-def remove_outliers_iqr(df, columns=None, threshold=1.5):
-    """
-    Remove outliers using IQR method.
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    Args:
-        df: pandas DataFrame
-        columns: list of column names or None for all numeric columns
-        threshold: IQR multiplier (default 1.5)
-    
-    Returns:
-        DataFrame with outliers removed
-    """
-    df_clean = df.copy()
-    
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - threshold * IQR
-            upper_bound = Q3 + threshold * IQR
-            
-            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
-            df_clean = df_clean[mask]
-    
-    return df_clean.reset_index(drop=True)
-
-def standardize_columns(df, columns=None):
-    """
-    Standardize numeric columns to have zero mean and unit variance.
-    
-    Args:
-        df: pandas DataFrame
-        columns: list of column names or None for all numeric columns
-    
-    Returns:
-        DataFrame with standardized columns
-    """
-    df_std = df.copy()
-    
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
-    
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            mean = df[col].mean()
-            std = df[col].std()
-            if std > 0:
-                df_std[col] = (df[col] - mean) / std
-    
-    return df_std
-
-def clean_dataset(df, missing_strategy='remove', outlier_removal=True, standardization=False):
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Args:
-        df: pandas DataFrame
-        missing_strategy: 'remove' or 'fill_mean'
-        outlier_removal: boolean, whether to remove outliers
-        standardization: boolean, whether to standardize numeric columns
-    
-    Returns:
-        Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    if missing_strategy == 'remove':
-        cleaned_df = remove_missing_rows(cleaned_df)
-    elif missing_strategy == 'fill_mean':
-        cleaned_df = fill_missing_with_mean(cleaned_df)
-    
-    if outlier_removal:
-        cleaned_df = remove_outliers_iqr(cleaned_df)
-    
-    if standardization:
-        cleaned_df = standardize_columns(cleaned_df)
-    
-    return cleaned_df
+    cleaned_df = clean_dataset(input_file, output_file)
+    print(f"Original data shape: {pd.read_csv(input_file).shape}")
+    print(f"Cleaned data shape: {cleaned_df.shape}")
