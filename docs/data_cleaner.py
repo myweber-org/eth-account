@@ -1,77 +1,122 @@
-
 import pandas as pd
+import numpy as np
 
-def clean_dataset(df, remove_duplicates=True, fill_method=None):
+def remove_missing_rows(df, columns=None):
     """
-    Clean a pandas DataFrame by handling missing values and optionally removing duplicates.
+    Remove rows with missing values from specified columns or entire DataFrame.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        remove_duplicates (bool): If True, remove duplicate rows.
-        fill_method (str or None): Method to fill missing values. 
-                                   Options: 'mean', 'median', 'mode', or None to drop rows.
+        df: pandas DataFrame
+        columns: list of column names or None for all columns
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+        Cleaned DataFrame
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_with_mean(df, columns=None):
+    """
+    Fill missing values with column mean.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+    
+    Returns:
+        DataFrame with filled values
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            df_filled[col] = df[col].fillna(df[col].mean())
+    
+    return df_filled
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names or None for all numeric columns
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    df_std = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df_std[col] = (df[col] - mean) / std
+    
+    return df_std
+
+def clean_dataset(df, missing_strategy='remove', outlier_removal=True, standardization=False):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: pandas DataFrame
+        missing_strategy: 'remove' or 'fill_mean'
+        outlier_removal: boolean, whether to remove outliers
+        standardization: boolean, whether to standardize numeric columns
+    
+    Returns:
+        Cleaned DataFrame
     """
     cleaned_df = df.copy()
     
-    # Handle missing values
-    if fill_method is None:
-        cleaned_df = cleaned_df.dropna()
-    else:
-        if fill_method == 'mean':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
-        elif fill_method == 'median':
-            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
-        elif fill_method == 'mode':
-            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
-        else:
-            raise ValueError("fill_method must be 'mean', 'median', 'mode', or None")
+    if missing_strategy == 'remove':
+        cleaned_df = remove_missing_rows(cleaned_df)
+    elif missing_strategy == 'fill_mean':
+        cleaned_df = fill_missing_with_mean(cleaned_df)
     
-    # Remove duplicates if requested
-    if remove_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
+    if outlier_removal:
+        cleaned_df = remove_outliers_iqr(cleaned_df)
     
-    # Reset index after cleaning
-    cleaned_df = cleaned_df.reset_index(drop=True)
+    if standardization:
+        cleaned_df = standardize_columns(cleaned_df)
     
     return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
-    
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if not isinstance(df, pd.DataFrame):
-        return False, "Input is not a pandas DataFrame"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"
-
-# Example usage (commented out for production)
-# if __name__ == "__main__":
-#     sample_data = {
-#         'A': [1, 2, None, 4, 4],
-#         'B': [5, None, 7, 8, 8],
-#         'C': ['x', 'y', 'z', 'x', 'x']
-#     }
-#     df = pd.DataFrame(sample_data)
-#     cleaned = clean_dataset(df, remove_duplicates=True, fill_method='mean')
-#     print("Original DataFrame:")
-#     print(df)
-#     print("\nCleaned DataFrame:")
-#     print(cleaned)
