@@ -169,4 +169,112 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    cleaned_data = example_usage()import pandas as pd
+import numpy as np
+from typing import Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[list] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        return self
+        
+    def fill_missing_numeric(self, strategy: str = 'mean', fill_value: Optional[float] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_val = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_val = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_val = self.df[col].mode()[0]
+                elif strategy == 'constant' and fill_value is not None:
+                    fill_val = fill_value
+                else:
+                    continue
+                    
+                self.df[col] = self.df[col].fillna(fill_val)
+        
+        return self
+        
+    def fill_missing_categorical(self, strategy: str = 'mode', fill_value: Optional[str] = None) -> 'DataCleaner':
+        categorical_cols = self.df.select_dtypes(include=['object', 'category']).columns
+        
+        for col in categorical_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mode':
+                    fill_val = self.df[col].mode()[0] if not self.df[col].mode().empty else 'Unknown'
+                elif strategy == 'constant' and fill_value is not None:
+                    fill_val = fill_value
+                else:
+                    continue
+                    
+                self.df[col] = self.df[col].fillna(fill_val)
+        
+        return self
+        
+    def remove_outliers_iqr(self, columns: list, multiplier: float = 1.5) -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self
+        
+    def standardize_numeric(self, columns: list) -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                mean = self.df[col].mean()
+                std = self.df[col].std()
+                if std > 0:
+                    self.df[col] = (self.df[col] - mean) / std
+        
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+        
+    def get_summary(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values_before': self.original_shape[0] * self.original_shape[1] - self.df.count().sum(),
+            'missing_values_after': self.df.isnull().sum().sum()
+        }
+
+def clean_csv_file(input_path: str, output_path: str, **kwargs) -> dict:
+    df = pd.read_csv(input_path)
+    cleaner = DataCleaner(df)
+    
+    if 'remove_dups' in kwargs and kwargs['remove_dups']:
+        cleaner.remove_duplicates(kwargs.get('dup_subset'))
+    
+    if 'fill_numeric' in kwargs:
+        cleaner.fill_missing_numeric(kwargs['fill_numeric'], kwargs.get('numeric_fill_value'))
+    
+    if 'fill_categorical' in kwargs:
+        cleaner.fill_missing_categorical(kwargs['fill_categorical'], kwargs.get('categorical_fill_value'))
+    
+    if 'remove_outliers' in kwargs and kwargs['remove_outliers']:
+        cleaner.remove_outliers_iqr(kwargs.get('outlier_columns', []), kwargs.get('outlier_multiplier', 1.5))
+    
+    if 'standardize' in kwargs and kwargs['standardize']:
+        cleaner.standardize_numeric(kwargs.get('standardize_columns', []))
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    cleaned_df.to_csv(output_path, index=False)
+    
+    return cleaner.get_summary()
