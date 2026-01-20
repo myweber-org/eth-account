@@ -1,61 +1,101 @@
-import pandas as pd
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def normalize_data(data, method='zscore'):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Normalize data using specified method.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    Args:
+        data: numpy array or pandas Series
+        method: 'zscore', 'minmax', or 'robust'
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        Normalized data
     """
+    if method == 'zscore':
+        return (data - np.mean(data)) / np.std(data)
+    elif method == 'minmax':
+        return (data - np.min(data)) / (np.max(data) - np.min(data))
+    elif method == 'robust':
+        return (data - np.median(data)) / stats.iqr(data)
+    else:
+        raise ValueError("Method must be 'zscore', 'minmax', or 'robust'")
+
+def remove_outliers_iqr(data, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        data: numpy array or pandas Series
+        factor: multiplier for IQR (default 1.5)
+    
+    Returns:
+        Data with outliers removed
+    """
+    q1 = np.percentile(data, 25)
+    q3 = np.percentile(data, 75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    return data[(data >= lower_bound) & (data <= upper_bound)]
+
+def clean_dataset(df, columns=None, outlier_method='iqr', normalize_method='zscore'):
+    """
+    Clean dataset by removing outliers and normalizing specified columns.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of columns to clean (default: all numeric columns)
+        outlier_method: 'iqr' or None
+        normalize_method: 'zscore', 'minmax', 'robust', or None
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
     cleaned_df = df.copy()
     
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
-            elif fill_missing == 'median':
-                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None, inplace=True)
+    for col in columns:
+        if col in df.columns:
+            # Remove outliers
+            if outlier_method == 'iqr':
+                mask = ~df[col].isna()
+                clean_series = remove_outliers_iqr(df[col][mask])
+                cleaned_df.loc[mask, col] = clean_series
+            
+            # Normalize data
+            if normalize_method:
+                mask = ~cleaned_df[col].isna()
+                cleaned_df.loc[mask, col] = normalize_data(
+                    cleaned_df.loc[mask, col], 
+                    method=normalize_method
+                )
     
     return cleaned_df
 
-def validate_dataset(df, check_duplicates=True, check_missing=True):
+def calculate_statistics(data):
     """
-    Validate a DataFrame by checking for duplicates and missing values.
+    Calculate basic statistics for data.
     
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    check_duplicates (bool): Whether to check for duplicate rows. Default is True.
-    check_missing (bool): Whether to check for missing values. Default is True.
+    Args:
+        data: numpy array or pandas Series
     
     Returns:
-    dict: Dictionary containing validation results.
+        Dictionary of statistics
     """
-    validation_results = {}
-    
-    if check_duplicates:
-        duplicate_count = df.duplicated().sum()
-        validation_results['duplicate_rows'] = duplicate_count
-        validation_results['has_duplicates'] = duplicate_count > 0
-    
-    if check_missing:
-        missing_counts = df.isnull().sum()
-        total_missing = missing_counts.sum()
-        validation_results['missing_values'] = total_missing
-        validation_results['missing_by_column'] = missing_counts[missing_counts > 0].to_dict()
-        validation_results['has_missing'] = total_missing > 0
-    
-    return validation_results
+    return {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data),
+        'q1': np.percentile(data, 25),
+        'q3': np.percentile(data, 75),
+        'skewness': stats.skew(data),
+        'kurtosis': stats.kurtosis(data)
+    }
