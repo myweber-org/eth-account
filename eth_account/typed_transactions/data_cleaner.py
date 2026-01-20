@@ -142,4 +142,98 @@ if __name__ == "__main__":
     )
     print("Validation Results:")
     for key, value in validation.items():
-        print(f"{key}: {value}")
+        print(f"{key}: {value}")import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, standardize_cols=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if standardize_cols:
+        df_clean.columns = (
+            df_clean.columns.str.strip()
+            .str.lower()
+            .str.replace(' ', '_')
+            .str.replace(r'[^\w_]', '', regex=True)
+        )
+        print("Column names standardized.")
+    
+    return df_clean
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns using different strategies.
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df_filled.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df_filled.columns and df_filled[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_filled[col].mean()
+            elif strategy == 'median':
+                fill_value = df_filled[col].median()
+            elif strategy == 'mode':
+                fill_value = df_filled[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_filled[col].fillna(fill_value, inplace=True)
+            print(f"Filled missing values in '{col}' using {strategy} strategy.")
+    
+    return df_filled
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame.")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows.")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'Customer ID': [1, 2, 2, 3, 4],
+        'Order Date': ['2023-01-01', '2023-01-02', '2023-01-02', None, '2023-01-04'],
+        'Total Amount': [100.0, 200.0, 200.0, 150.0, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    filled_df = handle_missing_values(cleaned_df, strategy='mean')
+    print("\nDataFrame after handling missing values:")
+    print(filled_df)
+    
+    try:
+        validate_dataframe(filled_df, required_columns=['customer_id', 'total_amount'])
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
