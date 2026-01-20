@@ -1,79 +1,90 @@
-import numpy as np
-import pandas as pd
+import csv
+import hashlib
+from collections import defaultdict
 
-def remove_outliers_iqr(df, column):
+def generate_row_hash(row):
+    """Generate a hash for a CSV row to identify duplicates."""
+    row_string = ''.join(str(field) for field in row)
+    return hashlib.md5(row_string.encode()).hexdigest()
+
+def remove_duplicates(input_file, output_file, key_columns=None):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove duplicate rows from a CSV file.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        input_file: Path to the input CSV file.
+        output_file: Path to the output CSV file.
+        key_columns: List of column indices to consider for duplicate detection.
+                     If None, consider all columns.
+    """
+    seen_hashes = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        headers = next(reader)
+        
+        for row in reader:
+            if key_columns is not None:
+                # Consider only specified columns for duplicate detection
+                key_data = [row[i] for i in key_columns]
+                row_hash = generate_row_hash(key_data)
+            else:
+                # Consider all columns for duplicate detection
+                row_hash = generate_row_hash(row)
+            
+            if row_hash not in seen_hashes:
+                seen_hashes.add(row_hash)
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(headers)
+        writer.writerows(unique_rows)
+    
+    print(f"Removed {len(seen_hashes) - len(unique_rows)} duplicate rows.")
+    print(f"Original rows: {len(seen_hashes)}")
+    print(f"Unique rows: {len(unique_rows)}")
+
+def find_duplicate_counts(input_file, key_columns=None):
+    """
+    Analyze duplicate frequency in a CSV file.
+    
+    Args:
+        input_file: Path to the input CSV file.
+        key_columns: List of column indices to consider for duplicate detection.
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        Dictionary with duplicate hashes and their counts.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    hash_counter = defaultdict(int)
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        headers = next(reader)
+        
+        for row in reader:
+            if key_columns is not None:
+                key_data = [row[i] for i in key_columns]
+                row_hash = generate_row_hash(key_data)
+            else:
+                row_hash = generate_row_hash(row)
+            
+            hash_counter[row_hash] += 1
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    # Filter to only show duplicates
+    duplicates = {h: c for h, c in hash_counter.items() if c > 1}
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_basic_stats(df, column):
-    """
-    Calculate basic statistics for a DataFrame column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
-    
-    Returns:
-    dict: Dictionary containing statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
-
-def example_usage():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    
-    data = {
-        'id': range(100),
-        'value': np.random.normal(100, 15, 100)
-    }
-    
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("Original statistics:", calculate_basic_stats(df, 'value'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_basic_stats(cleaned_df, 'value'))
-    
-    return cleaned_df
+    return duplicates
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    # Example usage
+    input_csv = "data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    # Remove duplicates considering all columns
+    remove_duplicates(input_csv, output_csv)
+    
+    # Analyze duplicates based on specific columns (e.g., first two columns)
+    duplicate_stats = find_duplicate_counts(input_csv, key_columns=[0, 1])
+    print(f"Found {len(duplicate_stats)} duplicate groups based on columns 0 and 1")
