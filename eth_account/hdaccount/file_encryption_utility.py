@@ -91,4 +91,72 @@ def test_encryption():
 
 if __name__ == "__main__":
     success = test_encryption()
-    print(f"Encryption/decryption test: {'PASSED' if success else 'FAILED'}")
+    print(f"Encryption/decryption test: {'PASSED' if success else 'FAILED'}")import os
+import base64
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives import padding
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2
+
+def derive_key(password, salt):
+    kdf = PBKDF2(
+        algorithm=algorithms.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+        backend=default_backend()
+    )
+    return kdf.derive(password.encode())
+
+def encrypt_data(plaintext, password):
+    salt = os.urandom(16)
+    key = derive_key(password, salt)
+    iv = os.urandom(16)
+    
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    encryptor = cipher.encryptor()
+    
+    padder = padding.PKCS7(128).padder()
+    padded_data = padder.update(plaintext.encode()) + padder.finalize()
+    
+    ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+    
+    return base64.b64encode(salt + iv + ciphertext).decode()
+
+def decrypt_data(encrypted_data, password):
+    data = base64.b64decode(encrypted_data)
+    salt = data[:16]
+    iv = data[16:32]
+    ciphertext = data[32:]
+    
+    key = derive_key(password, salt)
+    
+    cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+    decryptor = cipher.decryptor()
+    
+    padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+    
+    unpadder = padding.PKCS7(128).unpadder()
+    plaintext = unpadder.update(padded_plaintext) + unpadder.finalize()
+    
+    return plaintext.decode()
+
+def main():
+    password = "secure_password_123"
+    original_text = "This is a secret message that needs encryption."
+    
+    print("Original text:", original_text)
+    
+    encrypted = encrypt_data(original_text, password)
+    print("Encrypted data:", encrypted)
+    
+    decrypted = decrypt_data(encrypted, password)
+    print("Decrypted text:", decrypted)
+    
+    if original_text == decrypted:
+        print("Encryption/decryption successful!")
+    else:
+        print("Encryption/decryption failed!")
+
+if __name__ == "__main__":
+    main()
