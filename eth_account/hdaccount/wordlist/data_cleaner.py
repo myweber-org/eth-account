@@ -188,4 +188,97 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+import numpy as np
+
+def load_and_inspect_csv(filepath):
+    """
+    Load a CSV file and return basic information.
+    """
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+        print(f"Columns: {list(df.columns)}")
+        print(f"Missing values per column:\n{df.isnull().sum()}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error loading file: {e}")
+        return None
+
+def remove_duplicates(df):
+    """
+    Remove duplicate rows from the DataFrame.
+    """
+    initial_count = len(df)
+    df_cleaned = df.drop_duplicates()
+    removed_count = initial_count - len(df_cleaned)
+    print(f"Removed {removed_count} duplicate rows.")
+    return df_cleaned
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in specified columns using a given strategy.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in ['int64', 'float64']:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                fill_value = 0
+            df_filled[col].fillna(fill_value, inplace=True)
+        else:
+            df_filled[col].fillna('Unknown', inplace=True)
+    
+    print(f"Missing values filled using '{strategy}' strategy.")
+    return df_filled
+
+def normalize_numeric_columns(df, columns=None):
+    """
+    Normalize numeric columns to range [0, 1].
+    """
+    df_normalized = df.copy()
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and df[col].dtype in ['int64', 'float64']:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+    
+    print(f"Normalized columns: {list(columns)}")
+    return df_normalized
+
+def clean_data_pipeline(filepath):
+    """
+    Execute a complete data cleaning pipeline.
+    """
+    print("Starting data cleaning pipeline...")
+    df = load_and_inspect_csv(filepath)
+    if df is None:
+        return None
+    
+    df = remove_duplicates(df)
+    df = fill_missing_values(df, strategy='median')
+    df = normalize_numeric_columns(df)
+    
+    print("Data cleaning pipeline completed.")
+    return df
+
+if __name__ == "__main__":
+    sample_data = clean_data_pipeline("sample_data.csv")
+    if sample_data is not None:
+        print(f"Cleaned data shape: {sample_data.shape}")
+        sample_data.head()
