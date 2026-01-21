@@ -83,3 +83,11 @@ if __name__ == "__main__":
         print(f"\nRows removed: {len(df) - len(cleaned_df)}")
         print(f"Null values removed: {df.isnull().sum().sum() - cleaned_df.isnull().sum().sum()}")
         print(f"Duplicates removed: {len(df) - len(df.drop_duplicates())}")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
