@@ -1,101 +1,99 @@
 
 import numpy as np
-import pandas as pd
-from scipy import stats
 
-def normalize_data(data, method='zscore'):
+def remove_outliers_iqr(data, column):
     """
-    Normalize data using specified method.
+    Remove outliers from a specified column using the Interquartile Range method.
     
-    Args:
-        data: numpy array or pandas Series
-        method: 'zscore', 'minmax', or 'robust'
+    Parameters:
+    data (numpy.ndarray): Input data array.
+    column (int): Index of the column to process.
     
     Returns:
-        Normalized data
+    numpy.ndarray: Data with outliers removed from specified column.
     """
-    if method == 'zscore':
-        return (data - np.mean(data)) / np.std(data)
-    elif method == 'minmax':
-        return (data - np.min(data)) / (np.max(data) - np.min(data))
-    elif method == 'robust':
-        return (data - np.median(data)) / stats.iqr(data)
-    else:
-        raise ValueError("Method must be 'zscore', 'minmax', or 'robust'")
-
-def remove_outliers_iqr(data, factor=1.5):
-    """
-    Remove outliers using IQR method.
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
     
-    Args:
-        data: numpy array or pandas Series
-        factor: multiplier for IQR (default 1.5)
+    if column >= data.shape[1]:
+        raise IndexError("Column index out of bounds")
     
-    Returns:
-        Data with outliers removed
-    """
-    q1 = np.percentile(data, 25)
-    q3 = np.percentile(data, 75)
+    col_data = data[:, column]
+    
+    q1 = np.percentile(col_data, 25)
+    q3 = np.percentile(col_data, 75)
     iqr = q3 - q1
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
     
-    return data[(data >= lower_bound) & (data <= upper_bound)]
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    
+    return data[mask]
 
-def clean_dataset(df, columns=None, outlier_method='iqr', normalize_method='zscore'):
+def calculate_statistics(data, column):
     """
-    Clean dataset by removing outliers and normalizing specified columns.
+    Calculate basic statistics for a specified column.
     
-    Args:
-        df: pandas DataFrame
-        columns: list of columns to clean (default: all numeric columns)
-        outlier_method: 'iqr' or None
-        normalize_method: 'zscore', 'minmax', 'robust', or None
+    Parameters:
+    data (numpy.ndarray): Input data array.
+    column (int): Index of the column to analyze.
     
     Returns:
-        Cleaned DataFrame
+    dict: Dictionary containing statistical measures.
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy array")
     
-    cleaned_df = df.copy()
+    col_data = data[:, column]
     
-    for col in columns:
-        if col in df.columns:
-            # Remove outliers
-            if outlier_method == 'iqr':
-                mask = ~df[col].isna()
-                clean_series = remove_outliers_iqr(df[col][mask])
-                cleaned_df.loc[mask, col] = clean_series
-            
-            # Normalize data
-            if normalize_method:
-                mask = ~cleaned_df[col].isna()
-                cleaned_df.loc[mask, col] = normalize_data(
-                    cleaned_df.loc[mask, col], 
-                    method=normalize_method
-                )
-    
-    return cleaned_df
-
-def calculate_statistics(data):
-    """
-    Calculate basic statistics for data.
-    
-    Args:
-        data: numpy array or pandas Series
-    
-    Returns:
-        Dictionary of statistics
-    """
-    return {
-        'mean': np.mean(data),
-        'median': np.median(data),
-        'std': np.std(data),
-        'min': np.min(data),
-        'max': np.max(data),
-        'q1': np.percentile(data, 25),
-        'q3': np.percentile(data, 75),
-        'skewness': stats.skew(data),
-        'kurtosis': stats.kurtosis(data)
+    stats = {
+        'mean': np.mean(col_data),
+        'median': np.median(col_data),
+        'std': np.std(col_data),
+        'min': np.min(col_data),
+        'max': np.max(col_data),
+        'q1': np.percentile(col_data, 25),
+        'q3': np.percentile(col_data, 75)
     }
+    
+    return stats
+
+def validate_data_shape(data, expected_columns):
+    """
+    Validate that data has the expected number of columns.
+    
+    Parameters:
+    data (numpy.ndarray): Input data array.
+    expected_columns (int): Expected number of columns.
+    
+    Returns:
+    bool: True if shape is valid, False otherwise.
+    """
+    if not isinstance(data, np.ndarray):
+        return False
+    
+    return data.shape[1] == expected_columns
+
+def example_usage():
+    """
+    Example demonstrating how to use the data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    sample_data = np.random.randn(100, 3)
+    sample_data[0, 0] = 100
+    
+    print("Original data shape:", sample_data.shape)
+    
+    cleaned_data = remove_outliers_iqr(sample_data, 0)
+    print("Cleaned data shape:", cleaned_data.shape)
+    
+    stats = calculate_statistics(cleaned_data, 0)
+    print("Statistics for column 0:", stats)
+    
+    is_valid = validate_data_shape(cleaned_data, 3)
+    print("Data shape validation:", is_valid)
+
+if __name__ == "__main__":
+    example_usage()
