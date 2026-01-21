@@ -1,127 +1,134 @@
-
-import pandas as pd
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+import pandas as pd
+from scipy import stats
 
-def load_and_clean_data(filepath):
-    """
-    Load CSV data and perform cleaning operations.
-    """
-    try:
-        df = pd.read_csv(filepath)
-        print(f"Data loaded successfully. Shape: {df.shape}")
-    except FileNotFoundError:
-        print(f"Error: File not found at {filepath}")
-        return None
-    except Exception as e:
-        print(f"Error loading file: {e}")
-        return None
-
-    # Remove duplicate rows
-    initial_rows = df.shape[0]
-    df.drop_duplicates(inplace=True)
-    duplicates_removed = initial_rows - df.shape[0]
-    print(f"Removed {duplicates_removed} duplicate rows.")
-
-    # Handle missing values
-    missing_before = df.isnull().sum().sum()
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    categorical_cols = df.select_dtypes(include=['object']).columns
-
-    # Fill numeric missing values with median
-    for col in numeric_cols:
-        if df[col].isnull().any():
-            df[col].fillna(df[col].median(), inplace=True)
-
-    # Fill categorical missing values with mode
-    for col in categorical_cols:
-        if df[col].isnull().any():
-            df[col].fillna(df[col].mode()[0], inplace=True)
-
-    missing_after = df.isnull().sum().sum()
-    print(f"Missing values handled: {missing_before} -> {missing_after}")
-
-    # Normalize numeric columns
-    if len(numeric_cols) > 0:
-        scaler = StandardScaler()
-        df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
-        print(f"Normalized {len(numeric_cols)} numeric columns.")
-
-    # Remove outliers using IQR method
-    outliers_removed = 0
-    for col in numeric_cols:
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
         IQR = Q3 - Q1
         lower_bound = Q1 - 1.5 * IQR
         upper_bound = Q3 + 1.5 * IQR
-        outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)]
-        outliers_removed += len(outliers)
-        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers(self, columns=None, method='iqr'):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        original_len = len(self.df)
+        
+        for col in columns:
+            if method == 'iqr':
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+            elif method == 'zscore':
+                z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+                self.df = self.df[z_scores < 3]
+        
+        removed_count = original_len - len(self.df)
+        print(f"Removed {removed_count} outliers")
+        return self
+    
+    def normalize_data(self, columns=None, method='minmax'):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        df_normalized = self.df.copy()
+        
+        for col in columns:
+            if method == 'minmax':
+                min_val = df_normalized[col].min()
+                max_val = df_normalized[col].max()
+                if max_val != min_val:
+                    df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = df_normalized[col].mean()
+                std_val = df_normalized[col].std()
+                if std_val != 0:
+                    df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+        
+        self.df = df_normalized
+        return self
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        categorical_cols = self.df.select_dtypes(include=['object']).columns
+        
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'custom' and fill_value is not None:
+                    self.df[col].fillna(fill_value, inplace=True)
+        
+        for col in categorical_cols:
+            if self.df[col].isnull().any():
+                self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
+        }
+        return summary
 
-    print(f"Removed {outliers_removed} outliers using IQR method.")
-    print(f"Final data shape: {df.shape}")
-
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'age': np.random.normal(35, 10, 100),
+        'salary': np.random.normal(50000, 15000, 100),
+        'department': np.random.choice(['IT', 'HR', 'Finance', 'Marketing'], 100),
+        'experience': np.random.randint(1, 20, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[10:15, 'salary'] = np.nan
+    df.loc[20:25, 'age'] = np.nan
+    df.loc[5, 'salary'] = 200000
+    df.loc[6, 'age'] = 150
+    
     return df
 
-def save_cleaned_data(df, output_path):
-    """
-    Save cleaned DataFrame to CSV.
-    """
-    try:
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to {output_path}")
-        return True
-    except Exception as e:
-        print(f"Error saving file: {e}")
-        return False
-
 if __name__ == "__main__":
-    # Example usage
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-
-    cleaned_df = load_and_clean_data(input_file)
-    if cleaned_df is not None:
-        save_cleaned_data(cleaned_df, output_file)import pandas as pd
-
-def clean_data(df):
-    """
-    Clean the input DataFrame by removing duplicates and handling missing values.
-    """
-    # Remove duplicate rows
-    df_cleaned = df.drop_duplicates()
+    sample_df = create_sample_data()
+    print("Original data shape:", sample_df.shape)
+    print("\nMissing values before cleaning:")
+    print(sample_df.isnull().sum())
     
-    # Fill missing numeric values with the column mean
-    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
-    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    cleaner = DataCleaner(sample_df)
+    cleaner.handle_missing_values(strategy='mean')
+    cleaner.remove_outliers(method='iqr')
+    cleaner.normalize_data(method='minmax')
     
-    # Fill missing categorical values with the mode
-    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
-    for col in categorical_cols:
-        if df_cleaned[col].isnull().any():
-            mode_value = df_cleaned[col].mode()[0]
-            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    cleaned_df = cleaner.get_cleaned_data()
+    print("\nCleaned data shape:", cleaned_df.shape)
+    print("\nMissing values after cleaning:")
+    print(cleaned_df.isnull().sum())
     
-    return df_cleaned
-
-def save_cleaned_data(df, output_path):
-    """
-    Save the cleaned DataFrame to a CSV file.
-    """
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
-
-if __name__ == "__main__":
-    # Example usage
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    
-    try:
-        raw_df = pd.read_csv(input_file)
-        cleaned_df = clean_data(raw_df)
-        save_cleaned_data(cleaned_df, output_file)
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
+    summary = cleaner.get_summary()
+    print("\nCleaning Summary:")
+    for key, value in summary.items():
+        print(f"{key}: {value}")
