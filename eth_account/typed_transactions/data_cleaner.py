@@ -1,127 +1,86 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
+from typing import Optional, Dict, List
 
-def remove_outliers_iqr(dataframe, column):
-    Q1 = dataframe[column].quantile(0.25)
-    Q3 = dataframe[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+        
+        return self
+    
+    def convert_types(self, type_map: Dict[str, str]) -> 'DataCleaner':
+        for col, dtype in type_map.items():
+            if col in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[col] = pd.to_datetime(self.df[col])
+                    else:
+                        self.df[col] = self.df[col].astype(dtype)
+                except Exception as e:
+                    print(f"Error converting column {col} to {dtype}: {e}")
+        
+        return self
+    
+    def remove_outliers(self, columns: List[str], method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                if method == 'iqr':
+                    Q1 = self.df[col].quantile(0.25)
+                    Q3 = self.df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - threshold * IQR
+                    upper_bound = Q3 + threshold * IQR
+                    self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_cleaning_report(self) -> Dict:
+        return {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1],
+            'missing_values_remaining': self.df.isnull().sum().sum()
+        }
 
-def normalize_minmax(dataframe, column):
-    min_val = dataframe[column].min()
-    max_val = dataframe[column].max()
-    if max_val == min_val:
-        return dataframe[column].apply(lambda x: 0.0)
-    return dataframe[column].apply(lambda x: (x - min_val) / (max_val - min_val))
-
-def clean_dataset(dataframe, numeric_columns):
-    cleaned_df = dataframe.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
-
-def validate_dataframe(dataframe, required_columns):
-    missing_cols = [col for col in required_columns if col not in dataframe.columns]
-    if missing_cols:
-        raise ValueError(f"Missing required columns: {missing_cols}")
-    return Trueimport pandas as pd
-
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from a DataFrame.
+def clean_csv_file(input_path: str, output_path: str, **kwargs) -> Dict:
+    try:
+        df = pd.read_csv(input_path)
+        cleaner = DataCleaner(df)
+        
+        if 'missing_strategy' in kwargs:
+            cleaner.handle_missing_values(strategy=kwargs['missing_strategy'])
+        
+        if 'type_map' in kwargs:
+            cleaner.convert_types(kwargs['type_map'])
+        
+        if 'outlier_columns' in kwargs:
+            cleaner.remove_outliers(columns=kwargs['outlier_columns'])
+        
+        cleaned_df = cleaner.get_cleaned_data()
+        cleaned_df.to_csv(output_path, index=False)
+        
+        return cleaner.get_cleaning_report()
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    subset (list, optional): Column labels to consider for duplicates.
-    keep (str, optional): Which duplicates to keep.
-    
-    Returns:
-    pd.DataFrame: DataFrame with duplicates removed.
-    """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
-    
-    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
-    
-    print(f"Removed {len(df) - len(cleaned_df)} duplicate rows")
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and required columns.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list, optional): List of required column names.
-    
-    Returns:
-    bool: True if validation passes, False otherwise.
-    """
-    if not isinstance(df, pd.DataFrame):
-        print("Error: Input is not a DataFrame")
-        return False
-    
-    if df.empty:
-        print("Warning: DataFrame is empty")
-        return True
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            print(f"Error: Missing required columns: {missing_columns}")
-            return False
-    
-    return True
-
-def clean_numeric_columns(df, columns):
-    """
-    Clean numeric columns by converting to appropriate types.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    columns (list): List of column names to clean.
-    
-    Returns:
-    pd.DataFrame: DataFrame with cleaned numeric columns.
-    """
-    df_clean = df.copy()
-    
-    for col in columns:
-        if col in df_clean.columns:
-            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
-    
-    return df_clean
-
-def save_cleaned_data(df, output_path, format='csv'):
-    """
-    Save cleaned DataFrame to file.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to save.
-    output_path (str): Path to save the file.
-    format (str): File format ('csv', 'excel', 'parquet').
-    """
-    if format == 'csv':
-        df.to_csv(output_path, index=False)
-    elif format == 'excel':
-        df.to_excel(output_path, index=False)
-    elif format == 'parquet':
-        df.to_parquet(output_path, index=False)
-    else:
-        raise ValueError(f"Unsupported format: {format}")
-    
-    print(f"Data saved to {output_path}")
-def remove_duplicates(sequence):
-    seen = set()
-    result = []
-    for item in sequence:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    except Exception as e:
+        print(f"Error cleaning file: {e}")
+        return {'error': str(e)}
