@@ -1,90 +1,137 @@
-import csv
-import hashlib
-from collections import defaultdict
+import pandas as pd
+import numpy as np
 
-def generate_row_hash(row):
-    """Generate a hash for a CSV row to identify duplicates."""
-    row_string = ''.join(str(field) for field in row)
-    return hashlib.md5(row_string.encode()).hexdigest()
-
-def remove_duplicates(input_file, output_file, key_columns=None):
+def remove_outliers_iqr(df, column):
     """
-    Remove duplicate rows from a CSV file.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Args:
-        input_file: Path to the input CSV file.
-        output_file: Path to the output CSV file.
-        key_columns: List of column indices to consider for duplicate detection.
-                     If None, consider all columns.
-    """
-    seen_hashes = set()
-    unique_rows = []
-    
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.reader(infile)
-        headers = next(reader)
-        
-        for row in reader:
-            if key_columns is not None:
-                # Consider only specified columns for duplicate detection
-                key_data = [row[i] for i in key_columns]
-                row_hash = generate_row_hash(key_data)
-            else:
-                # Consider all columns for duplicate detection
-                row_hash = generate_row_hash(row)
-            
-            if row_hash not in seen_hashes:
-                seen_hashes.add(row_hash)
-                unique_rows.append(row)
-    
-    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.writer(outfile)
-        writer.writerow(headers)
-        writer.writerows(unique_rows)
-    
-    print(f"Removed {len(seen_hashes) - len(unique_rows)} duplicate rows.")
-    print(f"Original rows: {len(seen_hashes)}")
-    print(f"Unique rows: {len(unique_rows)}")
-
-def find_duplicate_counts(input_file, key_columns=None):
-    """
-    Analyze duplicate frequency in a CSV file.
-    
-    Args:
-        input_file: Path to the input CSV file.
-        key_columns: List of column indices to consider for duplicate detection.
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
     Returns:
-        Dictionary with duplicate hashes and their counts.
+    pd.DataFrame: DataFrame with outliers removed
     """
-    hash_counter = defaultdict(int)
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.reader(infile)
-        headers = next(reader)
-        
-        for row in reader:
-            if key_columns is not None:
-                key_data = [row[i] for i in key_columns]
-                row_hash = generate_row_hash(key_data)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numerical columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numerical_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if len(numerical_cols) == 0:
+        return pd.DataFrame()
+    
+    stats = df[numerical_cols].agg(['count', 'mean', 'std', 'min', 'max'])
+    
+    return stats.T
+
+def clean_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numerical columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_clean = df.copy()
+    numerical_cols = df_clean.select_dtypes(include=[np.number]).columns
+    
+    for col in numerical_cols:
+        if df_clean[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif strategy == 'mode':
+                fill_value = df_clean[col].mode()[0]
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
             else:
-                row_hash = generate_row_hash(row)
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
             
-            hash_counter[row_hash] += 1
+            df_clean[col] = df_clean[col].fillna(fill_value)
     
-    # Filter to only show duplicates
-    duplicates = {h: c for h, c in hash_counter.items() if c > 1}
+    return df_clean
+
+def normalize_data(df, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
     
-    return duplicates
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to normalize. If None, normalize all numerical columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    df_normalized = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            
+            if max_val > min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    
+    return df_normalized
 
 if __name__ == "__main__":
-    # Example usage
-    input_csv = "data.csv"
-    output_csv = "cleaned_data.csv"
+    sample_data = {
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': [1.1, 2.2, 3.3, 4.4, 5.5, 6.6]
+    }
     
-    # Remove duplicates considering all columns
-    remove_duplicates(input_csv, output_csv)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
     
-    # Analyze duplicates based on specific columns (e.g., first two columns)
-    duplicate_stats = find_duplicate_counts(input_csv, key_columns=[0, 1])
-    print(f"Found {len(duplicate_stats)} duplicate groups based on columns 0 and 1")
+    cleaned_df = remove_outliers_iqr(df, 'A')
+    print("DataFrame after removing outliers from column 'A':")
+    print(cleaned_df)
+    print()
+    
+    stats = calculate_summary_statistics(df)
+    print("Summary Statistics:")
+    print(stats)
+    print()
+    
+    df_with_nulls = df.copy()
+    df_with_nulls.loc[2, 'B'] = np.nan
+    df_cleaned = clean_missing_values(df_with_nulls, strategy='mean')
+    print("DataFrame after handling missing values:")
+    print(df_cleaned)
+    print()
+    
+    normalized_df = normalize_data(df, columns=['A', 'B'])
+    print("Normalized DataFrame:")
+    print(normalized_df)
