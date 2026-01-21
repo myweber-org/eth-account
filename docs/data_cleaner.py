@@ -1,59 +1,95 @@
+
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_data(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers from a DataFrame column using the IQR method.
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+    pd.DataFrame: Cleaned DataFrame
     """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    cleaned_df = df.copy()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Dropped rows with missing values")
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if cleaned_df[col].isnull().any():
+                if fill_missing == 'mean':
+                    fill_value = cleaned_df[col].mean()
+                else:
+                    fill_value = cleaned_df[col].median()
+                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                print(f"Filled missing values in {col} with {fill_missing}: {fill_value:.2f}")
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            if cleaned_df[col].isnull().any():
+                mode_value = cleaned_df[col].mode()
+                if not mode_value.empty:
+                    cleaned_df[col] = cleaned_df[col].fillna(mode_value[0])
+                    print(f"Filled missing values in {col} with mode: {mode_value[0]}")
     
-    return filtered_df
+    print(f"Data cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
 
-def clean_dataset(file_path, output_path=None):
+def validate_data(df, required_columns=None, min_rows=1):
     """
-    Clean dataset by removing outliers from numerical columns.
+    Validate DataFrame structure and content.
     
-    Args:
-        file_path (str): Path to input CSV file
-        output_path (str, optional): Path to save cleaned data
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    bool: True if validation passes, False otherwise
     """
-    df = pd.read_csv(file_path)
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
     
-    numerical_cols = df.select_dtypes(include=[np.number]).columns
+    if len(df) < min_rows:
+        print(f"Validation failed: DataFrame has fewer than {min_rows} rows")
+        return False
     
-    for col in numerical_cols:
-        initial_count = len(df)
-        df = remove_outliers_iqr(df, col)
-        removed_count = initial_count - len(df)
-        print(f"Removed {removed_count} outliers from column '{col}'")
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing required columns: {missing_cols}")
+            return False
     
-    if output_path:
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned data saved to: {output_path}")
-    
-    return df
+    print("Data validation passed")
+    return True
 
 if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, np.nan, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', np.nan, 'A']
+    }
     
-    cleaned_df = clean_dataset(input_file, output_file)
-    print(f"Original data shape: {pd.read_csv(input_file).shape}")
-    print(f"Cleaned data shape: {cleaned_df.shape}")
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_data(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid = validate_data(cleaned, required_columns=['id', 'value'], min_rows=3)
+    print(f"\nData is valid: {is_valid}")
