@@ -1,61 +1,70 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-def clean_dataset(df):
+def remove_outliers_iqr(df, column):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
     """
-    # Remove duplicate rows
-    df_cleaned = df.drop_duplicates()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    # Fill missing numeric values with column median
-    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    # Fill missing categorical values with mode
-    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
-    for col in categorical_cols:
-        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    return df_cleaned
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def validate_data(df):
+def clean_dataset(df, numeric_columns=None):
     """
-    Validate that the cleaned DataFrame has no missing values.
+    Clean a dataset by removing outliers from all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
     """
-    missing_values = df.isnull().sum().sum()
-    if missing_values == 0:
-        print("Data validation passed: No missing values found.")
-        return True
-    else:
-        print(f"Data validation failed: {missing_values} missing values found.")
-        return False
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            original_len = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_len - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df
 
 if __name__ == "__main__":
-    # Example usage
     sample_data = {
-        'id': [1, 2, 2, 3, 4, 5],
-        'name': ['Alice', 'Bob', 'Bob', None, 'Eve', None],
-        'age': [25, 30, 30, None, 35, 40],
-        'score': [85.5, 92.0, 92.0, 78.5, None, 88.0]
+        'id': range(1, 101),
+        'value': np.concatenate([
+            np.random.normal(100, 10, 90),
+            np.random.normal(300, 50, 10)
+        ]),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned_df = clean_dataset(df)
-    print(cleaned_df)
+    print(f"Original dataset shape: {df.shape}")
     
-    # Validate the cleaned data
-    validate_data(cleaned_df)
-def deduplicate_list(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
+    cleaned_df = clean_dataset(df, ['value'])
+    print(f"Cleaned dataset shape: {cleaned_df.shape}")
+    print(f"Outliers removed: {len(df) - len(cleaned_df)}")
