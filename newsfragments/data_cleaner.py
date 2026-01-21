@@ -1,104 +1,90 @@
-import pandas as pd
-import numpy as np
 
-def clean_csv_data(file_path, output_path=None, fill_strategy='mean'):
-    """
-    Clean CSV data by handling missing values and removing duplicates.
-    
-    Args:
-        file_path (str): Path to input CSV file
-        output_path (str, optional): Path for cleaned output CSV. Defaults to None.
-        fill_strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', 'drop')
-    
-    Returns:
-        pandas.DataFrame: Cleaned DataFrame
-    """
+import csv
+import re
+from typing import List, Dict, Optional
+
+def read_csv_file(file_path: str) -> List[Dict]:
+    """Read a CSV file and return a list of dictionaries."""
+    data = []
     try:
-        df = pd.read_csv(file_path)
-        
-        print(f"Original data shape: {df.shape}")
-        print(f"Missing values per column:\n{df.isnull().sum()}")
-        
-        df_cleaned = df.copy()
-        
-        if fill_strategy == 'drop':
-            df_cleaned = df_cleaned.dropna()
-        else:
-            numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
-            
-            for col in numeric_cols:
-                if df_cleaned[col].isnull().any():
-                    if fill_strategy == 'mean':
-                        fill_value = df_cleaned[col].mean()
-                    elif fill_strategy == 'median':
-                        fill_value = df_cleaned[col].median()
-                    elif fill_strategy == 'mode':
-                        fill_value = df_cleaned[col].mode()[0]
-                    else:
-                        fill_value = 0
-                    
-                    df_cleaned[col].fillna(fill_value, inplace=True)
-        
-        df_cleaned = df_cleaned.drop_duplicates()
-        
-        print(f"Cleaned data shape: {df_cleaned.shape}")
-        print(f"Remaining missing values: {df_cleaned.isnull().sum().sum()}")
-        
-        if output_path:
-            df_cleaned.to_csv(output_path, index=False)
-            print(f"Cleaned data saved to: {output_path}")
-        
-        return df_cleaned
-        
+        with open(file_path, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
     except FileNotFoundError:
-        print(f"Error: File not found at {file_path}")
-        return None
+        print(f"Error: File '{file_path}' not found.")
     except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
+        print(f"Error reading CSV file: {e}")
+    return data
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return value
+    cleaned = re.sub(r'\s+', ' ', value.strip())
+    return cleaned
+
+def clean_numeric(value: str) -> Optional[float]:
+    """Convert string to float, handling common issues."""
+    if not value:
+        return None
+    cleaned = value.replace(',', '').replace('$', '').strip()
+    try:
+        return float(cleaned)
+    except ValueError:
         return None
 
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Args:
-        df (pandas.DataFrame): DataFrame to validate
-        required_columns (list, optional): List of required column names
-    
-    Returns:
-        bool: True if validation passes, False otherwise
-    """
-    if df is None or df.empty:
-        print("Validation failed: DataFrame is empty or None")
-        return False
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            print(f"Validation failed: Missing required columns: {missing_cols}")
-            return False
-    
-    print("DataFrame validation passed")
-    return True
+def validate_email(email: str) -> bool:
+    """Basic email validation."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
 
-if __name__ == "__main__":
-    sample_data = {
-        'id': [1, 2, 3, 4, 5, 6],
-        'value': [10.5, None, 15.2, 10.5, None, 18.7],
-        'category': ['A', 'B', 'A', 'A', 'B', 'C']
-    }
+def clean_csv_data(data: List[Dict]) -> List[Dict]:
+    """Apply cleaning functions to all rows in the dataset."""
+    cleaned_data = []
+    for row in data:
+        cleaned_row = {}
+        for key, value in row.items():
+            if key.lower().endswith('email'):
+                cleaned_row[key] = value if validate_email(value) else ''
+            elif any(num_key in key.lower() for num_key in ['price', 'amount', 'quantity']):
+                cleaned_row[key] = clean_numeric(value)
+            else:
+                cleaned_row[key] = clean_string(value)
+        cleaned_data.append(cleaned_row)
+    return cleaned_data
+
+def write_csv_file(data: List[Dict], file_path: str) -> bool:
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        return False
+    try:
+        fieldnames = data[0].keys()
+        with open(file_path, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing CSV file: {e}")
+        return False
+
+def process_csv(input_path: str, output_path: str) -> None:
+    """Complete CSV processing pipeline."""
+    print(f"Reading data from {input_path}")
+    raw_data = read_csv_file(input_path)
     
-    test_df = pd.DataFrame(sample_data)
-    test_df.to_csv('test_data.csv', index=False)
+    if not raw_data:
+        print("No data to process.")
+        return
     
-    cleaned_df = clean_csv_data('test_data.csv', 'cleaned_data.csv', 'mean')
+    print(f"Cleaning {len(raw_data)} rows...")
+    cleaned_data = clean_csv_data(raw_data)
     
-    if cleaned_df is not None:
-        is_valid = validate_dataframe(cleaned_df, ['id', 'value', 'category'])
-        print(f"Data validation result: {is_valid}")
-        
-        import os
-        if os.path.exists('test_data.csv'):
-            os.remove('test_data.csv')
-        if os.path.exists('cleaned_data.csv'):
-            os.remove('cleaned_data.csv')
+    print(f"Writing cleaned data to {output_path}")
+    success = write_csv_file(cleaned_data, output_path)
+    
+    if success:
+        print("CSV processing completed successfully.")
+    else:
+        print("CSV processing failed.")
