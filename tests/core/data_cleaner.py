@@ -270,3 +270,75 @@ if __name__ == "__main__":
     df_standardized = standardize_columns(df_no_outliers)
     print("\nAfter standardization:")
     print(df_standardized)
+def remove_duplicates(input_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    
+    Args:
+        input_list (list): List containing potentially duplicate items.
+    
+    Returns:
+        list: List with duplicates removed.
+    """
+    seen = set()
+    result = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to floats and handling invalid values.
+    
+    Args:
+        values (list): List of values to clean.
+        default (float): Default value for invalid entries.
+    
+    Returns:
+        list: Cleaned list of numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        try:
+            cleaned.append(float(value))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    
+    return cleaned
+
+def filter_by_threshold(data, threshold, key=None):
+    """
+    Filter data based on a threshold value.
+    
+    Args:
+        data (list): List of data points to filter.
+        threshold (float): Threshold value for filtering.
+        key (callable, optional): Function to extract value from data points.
+    
+    Returns:
+        list: Filtered data points.
+    """
+    if key is None:
+        key = lambda x: x
+    
+    return [item for item in data if key(item) >= threshold]
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    
+    numeric_data = ["1.5", "2.3", "invalid", "4.7", None]
+    cleaned_numeric = clean_numeric_data(numeric_data)
+    print(f"Numeric data: {cleaned_numeric}")
+    
+    values = [10, 25, 5, 30, 15]
+    filtered = filter_by_threshold(values, threshold=20)
+    print(f"Filtered values: {filtered}")
