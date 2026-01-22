@@ -76,4 +76,78 @@ def validate_dataframe(df, required_columns=None):
 #     print(cleaned)
 #     
 #     is_valid = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
-#     print(f"\nDataFrame validation: {is_valid}")
+#     print(f"\nDataFrame validation: {is_valid}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers(self, columns):
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in clean_df.columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        return clean_df
+    
+    def impute_missing_mean(self, columns):
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in filled_df.columns and filled_df[col].isnull().any():
+                mean_val = filled_df[col].mean()
+                filled_df[col].fillna(mean_val, inplace=True)
+        return filled_df
+    
+    def impute_missing_median(self, columns):
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in filled_df.columns and filled_df[col].isnull().any():
+                median_val = filled_df[col].median()
+                filled_df[col].fillna(median_val, inplace=True)
+        return filled_df
+    
+    def drop_duplicates(self, subset=None):
+        return self.df.drop_duplicates(subset=subset, keep='first')
+    
+    def get_cleaning_report(self):
+        report = {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicate_rows': self.df.duplicated().sum(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return report
+
+def clean_dataset(df, outlier_columns=None, impute_strategy='mean'):
+    cleaner = DataCleaner(df)
+    
+    if outlier_columns:
+        df = cleaner.remove_outliers(outlier_columns)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    if impute_strategy == 'mean':
+        df = cleaner.impute_missing_mean(numeric_cols)
+    elif impute_strategy == 'median':
+        df = cleaner.impute_missing_median(numeric_cols)
+    
+    df = cleaner.drop_duplicates()
+    
+    return df, cleaner.get_cleaning_report()
