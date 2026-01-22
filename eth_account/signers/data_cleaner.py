@@ -1,103 +1,94 @@
-def remove_duplicates(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return resultimport pandas as pd
+
+import pandas as pd
 import numpy as np
 
-def remove_duplicates(df, subset=None):
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, strategy='mean'):
     """
-    Remove duplicate rows from DataFrame.
-    """
-    return df.drop_duplicates(subset=subset, keep='first')
-
-def fill_missing_values(df, strategy='mean', columns=None):
-    """
-    Fill missing values in specified columns.
-    """
-    df_filled = df.copy()
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    if columns is None:
-        columns = df.columns
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (bool): Whether to fill missing values
+        strategy (str): Strategy for filling missing values ('mean', 'median', 'mode', or 'zero')
     
-    for col in columns:
-        if df[col].dtype in [np.float64, np.int64]:
-            if strategy == 'mean':
-                fill_value = df[col].mean()
-            elif strategy == 'median':
-                fill_value = df[col].median()
-            elif strategy == 'mode':
-                fill_value = df[col].mode()[0]
-            else:
-                fill_value = 0
-            
-            df_filled[col] = df[col].fillna(fill_value)
-        else:
-            df_filled[col] = df[col].fillna('Unknown')
-    
-    return df_filled
-
-def normalize_column(df, column, method='minmax'):
-    """
-    Normalize values in a column.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    df_normalized = df.copy()
-    
-    if method == 'minmax':
-        min_val = df[column].min()
-        max_val = df[column].max()
-        if max_val != min_val:
-            df_normalized[column] = (df[column] - min_val) / (max_val - min_val)
-    
-    elif method == 'zscore':
-        mean_val = df[column].mean()
-        std_val = df[column].std()
-        if std_val != 0:
-            df_normalized[column] = (df[column] - mean_val) / std_val
-    
-    return df_normalized
-
-def filter_outliers(df, column, method='iqr', threshold=1.5):
-    """
-    Filter outliers from a column.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    df_filtered = df.copy()
-    
-    if method == 'iqr':
-        Q1 = df[column].quantile(0.25)
-        Q3 = df[column].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - threshold * IQR
-        upper_bound = Q3 + threshold * IQR
-        
-        mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
-        df_filtered = df[mask].reset_index(drop=True)
-    
-    return df_filtered
-
-def clean_dataframe(df, operations):
-    """
-    Apply multiple cleaning operations to DataFrame.
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
     """
     cleaned_df = df.copy()
     
-    for operation in operations:
-        if operation['type'] == 'remove_duplicates':
-            cleaned_df = remove_duplicates(cleaned_df, **operation.get('params', {}))
-        elif operation['type'] == 'fill_missing':
-            cleaned_df = fill_missing_values(cleaned_df, **operation.get('params', {}))
-        elif operation['type'] == 'normalize':
-            cleaned_df = normalize_column(cleaned_df, **operation.get('params', {}))
-        elif operation['type'] == 'filter_outliers':
-            cleaned_df = filter_outliers(cleaned_df, **operation.get('params', {}))
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing and cleaned_df.isnull().sum().any():
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if strategy == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif strategy == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif strategy == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                elif strategy == 'zero':
+                    fill_value = 0
+                else:
+                    raise ValueError(f"Unknown strategy: {strategy}")
+                
+                cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+                print(f"Filled missing values in '{column}' with {strategy}: {fill_value}")
     
     return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        bool: True if validation passes, False otherwise
+    """
+    if len(df) < min_rows:
+        print(f"Dataset has only {len(df)} rows, minimum required is {min_rows}")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, np.nan, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', 'C', 'A']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original dataset:")
+    print(df)
+    print("\nDataset info:")
+    print(df.info())
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing=True, strategy='mean')
+    
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    # Validate the cleaned dataset
+    is_valid = validate_dataset(cleaned_df, required_columns=['id', 'value'], min_rows=3)
+    print(f"\nDataset validation: {'PASS' if is_valid else 'FAIL'}")
+
+if __name__ == "__main__":
+    main()
