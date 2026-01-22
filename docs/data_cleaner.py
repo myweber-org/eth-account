@@ -1,32 +1,77 @@
+import csv
+import re
+from typing import List, Dict, Optional
 
-import pandas as pd
-import numpy as np
+def validate_email(email: str) -> bool:
+    """Validate email format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
-def remove_outliers(df, column, threshold=3):
-    mean = df[column].mean()
-    std = df[column].std()
-    z_scores = np.abs((df[column] - mean) / std)
-    return df[z_scores < threshold]
+def clean_phone_number(phone: str) -> Optional[str]:
+    """Remove non-digit characters from phone number."""
+    digits = re.sub(r'\D', '', phone)
+    return digits if len(digits) >= 10 else None
 
-def normalize_column(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column] = (df[column] - min_val) / (max_val - min_val)
-    return df
+def read_csv_file(filepath: str) -> List[Dict]:
+    """Read CSV file and return list of dictionaries."""
+    data = []
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+    return data
 
-def clean_dataset(file_path):
-    df = pd.read_csv(file_path)
+def clean_data(rows: List[Dict]) -> List[Dict]:
+    """Clean and validate data rows."""
+    cleaned_rows = []
+    for row in rows:
+        cleaned_row = row.copy()
+        
+        # Clean phone number
+        if 'phone' in cleaned_row:
+            cleaned_row['phone'] = clean_phone_number(cleaned_row['phone'])
+        
+        # Validate email
+        if 'email' in cleaned_row:
+            cleaned_row['email_valid'] = validate_email(cleaned_row['email'])
+        
+        # Trim string fields
+        for key, value in cleaned_row.items():
+            if isinstance(value, str):
+                cleaned_row[key] = value.strip()
+        
+        cleaned_rows.append(cleaned_row)
     
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    return cleaned_rows
+
+def write_csv_file(filepath: str, data: List[Dict], fieldnames: List[str]):
+    """Write data to CSV file."""
+    try:
+        with open(filepath, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"Successfully wrote cleaned data to '{filepath}'")
+    except Exception as e:
+        print(f"Error writing CSV: {e}")
+
+def process_csv(input_file: str, output_file: str):
+    """Main function to process CSV file."""
+    raw_data = read_csv_file(input_file)
+    if not raw_data:
+        return
     
-    for col in numeric_columns:
-        df = remove_outliers(df, col)
-        df = normalize_column(df, col)
+    cleaned_data = clean_data(raw_data)
     
-    cleaned_file_path = file_path.replace('.csv', '_cleaned.csv')
-    df.to_csv(cleaned_file_path, index=False)
-    return cleaned_file_path
+    # Get fieldnames from first row
+    if cleaned_data:
+        fieldnames = list(cleaned_data[0].keys())
+        write_csv_file(output_file, cleaned_data, fieldnames)
 
 if __name__ == "__main__":
-    cleaned = clean_dataset('raw_data.csv')
-    print(f"Cleaned data saved to: {cleaned}")
+    process_csv('input_data.csv', 'cleaned_data.csv')
