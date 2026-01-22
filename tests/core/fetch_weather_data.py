@@ -121,3 +121,128 @@ if __name__ == "__main__":
     
     weather = get_weather(API_KEY, CITY)
     display_weather(weather)
+import requests
+import json
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+class WeatherFetcher:
+    """A class to fetch weather data from a public API."""
+    
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+    
+    def __init__(self, api_key: str):
+        """Initialize the weather fetcher with an API key."""
+        self.api_key = api_key
+        self.session = requests.Session()
+    
+    def get_weather_by_city(self, city_name: str, country_code: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Fetch weather data for a given city."""
+        query = city_name
+        if country_code:
+            query = f"{city_name},{country_code}"
+        
+        params = {
+            'q': query,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = self.session.get(self.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            return self._parse_weather_data(response.json())
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching weather data: {e}")
+            return None
+    
+    def get_weather_by_coordinates(self, lat: float, lon: float) -> Optional[Dict[str, Any]]:
+        """Fetch weather data using latitude and longitude coordinates."""
+        params = {
+            'lat': lat,
+            'lon': lon,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = self.session.get(self.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            return self._parse_weather_data(response.json())
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching weather data: {e}")
+            return None
+    
+    def _parse_weather_data(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Parse and structure the raw weather API response."""
+        parsed_data = {
+            'location': raw_data.get('name', 'Unknown'),
+            'country': raw_data.get('sys', {}).get('country', 'Unknown'),
+            'temperature': raw_data.get('main', {}).get('temp'),
+            'feels_like': raw_data.get('main', {}).get('feels_like'),
+            'humidity': raw_data.get('main', {}).get('humidity'),
+            'pressure': raw_data.get('main', {}).get('pressure'),
+            'weather_description': raw_data.get('weather', [{}])[0].get('description', 'Unknown'),
+            'wind_speed': raw_data.get('wind', {}).get('speed'),
+            'wind_direction': raw_data.get('wind', {}).get('deg'),
+            'cloudiness': raw_data.get('clouds', {}).get('all'),
+            'visibility': raw_data.get('visibility'),
+            'sunrise': self._convert_timestamp(raw_data.get('sys', {}).get('sunrise')),
+            'sunset': self._convert_timestamp(raw_data.get('sys', {}).get('sunset')),
+            'data_timestamp': self._convert_timestamp(raw_data.get('dt')),
+            'raw_data': raw_data
+        }
+        return parsed_data
+    
+    def _convert_timestamp(self, timestamp: Optional[int]) -> Optional[str]:
+        """Convert Unix timestamp to readable datetime string."""
+        if timestamp:
+            return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        return None
+    
+    def display_weather(self, weather_data: Dict[str, Any]) -> None:
+        """Display weather information in a readable format."""
+        if not weather_data:
+            print("No weather data available.")
+            return
+        
+        print("\n" + "="*50)
+        print(f"Weather in {weather_data['location']}, {weather_data['country']}")
+        print("="*50)
+        print(f"Temperature: {weather_data['temperature']}°C")
+        print(f"Feels like: {weather_data['feels_like']}°C")
+        print(f"Weather: {weather_data['weather_description'].title()}")
+        print(f"Humidity: {weather_data['humidity']}%")
+        print(f"Pressure: {weather_data['pressure']} hPa")
+        print(f"Wind: {weather_data['wind_speed']} m/s at {weather_data['wind_direction']}°")
+        print(f"Cloudiness: {weather_data['cloudiness']}%")
+        print(f"Visibility: {weather_data['visibility']} meters")
+        print(f"Sunrise: {weather_data['sunrise']}")
+        print(f"Sunset: {weather_data['sunset']}")
+        print(f"Data collected at: {weather_data['data_timestamp']}")
+        print("="*50 + "\n")
+
+def main():
+    """Example usage of the WeatherFetcher class."""
+    api_key = "your_api_key_here"  # Replace with actual API key
+    
+    fetcher = WeatherFetcher(api_key)
+    
+    # Example: Get weather by city
+    print("Fetching weather for London, UK...")
+    london_weather = fetcher.get_weather_by_city("London", "UK")
+    fetcher.display_weather(london_weather)
+    
+    # Example: Get weather by coordinates (New York)
+    print("Fetching weather for New York coordinates...")
+    ny_weather = fetcher.get_weather_by_coordinates(40.7128, -74.0060)
+    fetcher.display_weather(ny_weather)
+    
+    # Save weather data to JSON file
+    if london_weather:
+        with open('london_weather.json', 'w') as f:
+            json.dump(london_weather, f, indent=2)
+        print("Weather data saved to 'london_weather.json'")
+
+if __name__ == "__main__":
+    main()
