@@ -151,3 +151,107 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
     print(cleaned[['feature1_normalized', 'feature2_standardized']].head())
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Columns to consider for duplicates
+    keep (str): Which duplicates to keep - 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): 'drop' to remove rows, 'fill' to fill values
+    fill_value: Value to fill missing values with
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if df.empty:
+        return df
+    
+    if strategy == 'drop':
+        cleaned_df = df.dropna()
+        removed_count = len(df) - len(cleaned_df)
+        print(f"Removed {removed_count} rows with missing values")
+    elif strategy == 'fill':
+        if fill_value is not None:
+            cleaned_df = df.fillna(fill_value)
+        else:
+            cleaned_df = df.fillna(df.mean(numeric_only=True))
+        print("Filled missing values")
+    else:
+        cleaned_df = df.copy()
+        print("No missing value handling applied")
+    
+    return cleaned_df
+
+def clean_dataframe(df, duplicate_params=None, missing_params=None):
+    """
+    Main function to clean DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    duplicate_params (dict): Parameters for remove_duplicates function
+    missing_params (dict): Parameters for handle_missing_values function
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if duplicate_params is None:
+        duplicate_params = {}
+    
+    if missing_params is None:
+        missing_params = {}
+    
+    print(f"Original DataFrame shape: {df.shape}")
+    
+    df_clean = remove_duplicates(df, **duplicate_params)
+    df_clean = handle_missing_values(df_clean, **missing_params)
+    
+    print(f"Cleaned DataFrame shape: {df_clean.shape}")
+    
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve', 'Frank'],
+        'score': [85, 90, 90, None, 88, 88, 92],
+        'age': [25, 30, 30, 35, 28, 28, 40]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Sample DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(
+        df,
+        duplicate_params={'subset': ['id', 'name'], 'keep': 'first'},
+        missing_params={'strategy': 'fill', 'fill_value': 0}
+    )
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
