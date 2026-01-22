@@ -1,92 +1,93 @@
-import os
 from cryptography.fernet import Fernet
+import os
 
-def generate_key():
-    return Fernet.generate_key()
-
-def save_key(key, key_file='secret.key'):
-    with open(key_file, 'wb') as file:
-        file.write(key)
-
-def load_key(key_file='secret.key'):
-    return open(key_file, 'rb').read()
-
-def encrypt_file(file_path, key):
-    fernet = Fernet(key)
-    with open(file_path, 'rb') as file:
-        original = file.read()
-    encrypted = fernet.encrypt(original)
-    with open(file_path + '.enc', 'wb') as encrypted_file:
-        encrypted_file.write(encrypted)
-    os.remove(file_path)
-    return file_path + '.enc'
-
-def decrypt_file(encrypted_path, key):
-    fernet = Fernet(key)
-    with open(encrypted_path, 'rb') as file:
-        encrypted = file.read()
-    decrypted = fernet.decrypt(encrypted)
-    original_path = encrypted_path.replace('.enc', '')
-    with open(original_path, 'wb') as file:
-        file.write(decrypted)
-    os.remove(encrypted_path)
-    return original_path
-
-def encrypt_message(message, key):
-    fernet = Fernet(key)
-    return fernet.encrypt(message.encode())
-
-def decrypt_message(encrypted_message, key):
-    fernet = Fernet(key)
-    return fernet.decrypt(encrypted_message).decode()
+class FileEncryptor:
+    def __init__(self, key_path='secret.key'):
+        self.key_path = key_path
+        self.key = None
+        self.cipher = None
+        
+    def generate_key(self):
+        self.key = Fernet.generate_key()
+        with open(self.key_path, 'wb') as key_file:
+            key_file.write(self.key)
+        print(f"Key generated and saved to {self.key_path}")
+        return self.key
+    
+    def load_key(self):
+        if not os.path.exists(self.key_path):
+            raise FileNotFoundError(f"Key file {self.key_path} not found")
+        with open(self.key_path, 'rb') as key_file:
+            self.key = key_file.read()
+        self.cipher = Fernet(self.key)
+        return self.key
+    
+    def encrypt_file(self, input_path, output_path=None):
+        if not self.cipher:
+            self.load_key()
+        
+        if not os.path.exists(input_path):
+            raise FileNotFoundError(f"Input file {input_path} not found")
+        
+        if output_path is None:
+            output_path = input_path + '.encrypted'
+        
+        with open(input_path, 'rb') as file:
+            file_data = file.read()
+        
+        encrypted_data = self.cipher.encrypt(file_data)
+        
+        with open(output_path, 'wb') as file:
+            file.write(encrypted_data)
+        
+        print(f"File encrypted and saved to {output_path}")
+        return output_path
+    
+    def decrypt_file(self, input_path, output_path=None):
+        if not self.cipher:
+            self.load_key()
+        
+        if not os.path.exists(input_path):
+            raise FileNotFoundError(f"Input file {input_path} not found")
+        
+        if output_path is None:
+            if input_path.endswith('.encrypted'):
+                output_path = input_path[:-10]
+            else:
+                output_path = input_path + '.decrypted'
+        
+        with open(input_path, 'rb') as file:
+            encrypted_data = file.read()
+        
+        decrypted_data = self.cipher.decrypt(encrypted_data)
+        
+        with open(output_path, 'wb') as file:
+            file.write(decrypted_data)
+        
+        print(f"File decrypted and saved to {output_path}")
+        return output_path
 
 def main():
-    print("File Encryption Utility")
-    print("1. Generate new key")
-    print("2. Encrypt file")
-    print("3. Decrypt file")
-    print("4. Encrypt message")
-    print("5. Decrypt message")
+    encryptor = FileEncryptor()
     
-    choice = input("Select option: ")
+    action = input("Choose action (generate_key/encrypt/decrypt): ").strip().lower()
     
-    if choice == '1':
-        key = generate_key()
-        save_key(key)
-        print(f"Key generated and saved: {key.decode()}")
-    
-    elif choice == '2':
-        key = load_key()
-        file_path = input("Enter file path to encrypt: ")
-        if os.path.exists(file_path):
-            result = encrypt_file(file_path, key)
-            print(f"File encrypted: {result}")
-        else:
-            print("File not found")
-    
-    elif choice == '3':
-        key = load_key()
-        file_path = input("Enter encrypted file path: ")
-        if os.path.exists(file_path):
-            result = decrypt_file(file_path, key)
-            print(f"File decrypted: {result}")
-        else:
-            print("File not found")
-    
-    elif choice == '4':
-        key = load_key()
-        message = input("Enter message to encrypt: ")
-        encrypted = encrypt_message(message, key)
-        print(f"Encrypted message: {encrypted.decode()}")
-    
-    elif choice == '5':
-        key = load_key()
-        message = input("Enter encrypted message: ")
-        try:
-            decrypted = decrypt_message(message.encode(), key)
-            print(f"Decrypted message: {decrypted}")
-        except:
-            print("Decryption failed - invalid key or message")
+    if action == 'generate_key':
+        encryptor.generate_key()
+    elif action == 'encrypt':
+        input_file = input("Enter input file path: ").strip()
+        output_file = input("Enter output file path (optional): ").strip()
+        if not output_file:
+            output_file = None
+        encryptor.encrypt_file(input_file, output_file)
+    elif action == 'decrypt':
+        input_file = input("Enter input file path: ").strip()
+        output_file = input("Enter output file path (optional): ").strip()
+        if not output_file:
+            output_file = None
+        encryptor.decrypt_file(input_file, output_file)
+    else:
+        print("Invalid action")
 
 if __name__ == "__main__":
     main()
