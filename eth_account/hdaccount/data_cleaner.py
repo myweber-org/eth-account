@@ -1,65 +1,48 @@
-
 import pandas as pd
-import numpy as np
-from typing import List, Optional
 
-class DataCleaner:
-    def __init__(self, df: pd.DataFrame):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
-        self.df = self.df.drop_duplicates(subset=subset)
-        return self
-        
-    def handle_missing_values(self, strategy: str = 'drop', fill_value: Optional[float] = None) -> 'DataCleaner':
-        if strategy == 'drop':
-            self.df = self.df.dropna()
-        elif strategy == 'fill':
-            if fill_value is not None:
-                self.df = self.df.fillna(fill_value)
-            else:
-                self.df = self.df.fillna(self.df.mean())
-        return self
-        
-    def remove_outliers(self, column: str, threshold: float = 3.0) -> 'DataCleaner':
-        if column in self.df.columns:
-            z_scores = np.abs((self.df[column] - self.df[column].mean()) / self.df[column].std())
-            self.df = self.df[z_scores < threshold]
-        return self
-        
-    def get_cleaned_data(self) -> pd.DataFrame:
-        return self.df
-        
-    def get_cleaning_report(self) -> dict:
-        return {
-            'original_rows': self.original_shape[0],
-            'original_columns': self.original_shape[1],
-            'cleaned_rows': self.df.shape[0],
-            'cleaned_columns': self.df.shape[1],
-            'rows_removed': self.original_shape[0] - self.df.shape[0],
-            'columns_removed': self.original_shape[1] - self.df.shape[1]
-        }
+def clean_dataset(df, column_names):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing specified string columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_names (list): List of column names to normalize (strip whitespace, lower case).
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with duplicates removed and strings normalized.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Normalize string columns
+    for col in column_names:
+        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+            cleaned_df[col] = cleaned_df[col].str.strip().str.lower()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
 
-def clean_dataset(data: pd.DataFrame, 
-                  remove_dups: bool = True,
-                  handle_nulls: bool = True,
-                  outlier_columns: Optional[List[str]] = None) -> pd.DataFrame:
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns and has no empty rows.
     
-    cleaner = DataCleaner(data)
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
     
-    if remove_dups:
-        cleaner.remove_duplicates()
+    Returns:
+        tuple: (bool, str) indicating validation success and message.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
     
-    if handle_nulls:
-        cleaner.handle_missing_values(strategy='fill')
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
     
-    if outlier_columns:
-        for col in outlier_columns:
-            if col in data.columns:
-                cleaner.remove_outliers(col)
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    report = cleaner.get_cleaning_report()
-    print(f"Data cleaning completed. Removed {report['rows_removed']} rows.")
-    
-    return cleaner.get_cleaned_data()
+    return True, "Data validation passed"
