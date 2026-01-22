@@ -1,44 +1,28 @@
 
 import os
-import sys
+import glob
+from pathlib import Path
+from datetime import datetime
 
-def rename_files_with_sequence(directory, prefix="file"):
-    """
-    Rename all files in the specified directory with sequential numbering.
-    Files are sorted alphabetically before renaming.
-    """
-    try:
-        files = [f for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
-        files.sort()
+def rename_files_sequential(directory, prefix="file", extension=".txt"):
+    files = glob.glob(os.path.join(directory, "*" + extension))
+    files.sort(key=os.path.getctime)
+    
+    for index, filepath in enumerate(files, start=1):
+        creation_time = datetime.fromtimestamp(os.path.getctime(filepath))
+        timestamp = creation_time.strftime("%Y%m%d_%H%M%S")
+        new_filename = f"{prefix}_{timestamp}_{index:03d}{extension}"
+        new_path = os.path.join(directory, new_filename)
         
-        for index, filename in enumerate(files, start=1):
-            file_extension = os.path.splitext(filename)[1]
-            new_filename = f"{prefix}_{index:03d}{file_extension}"
-            old_path = os.path.join(directory, filename)
-            new_path = os.path.join(directory, new_filename)
-            
-            os.rename(old_path, new_path)
-            print(f"Renamed: {filename} -> {new_filename}")
-        
-        print(f"Successfully renamed {len(files)} files.")
-        return True
-        
-    except FileNotFoundError:
-        print(f"Error: Directory '{directory}' not found.")
-        return False
-    except PermissionError:
-        print(f"Error: Permission denied for directory '{directory}'.")
-        return False
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        return False
+        try:
+            os.rename(filepath, new_path)
+            print(f"Renamed: {Path(filepath).name} -> {new_filename}")
+        except OSError as e:
+            print(f"Error renaming {filepath}: {e}")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python file_renamer.py <directory_path> [prefix]")
-        sys.exit(1)
-    
-    target_directory = sys.argv[1]
-    name_prefix = sys.argv[2] if len(sys.argv) > 2 else "file"
-    
-    rename_files_with_sequence(target_directory, name_prefix)
+    target_dir = input("Enter directory path: ").strip()
+    if os.path.isdir(target_dir):
+        rename_files_sequential(target_dir)
+    else:
+        print("Invalid directory path.")
