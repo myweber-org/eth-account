@@ -129,3 +129,23 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Statistics:")
     print(calculate_basic_stats(cleaned_df, 'values'))
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    original_length = len(df)
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+    removed_count = original_length - len(df)
+    print(f"Removed {removed_count} outliers from dataset")
+    return df
