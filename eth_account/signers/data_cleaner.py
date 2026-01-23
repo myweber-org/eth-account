@@ -1,116 +1,56 @@
+import re
+import string
 
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
-
-def clean_dataset(df, numeric_columns):
-    original_len = len(df)
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-    removed_count = original_len - len(cleaned_df)
-    print(f"Removed {removed_count} outliers from dataset")
-    return cleaned_dfimport pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
+def clean_text(text, remove_punctuation=True, lowercase=True, remove_numbers=False):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
+    Clean and normalize a given text string.
+
     Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+        text (str): The input text to clean.
+        remove_punctuation (bool): If True, remove all punctuation.
+        lowercase (bool): If True, convert text to lowercase.
+        remove_numbers (bool): If True, remove all digits.
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a DataFrame column.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
-    
     Returns:
-        dict: Dictionary containing summary statistics
+        str: The cleaned text.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
+    if not isinstance(text, str):
+        return ""
 
-def clean_numeric_data(df, columns=None):
+    cleaned = text.strip()
+
+    if remove_numbers:
+        cleaned = re.sub(r'\d+', '', cleaned)
+
+    if remove_punctuation:
+        translator = str.maketrans('', '', string.punctuation)
+        cleaned = cleaned.translate(translator)
+
+    if lowercase:
+        cleaned = cleaned.lower()
+
+    cleaned = re.sub(r'\s+', ' ', cleaned)
+
+    return cleaned
+
+def tokenize_text(text, delimiter=' '):
     """
-    Clean numeric data by removing outliers from specified columns.
-    
+    Split text into tokens based on a delimiter.
+
     Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list): List of column names to clean. If None, clean all numeric columns.
-    
+        text (str): The input text.
+        delimiter (str): The delimiter to split on.
+
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+        list: A list of tokens.
     """
-    if columns is None:
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
-    
-    cleaned_df = df.copy()
-    
-    for col in columns:
-        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-    
-    return cleaned_df
+    cleaned = clean_text(text)
+    if not cleaned:
+        return []
+    return cleaned.split(delimiter)
 
 if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("\nOriginal summary statistics for column 'A':")
-    print(calculate_summary_statistics(df, 'A'))
-    
-    cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("\nCleaned summary statistics for column 'A':")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    sample_text = "Hello, World! This is a TEST. 12345"
+    print(f"Original: {sample_text}")
+    print(f"Cleaned: {clean_text(sample_text)}")
+    print(f"Tokens: {tokenize_text(sample_text)}")
