@@ -232,4 +232,38 @@ if __name__ == "__main__":
     print("Cleaning summary:", summary)
     
     print("First 5 rows of cleaned data:")
-    print(cleaned_df.head())
+    print(cleaned_df.head())import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    print(f"Initial shape: {df.shape}")
+    
+    df_cleaned = df.copy()
+    
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        z_scores = np.abs(stats.zscore(df_cleaned[col].dropna()))
+        outliers = z_scores > 3
+        df_cleaned.loc[outliers, col] = np.nan
+        print(f"Column '{col}': Removed {outliers.sum()} outliers")
+    
+    df_cleaned = df_cleaned.dropna()
+    print(f"Shape after outlier removal: {df_cleaned.shape}")
+    
+    for col in numeric_cols:
+        if col in df_cleaned.columns:
+            col_min = df_cleaned[col].min()
+            col_max = df_cleaned[col].max()
+            if col_max > col_min:
+                df_cleaned[col] = (df_cleaned[col] - col_min) / (col_max - col_min)
+    
+    print(f"Final cleaned shape: {df_cleaned.shape}")
+    return df_cleaned
+
+if __name__ == "__main__":
+    cleaned_df = load_and_clean_data("sample_data.csv")
+    cleaned_df.to_csv("cleaned_data.csv", index=False)
+    print("Cleaned data saved to 'cleaned_data.csv'")
