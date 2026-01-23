@@ -291,3 +291,56 @@ def clean_numeric_columns(dataframe, columns=None):
             cleaned_df[column] = pd.to_numeric(cleaned_df[column], errors='coerce')
     
     return cleaned_df
+import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if subset is None:
+        return df.drop_duplicates(keep=keep)
+    else:
+        return df.drop_duplicates(subset=subset, keep=keep)
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to clean
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df_clean.columns:
+            df_clean[col] = pd.to_numeric(df_clean[col], errors='coerce')
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate that DataFrame contains required columns.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of required column names
+    
+    Returns:
+        Tuple of (is_valid, missing_columns)
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    is_valid = len(missing_columns) == 0
+    
+    return is_valid, missing_columns
