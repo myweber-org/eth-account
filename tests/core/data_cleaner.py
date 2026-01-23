@@ -125,3 +125,63 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nData validation passed: {is_valid}")
+import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    if drop_duplicates:
+        df = df.drop_duplicates()
+    
+    if fill_missing:
+        numeric_cols = df.select_dtypes(include=['number']).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        df[categorical_cols] = df[categorical_cols].fillna('Unknown')
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    """
+    if required_columns:
+        missing_cols = set(required_columns) - set(df.columns)
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def process_csv_file(input_path, output_path, **kwargs):
+    """
+    Read, clean, and save a CSV file.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        df_clean = clean_dataframe(df, **kwargs)
+        validate_dataframe(df_clean)
+        df_clean.to_csv(output_path, index=False)
+        print(f"Processed file saved to: {output_path}")
+        return df_clean
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        raise
+
+if __name__ == "__main__":
+    # Example usage
+    sample_df = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4],
+        'value': [10.5, None, 15.0, None, 20.0],
+        'category': ['A', 'B', None, 'A', 'C']
+    })
+    
+    cleaned_df = clean_dataframe(sample_df)
+    print("Original DataFrame:")
+    print(sample_df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
