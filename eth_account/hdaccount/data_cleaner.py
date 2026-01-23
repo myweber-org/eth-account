@@ -1,98 +1,84 @@
+
 import pandas as pd
-import numpy as np
+import re
 
-def remove_outliers_iqr(df, column):
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_mapping (dict, optional): Dictionary mapping original column names to new names.
+        drop_duplicates (bool, optional): Whether to remove duplicate rows. Defaults to True.
+        normalize_text (bool, optional): Whether to normalize text in string columns. Defaults to True.
     
     Returns:
-        pd.DataFrame: DataFrame with outliers removed
+        pd.DataFrame: Cleaned DataFrame.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def clean_dataset(df, numeric_columns=None):
-    """
-    Clean dataset by removing outliers from specified numeric columns.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        numeric_columns (list): List of numeric column names to clean
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
     cleaned_df = df.copy()
     
-    for column in numeric_columns:
-        if column in cleaned_df.columns:
-            original_len = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_len - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].apply(lambda x: normalize_string(x) if isinstance(x, str) else x)
     
     return cleaned_df
 
-def get_statistics(df, column):
+def normalize_string(text):
     """
-    Calculate basic statistics for a column.
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
     
     Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name
+        text (str): Input string to normalize.
     
     Returns:
-        dict: Dictionary containing statistics
+        str: Normalized string.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if not isinstance(text, str):
+        return text
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
+    text = text.lower().strip()
+    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r'[^\w\s-]', '', text)
     
-    return stats
+    return text
+
+def validate_email(email):
+    """
+    Validate an email address format.
+    
+    Args:
+        email (str): Email address to validate.
+    
+    Returns:
+        bool: True if email format is valid, False otherwise.
+    """
+    if not isinstance(email, str):
+        return False
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
 
 if __name__ == "__main__":
     sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  '],
+        'Email': ['john@example.com', 'jane@example.com', 'invalid-email', 'bob@example.com'],
+        'Age': [25, 30, 25, 35]
     }
     
     df = pd.DataFrame(sample_data)
-    df.loc[::100, 'A'] = 500
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned = clean_dataframe(df)
+    print(cleaned)
     
-    print("Original dataset shape:", df.shape)
-    print("\nColumn A statistics before cleaning:")
-    print(get_statistics(df, 'A'))
-    
-    cleaned_df = clean_dataset(df, ['A', 'B'])
-    
-    print("\nCleaned dataset shape:", cleaned_df.shape)
-    print("\nColumn A statistics after cleaning:")
-    print(get_statistics(cleaned_df, 'A'))
+    print("\nEmail Validation:")
+    for email in df['Email']:
+        print(f"{email}: {validate_email(email)}")
