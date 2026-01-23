@@ -1,88 +1,70 @@
-import numpy as np
-import pandas as pd
 
-def remove_outliers_iqr(df, column):
+import numpy as np
+
+def remove_outliers_iqr(data, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a pandas DataFrame column using the IQR method.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to clean
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
-    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def calculate_statistics(df, column):
+def calculate_statistics(data, column):
     """
     Calculate basic statistics for a column after outlier removal.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name
     
     Returns:
-    dict: Dictionary containing statistical measures
+    dict: Dictionary containing statistics
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
     stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column])
+        'mean': np.mean(data[column]),
+        'median': np.median(data[column]),
+        'std': np.std(data[column]),
+        'min': np.min(data[column]),
+        'max': np.max(data[column]),
+        'count': len(data[column])
     }
-    
     return stats
 
-def process_dataframe(df, column):
+def clean_dataset(data, columns_to_clean):
     """
-    Complete data processing pipeline: remove outliers and calculate statistics.
+    Clean multiple columns in a dataset by removing outliers.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    data (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean
     
     Returns:
-    tuple: (cleaned_df, statistics_dict)
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each cleaned column
     """
-    cleaned_df = remove_outliers_iqr(df, column)
-    stats = calculate_statistics(cleaned_df, column)
+    cleaned_data = data.copy()
+    all_stats = {}
     
-    return cleaned_df, stats
-
-if __name__ == "__main__":
-    sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 15, 12, 11, 200, 10]
-    }
+    for column in columns_to_clean:
+        if column in cleaned_data.columns:
+            original_count = len(cleaned_data)
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+            removed_count = original_count - len(cleaned_data)
+            
+            stats = calculate_statistics(cleaned_data, column)
+            stats['outliers_removed'] = removed_count
+            all_stats[column] = stats
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print(f"\nOriginal shape: {df.shape}")
-    
-    cleaned_df, stats = process_dataframe(df, 'values')
-    
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print(f"\nCleaned shape: {cleaned_df.shape}")
-    
-    print("\nStatistics after cleaning:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+    return cleaned_data, all_stats
