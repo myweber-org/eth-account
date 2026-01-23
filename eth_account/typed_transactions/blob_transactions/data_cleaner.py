@@ -95,4 +95,105 @@ if __name__ == "__main__":
     summary = cleaner.get_summary()
     print(f"Data cleaning summary: {summary}")
     print(f"Cleaned data shape: {cleaned_df.shape}")
-    print(f"First 5 rows of cleaned data:\n{cleaned_df.head()}")
+    print(f"First 5 rows of cleaned data:\n{cleaned_df.head()}")import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None, strategy='mean'):
+    """
+    Clean a CSV file by handling missing values.
+    
+    Args:
+        input_path (str): Path to input CSV file
+        output_path (str, optional): Path for cleaned CSV. Defaults to None.
+        strategy (str): Method for handling missing values: 
+                       'mean', 'median', 'mode', or 'drop'
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(input_path)
+        original_shape = df.shape
+        
+        if strategy == 'drop':
+            df_cleaned = df.dropna()
+        elif strategy in ['mean', 'median']:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            for col in numeric_cols:
+                if strategy == 'mean':
+                    fill_value = df[col].mean()
+                else:
+                    fill_value = df[col].median()
+                df[col] = df[col].fillna(fill_value)
+            df_cleaned = df
+        elif strategy == 'mode':
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    mode_value = df[col].mode()[0] if not df[col].mode().empty else ''
+                    df[col] = df[col].fillna(mode_value)
+            df_cleaned = df
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        if output_path:
+            df_cleaned.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        missing_count = df.isnull().sum().sum()
+        cleaned_missing = df_cleaned.isnull().sum().sum()
+        
+        print(f"Original shape: {original_shape}")
+        print(f"Missing values before: {missing_count}")
+        print(f"Missing values after: {cleaned_missing}")
+        print(f"Rows removed: {original_shape[0] - df_cleaned.shape[0]}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
+
+def validate_csv_file(file_path):
+    """
+    Validate if a file exists and is a CSV.
+    
+    Args:
+        file_path (str): Path to the file
+    
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    path = Path(file_path)
+    if not path.exists():
+        print(f"File does not exist: {file_path}")
+        return False
+    if path.suffix.lower() != '.csv':
+        print(f"File is not a CSV: {file_path}")
+        return False
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': ['x', 'y', np.nan, 'z', 'x']
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    print("Testing data cleaning utility...")
+    cleaned = clean_csv_data('test_data.csv', 'cleaned_data.csv', strategy='mean')
+    
+    import os
+    if os.path.exists('test_data.csv'):
+        os.remove('test_data.csv')
+    if os.path.exists('cleaned_data.csv'):
+        os.remove('cleaned_data.csv')
