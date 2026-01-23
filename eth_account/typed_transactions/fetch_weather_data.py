@@ -92,4 +92,95 @@ def main():
         print(f"Could not fetch weather data for {city_name}")
 
 if __name__ == "__main__":
+    main()import requests
+import json
+from datetime import datetime, timedelta
+import os
+
+class WeatherFetcher:
+    def __init__(self, api_key, cache_dir='./weather_cache'):
+        self.api_key = api_key
+        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
+        self.cache_dir = cache_dir
+        if not os.path.exists(cache_dir):
+            os.makedirs(cache_dir)
+
+    def _get_cache_path(self, city):
+        safe_city = "".join(c for c in city if c.isalnum())
+        return os.path.join(self.cache_dir, f"{safe_city}.json")
+
+    def _is_cache_valid(self, cache_path):
+        if not os.path.exists(cache_path):
+            return False
+        file_time = datetime.fromtimestamp(os.path.getmtime(cache_path))
+        return datetime.now() - file_time < timedelta(minutes=30)
+
+    def fetch_weather(self, city):
+        cache_path = self._get_cache_path(city)
+        if self._is_cache_valid(cache_path):
+            try:
+                with open(cache_path, 'r') as f:
+                    cached_data = json.load(f)
+                    print(f"Using cached data for {city}")
+                    return cached_data
+            except (json.JSONDecodeError, IOError) as e:
+                print(f"Cache read error: {e}")
+
+        params = {
+            'q': city,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+
+        try:
+            response = requests.get(self.base_url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            if data.get('cod') != 200:
+                raise ValueError(f"API error: {data.get('message', 'Unknown error')}")
+
+            processed_data = {
+                'city': data['name'],
+                'temperature': data['main']['temp'],
+                'humidity': data['main']['humidity'],
+                'description': data['weather'][0]['description'],
+                'timestamp': datetime.now().isoformat()
+            }
+
+            try:
+                with open(cache_path, 'w') as f:
+                    json.dump(processed_data, f, indent=2)
+            except IOError as e:
+                print(f"Cache write error: {e}")
+
+            return processed_data
+
+        except requests.exceptions.RequestException as e:
+            print(f"Network error occurred: {e}")
+            return None
+        except (KeyError, ValueError) as e:
+            print(f"Data processing error: {e}")
+            return None
+
+def main():
+    api_key = os.environ.get('WEATHER_API_KEY')
+    if not api_key:
+        print("Error: WEATHER_API_KEY environment variable not set")
+        return
+
+    fetcher = WeatherFetcher(api_key)
+    cities = ['London', 'Tokyo', 'New York']
+
+    for city in cities:
+        print(f"\nFetching weather for {city}...")
+        weather = fetcher.fetch_weather(city)
+        if weather:
+            print(f"Temperature: {weather['temperature']}°C")
+            print(f"Humidity: {weather['humidity']}%")
+            print(f"Conditions: {weather['description']}")
+        else:
+            print(f"Failed to fetch weather data for {city}")
+
+if __name__ == "__main__":
     main()
