@@ -1,77 +1,76 @@
-import csv
-import re
-from typing import List, Dict, Optional
+import pandas as pd
 
-def validate_email(email: str) -> bool:
-    """Validate email format."""
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return re.match(pattern, email) is not None
-
-def clean_phone_number(phone: str) -> Optional[str]:
-    """Remove non-digit characters from phone number."""
-    digits = re.sub(r'\D', '', phone)
-    return digits if len(digits) >= 10 else None
-
-def read_csv_file(filepath: str) -> List[Dict]:
-    """Read CSV file and return list of dictionaries."""
-    data = []
-    try:
-        with open(filepath, 'r', newline='', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                data.append(row)
-    except FileNotFoundError:
-        print(f"Error: File '{filepath}' not found.")
-    except Exception as e:
-        print(f"Error reading CSV: {e}")
-    return data
-
-def clean_data(rows: List[Dict]) -> List[Dict]:
-    """Clean and validate data rows."""
-    cleaned_rows = []
-    for row in rows:
-        cleaned_row = row.copy()
-        
-        # Clean phone number
-        if 'phone' in cleaned_row:
-            cleaned_row['phone'] = clean_phone_number(cleaned_row['phone'])
-        
-        # Validate email
-        if 'email' in cleaned_row:
-            cleaned_row['email_valid'] = validate_email(cleaned_row['email'])
-        
-        # Trim string fields
-        for key, value in cleaned_row.items():
-            if isinstance(value, str):
-                cleaned_row[key] = value.strip()
-        
-        cleaned_rows.append(cleaned_row)
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
     
-    return cleaned_rows
-
-def write_csv_file(filepath: str, data: List[Dict], fieldnames: List[str]):
-    """Write data to CSV file."""
-    try:
-        with open(filepath, 'w', newline='', encoding='utf-8') as file:
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(data)
-        print(f"Successfully wrote cleaned data to '{filepath}'")
-    except Exception as e:
-        print(f"Error writing CSV: {e}")
-
-def process_csv(input_file: str, output_file: str):
-    """Main function to process CSV file."""
-    raw_data = read_csv_file(input_file)
-    if not raw_data:
-        return
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+        fill_missing (str or dict): Method to fill missing values. Can be 'mean', 
+                                   'median', 'mode', or a dictionary of column:value pairs.
     
-    cleaned_data = clean_data(raw_data)
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
     
-    # Get fieldnames from first row
-    if cleaned_data:
-        fieldnames = list(cleaned_data[0].keys())
-        write_csv_file(output_file, cleaned_data, fieldnames)
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the structure and content of a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
 
 if __name__ == "__main__":
-    process_csv('input_data.csv', 'cleaned_data.csv')
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, None, 30, 40, 50],
+        'C': ['x', 'y', 'y', 'z', None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
+    print(f"\nValidation: {is_valid} - {message}")
