@@ -1,6 +1,5 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
 
 def remove_outliers_iqr(df, column):
     Q1 = df[column].quantile(0.25)
@@ -8,28 +7,37 @@ def remove_outliers_iqr(df, column):
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    return cleaned_df
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original shape: {df.shape}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
+        
+        print(f"Cleaned shape: {df.shape}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File {file_path} not found")
+        return None
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return None
 
 if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'A': np.random.normal(100, 15, 200),
-        'B': np.random.exponential(50, 200),
-        'C': np.random.uniform(0, 1, 200)
-    })
-    sample_data.loc[10, 'A'] = 500
-    sample_data.loc[20, 'B'] = 1000
-    
-    numeric_cols = ['A', 'B']
-    result = clean_dataset(sample_data, numeric_cols)
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {result.shape}")
-    print("Outliers removed successfully")
+    cleaned_data = clean_dataset('sample_data.csv')
+    if cleaned_data is not None:
+        cleaned_data.to_csv('cleaned_data.csv', index=False)
+        print("Data cleaning completed successfully")
