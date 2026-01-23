@@ -170,3 +170,112 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import json
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+class WeatherFetcher:
+    def __init__(self, api_key: str, base_url: str = "http://api.openweathermap.org/data/2.5"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+    
+    def get_current_weather(self, city: str, country_code: Optional[str] = None) -> Dict[str, Any]:
+        location = f"{city},{country_code}" if country_code else city
+        params = {
+            'q': location,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = self.session.get(
+                f"{self.base_url}/weather",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            return {
+                'city': data['name'],
+                'country': data['sys']['country'],
+                'temperature': data['main']['temp'],
+                'feels_like': data['main']['feels_like'],
+                'humidity': data['main']['humidity'],
+                'pressure': data['main']['pressure'],
+                'weather': data['weather'][0]['description'],
+                'wind_speed': data['wind']['speed'],
+                'timestamp': datetime.fromtimestamp(data['dt']).isoformat(),
+                'sunrise': datetime.fromtimestamp(data['sys']['sunrise']).isoformat(),
+                'sunset': datetime.fromtimestamp(data['sys']['sunset']).isoformat()
+            }
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Failed to fetch weather data: {str(e)}")
+        except (KeyError, ValueError) as e:
+            raise Exception(f"Invalid response format: {str(e)}")
+    
+    def get_forecast(self, city: str, days: int = 5) -> Dict[str, Any]:
+        params = {
+            'q': city,
+            'appid': self.api_key,
+            'units': 'metric',
+            'cnt': days * 8
+        }
+        
+        try:
+            response = self.session.get(
+                f"{self.base_url}/forecast",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            forecast = []
+            for item in data['list'][:days*8:8]:
+                forecast.append({
+                    'date': datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d'),
+                    'temperature': item['main']['temp'],
+                    'weather': item['weather'][0]['description'],
+                    'humidity': item['main']['humidity']
+                })
+            
+            return {
+                'city': data['city']['name'],
+                'country': data['city']['country'],
+                'forecast': forecast
+            }
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Failed to fetch forecast: {str(e)}")
+        except (KeyError, ValueError) as e:
+            raise Exception(f"Invalid forecast response: {str(e)}")
+
+def save_to_json(data: Dict[str, Any], filename: str) -> None:
+    with open(filename, 'w') as f:
+        json.dump(data, f, indent=2)
+
+def main():
+    api_key = "your_api_key_here"
+    fetcher = WeatherFetcher(api_key)
+    
+    try:
+        current = fetcher.get_current_weather("London", "UK")
+        print(f"Current weather in {current['city']}:")
+        print(f"Temperature: {current['temperature']}°C")
+        print(f"Weather: {current['weather']}")
+        print(f"Humidity: {current['humidity']}%")
+        
+        save_to_json(current, "london_weather.json")
+        
+        forecast = fetcher.get_forecast("London", 3)
+        print(f"\n3-day forecast for {forecast['city']}:")
+        for day in forecast['forecast']:
+            print(f"{day['date']}: {day['temperature']}°C, {day['weather']}")
+            
+    except Exception as e:
+        print(f"Error: {e}")
+
+if __name__ == "__main__":
+    main()
