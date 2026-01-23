@@ -217,3 +217,77 @@ def validate_dataframe(df, required_columns):
         raise ValueError(f"Null values found in columns: {null_counts[null_counts > 0].to_dict()}")
     
     return True
+import pandas as pd
+
+def remove_duplicates(dataframe, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame to clean
+        subset: column label or sequence of labels to consider for duplicates
+        keep: determines which duplicates to mark
+            'first' : Mark duplicates as True except for the first occurrence.
+            'last' : Mark duplicates as True except for the last occurrence.
+            False : Mark all duplicates as True.
+    
+    Returns:
+        Cleaned DataFrame with duplicates removed
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = dataframe.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(dataframe) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        dataframe: pandas DataFrame to validate
+        required_columns: list of column names that must be present
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    if dataframe.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
+
+def clean_numeric_columns(dataframe, columns=None):
+    """
+    Clean numeric columns by converting to appropriate types and handling errors.
+    
+    Args:
+        dataframe: pandas DataFrame
+        columns: list of column names to clean (defaults to all numeric columns)
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=['object']).columns
+    
+    cleaned_df = dataframe.copy()
+    
+    for column in columns:
+        if column in cleaned_df.columns:
+            cleaned_df[column] = pd.to_numeric(cleaned_df[column], errors='coerce')
+    
+    return cleaned_df
