@@ -67,3 +67,52 @@ def organize_files(directory):
 if __name__ == "__main__":
     target_directory = input("Enter directory path to organize: ").strip()
     organize_files(target_directory)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files(directory_path):
+    """
+    Organize files in the given directory by moving them into subfolders
+    based on their file extensions.
+    """
+    if not os.path.exists(directory_path):
+        print(f"Directory '{directory_path}' does not exist.")
+        return
+
+    base_path = Path(directory_path)
+    
+    extension_mapping = {
+        'images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
+        'documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
+        'audio': ['.mp3', '.wav', '.flac', '.aac'],
+        'video': ['.mp4', '.avi', '.mov', '.mkv'],
+        'archives': ['.zip', '.rar', '.tar', '.gz'],
+        'code': ['.py', '.js', '.html', '.css', '.java', '.cpp']
+    }
+
+    for item in base_path.iterdir():
+        if item.is_file():
+            file_extension = item.suffix.lower()
+            target_folder = None
+
+            for folder, extensions in extension_mapping.items():
+                if file_extension in extensions:
+                    target_folder = folder
+                    break
+
+            if not target_folder:
+                target_folder = 'others'
+
+            target_path = base_path / target_folder
+            target_path.mkdir(exist_ok=True)
+
+            try:
+                shutil.move(str(item), str(target_path / item.name))
+                print(f"Moved: {item.name} -> {target_folder}/")
+            except Exception as e:
+                print(f"Error moving {item.name}: {e}")
+
+if __name__ == "__main__":
+    target_directory = input("Enter directory path to organize: ").strip()
+    organize_files(target_directory)
