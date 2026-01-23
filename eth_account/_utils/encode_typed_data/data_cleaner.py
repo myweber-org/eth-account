@@ -1,70 +1,82 @@
-
 import numpy as np
+import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(data, column):
-    """
-    Remove outliers from a pandas DataFrame column using the IQR method.
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers.index.tolist()
     
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    def remove_outliers(self, columns, method='iqr', threshold=1.5):
+        outlier_indices = []
+        for col in columns:
+            if method == 'iqr':
+                indices = self.detect_outliers_iqr(col, threshold)
+                outlier_indices.extend(indices)
+        
+        unique_outliers = list(set(outlier_indices))
+        self.df = self.df.drop(index=unique_outliers)
+        return len(unique_outliers)
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    def normalize_column(self, column, method='zscore'):
+        if method == 'zscore':
+            self.df[column] = stats.zscore(self.df[column])
+        elif method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        return self.df[column]
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    def fill_missing(self, column, method='mean'):
+        if method == 'mean':
+            fill_value = self.df[column].mean()
+        elif method == 'median':
+            fill_value = self.df[column].median()
+        elif method == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = method
+        
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self.df[column]
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_cleaning_report(self):
+        removed_rows = self.original_shape[0] - self.df.shape[0]
+        return {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': self.df.shape[0],
+            'removed_rows': removed_rows,
+            'removed_percentage': (removed_rows / self.original_shape[0]) * 100
+        }
 
-def calculate_statistics(data, column):
-    """
-    Calculate basic statistics for a column after outlier removal.
-    
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    column (str): Column name
-    
-    Returns:
-    dict: Dictionary containing statistics
-    """
-    stats = {
-        'mean': np.mean(data[column]),
-        'median': np.median(data[column]),
-        'std': np.std(data[column]),
-        'min': np.min(data[column]),
-        'max': np.max(data[column]),
-        'count': len(data[column])
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
     }
-    return stats
-
-def clean_dataset(data, columns_to_clean):
-    """
-    Clean multiple columns in a dataset by removing outliers.
     
-    Parameters:
-    data (pd.DataFrame): Input DataFrame
-    columns_to_clean (list): List of column names to clean
+    df = pd.DataFrame(data)
+    cleaner = DataCleaner(df)
     
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    dict: Dictionary of statistics for each cleaned column
-    """
-    cleaned_data = data.copy()
-    all_stats = {}
+    outliers_removed = cleaner.remove_outliers(['feature1', 'feature2'])
+    cleaner.normalize_column('feature1', method='zscore')
+    cleaner.normalize_column('feature2', method='minmax')
     
-    for column in columns_to_clean:
-        if column in cleaned_data.columns:
-            original_count = len(cleaned_data)
-            cleaned_data = remove_outliers_iqr(cleaned_data, column)
-            removed_count = original_count - len(cleaned_data)
-            
-            stats = calculate_statistics(cleaned_data, column)
-            stats['outliers_removed'] = removed_count
-            all_stats[column] = stats
+    report = cleaner.get_cleaning_report()
+    cleaned_df = cleaner.get_cleaned_data()
     
-    return cleaned_data, all_stats
+    return cleaned_df, report
