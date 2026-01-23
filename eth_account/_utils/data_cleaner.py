@@ -256,4 +256,62 @@ def clean_dataframe(df, remove_dups=True, fill_na=True, normalize=False,
         outlier_mask = detect_outliers(cleaned_df, threshold=outlier_threshold)
         cleaned_df = cleaned_df[~outlier_mask]
     
-    return cleaned_df
+    return cleaned_dfimport csv
+import re
+from typing import List, Dict, Any
+
+def remove_duplicates(data: List[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
+    seen = set()
+    unique_data = []
+    for row in data:
+        if row[key] not in seen:
+            seen.add(row[key])
+            unique_data.append(row)
+    return unique_data
+
+def normalize_string(value: str) -> str:
+    if not isinstance(value, str):
+        return value
+    value = value.strip()
+    value = re.sub(r'\s+', ' ', value)
+    return value.lower()
+
+def clean_numeric(value: Any) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = re.sub(r'[^\d.-]', '', value)
+        try:
+            return float(cleaned)
+        except ValueError:
+            return 0.0
+    return 0.0
+
+def validate_email(email: str) -> bool:
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def process_csv_file(input_path: str, output_path: str, key_column: str) -> None:
+    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        data = list(reader)
+    
+    cleaned_data = []
+    for row in data:
+        cleaned_row = {}
+        for col, val in row.items():
+            if 'email' in col.lower():
+                cleaned_row[col] = val if validate_email(val) else ''
+            elif any(num_key in col.lower() for num_key in ['price', 'amount', 'quantity']):
+                cleaned_row[col] = clean_numeric(val)
+            else:
+                cleaned_row[col] = normalize_string(val)
+        cleaned_data.append(cleaned_row)
+    
+    cleaned_data = remove_duplicates(cleaned_data, key_column)
+    
+    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
+        if cleaned_data:
+            writer = csv.DictWriter(outfile, fieldnames=cleaned_data[0].keys())
+            writer.writeheader()
+            writer.writerows(cleaned_data)
