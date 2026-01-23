@@ -161,3 +161,89 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> pd.DataFrame:
+        """Remove duplicate rows from the dataframe."""
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        removed = initial_count - len(self.df)
+        print(f"Removed {removed} duplicate rows")
+        return self.df
+    
+    def normalize_numeric(self, columns: List[str]) -> pd.DataFrame:
+        """Normalize numeric columns to range [0, 1]."""
+        for col in columns:
+            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+                else:
+                    self.df[col] = 0
+        print(f"Normalized columns: {columns}")
+        return self.df
+    
+    def fill_missing(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> pd.DataFrame:
+        """Fill missing values using specified strategy."""
+        if columns is None:
+            columns = self.df.columns.tolist()
+        
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col] = self.df[col].fillna(self.df[col].mean())
+                elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col] = self.df[col].fillna(self.df[col].median())
+                elif strategy == 'mode':
+                    self.df[col] = self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else 0)
+                elif strategy == 'zero':
+                    self.df[col] = self.df[col].fillna(0)
+        
+        print(f"Filled missing values using '{strategy}' strategy")
+        return self.df
+    
+    def get_cleaning_report(self) -> dict:
+        """Generate a report of cleaning operations."""
+        final_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'final_rows': final_shape[0],
+            'final_columns': final_shape[1],
+            'rows_removed': self.original_shape[0] - final_shape[0],
+            'columns_removed': self.original_shape[1] - final_shape[1]
+        }
+
+def create_sample_data() -> pd.DataFrame:
+    """Create sample dataframe for testing."""
+    data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10.5, 20.3, np.nan, 40.7, 50.1, 50.1, 60.9],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A', 'C'],
+        'score': [0.8, 0.6, 0.9, 0.7, 0.5, 0.5, 0.4]
+    }
+    return pd.DataFrame(data)
+
+if __name__ == "__main__":
+    df = create_sample_data()
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates(subset=['id'])
+    cleaner.fill_missing(strategy='mean', columns=['value'])
+    cleaner.normalize_numeric(columns=['score'])
+    
+    report = cleaner.get_cleaning_report()
+    print("\nCleaning Report:")
+    for key, value in report.items():
+        print(f"{key}: {value}")
+    
+    print("\nCleaned Data:")
+    print(cleaner.df)
