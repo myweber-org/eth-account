@@ -1,120 +1,96 @@
+
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_dataset(file_path):
-    try:
-        df = pd.read_csv(file_path)
-        print(f"Original shape: {df.shape}")
-        
-        numeric_cols = df.select_dtypes(include=[np.number]).columns
-        
-        for col in numeric_cols:
-            df = remove_outliers_iqr(df, col)
-            df = normalize_minmax(df, col)
-        
-        print(f"Cleaned shape: {df.shape}")
-        return df
-        
-    except FileNotFoundError:
-        print(f"Error: File {file_path} not found")
-        return None
-    except Exception as e:
-        print(f"Error during cleaning: {str(e)}")
-        return None
-
-if __name__ == "__main__":
-    cleaned_data = clean_dataset('sample_data.csv')
-    if cleaned_data is not None:
-        cleaned_data.to_csv('cleaned_data.csv', index=False)
-        print("Data cleaning completed successfully")
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(df, columns=None):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from DataFrame using Interquartile Range method.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (default: all numeric columns)
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        DataFrame with outliers removed
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    df_clean = df.copy()
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
+    return df_clean.reset_index(drop=True)
 
-def calculate_statistics(df, column):
+def normalize_data(df, columns=None, method='minmax'):
     """
-    Calculate basic statistics for a column.
+    Normalize specified columns in DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize
+        method: 'minmax' or 'zscore' normalization
     
     Returns:
-    dict: Dictionary containing statistics
+        DataFrame with normalized columns
     """
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column])
-    }
-    return stats
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            if method == 'minmax':
+                min_val = df[col].min()
+                max_val = df[col].max()
+                if max_val != min_val:
+                    df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+            
+            elif method == 'zscore':
+                mean_val = df[col].mean()
+                std_val = df[col].std()
+                if std_val != 0:
+                    df_norm[col] = (df[col] - mean_val) / std_val
+    
+    return df_norm
 
-def example_usage():
+def handle_missing_values(df, strategy='mean', columns=None):
     """
-    Example usage of the data cleaning functions.
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of column names to process
+    
+    Returns:
+        DataFrame with handled missing values
     """
-    np.random.seed(42)
-    data = {
-        'values': np.concatenate([
-            np.random.normal(100, 15, 95),
-            np.random.normal(300, 50, 5)
-        ])
-    }
+    if columns is None:
+        columns = df.columns.tolist()
     
-    df = pd.DataFrame(data)
-    print(f"Original data shape: {df.shape}")
+    df_processed = df.copy()
     
-    original_stats = calculate_statistics(df, 'values')
-    print(f"Original statistics: {original_stats}")
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                df_processed[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_processed[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print(f"Cleaned data shape: {cleaned_df.shape}")
-    
-    cleaned_stats = calculate_statistics(cleaned_df, 'values')
-    print(f"Cleaned statistics: {cleaned_stats}")
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    cleaned_data = example_usage()
+    return df_processed.reset_index(drop=True)
