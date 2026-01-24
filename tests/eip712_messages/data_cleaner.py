@@ -322,4 +322,78 @@ if __name__ == "__main__":
     for col, col_stats in stats.items():
         print(f"{col}:")
         for stat_name, stat_value in col_stats.items():
-            print(f"  {stat_name}: {stat_value:.2f}")
+            print(f"  {stat_name}: {stat_value:.2f}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values using specified strategy.
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_filled = df.copy()
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                df_filled[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_filled[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_filled[col] = df[col].fillna(df[col].mode()[0])
+        else:
+            df_filled[col] = df[col].fillna(df[col].mode()[0])
+    
+    return df_filled
+
+def normalize_column(df, column):
+    """
+    Normalize a column using min-max scaling.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        return df[column]
+    
+    return (df[column] - min_val) / (max_val - min_val)
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def clean_dataframe(df, duplicate_subset=None, fill_strategy='mean', normalize_cols=None):
+    """
+    Perform comprehensive data cleaning.
+    """
+    cleaned_df = remove_duplicates(df, subset=duplicate_subset)
+    cleaned_df = fill_missing_values(cleaned_df, strategy=fill_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
