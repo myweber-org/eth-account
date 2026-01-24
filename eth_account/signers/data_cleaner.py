@@ -1,60 +1,56 @@
-import csv
-import re
 
-def clean_string(value):
-    if not isinstance(value, str):
-        return str(value)
-    value = value.strip()
-    value = re.sub(r'\s+', ' ', value)
-    return value
+import pandas as pd
+import numpy as np
+from typing import List, Optional
 
-def validate_email(email):
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
 
-def read_and_clean_csv(input_path, output_path):
-    cleaned_rows = []
-    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        for row in reader:
-            cleaned_row = {}
-            for key, value in row.items():
-                cleaned_row[key] = clean_string(value)
-            cleaned_rows.append(cleaned_row)
-    
-    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(cleaned_rows)
-    
-    return len(cleaned_rows)
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        return self
 
-def filter_valid_emails(input_path, output_path):
-    valid_rows = []
-    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        fieldnames = reader.fieldnames
-        
-        for row in reader:
-            if 'email' in row and validate_email(row['email']):
-                valid_rows.append(row)
-    
-    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(valid_rows)
-    
-    return len(valid_rows)
+    def handle_missing_values(self, strategy: str = 'drop', fill_value: Optional[float] = None) -> 'DataCleaner':
+        if strategy == 'drop':
+            self.df = self.df.dropna()
+        elif strategy == 'fill':
+            if fill_value is not None:
+                self.df = self.df.fillna(fill_value)
+            else:
+                self.df = self.df.fillna(self.df.mean())
+        return self
 
-if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    cleaned_file = "cleaned_data.csv"
-    filtered_file = "valid_emails.csv"
+    def normalize_column(self, column: str) -> 'DataCleaner':
+        if column in self.df.columns:
+            col_min = self.df[column].min()
+            col_max = self.df[column].max()
+            if col_max != col_min:
+                self.df[column] = (self.df[column] - col_min) / (col_max - col_min)
+        return self
+
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+
+    def get_report(self) -> dict:
+        cleaned_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': cleaned_shape[0],
+            'cleaned_columns': cleaned_shape[1],
+            'rows_removed': self.original_shape[0] - cleaned_shape[0],
+            'columns_removed': self.original_shape[1] - cleaned_shape[1]
+        }
+
+def clean_dataset(df: pd.DataFrame, operations: List[str]) -> pd.DataFrame:
+    cleaner = DataCleaner(df)
     
-    count_cleaned = read_and_clean_csv(input_file, cleaned_file)
-    print(f"Cleaned {count_cleaned} rows")
+    for op in operations:
+        if op == 'deduplicate':
+            cleaner.remove_duplicates()
+        elif op == 'handle_nulls':
+            cleaner.handle_missing_values(strategy='fill')
     
-    count_valid = filter_valid_emails(cleaned_file, filtered_file)
-    print(f"Found {count_valid} rows with valid emails")
+    return cleaner.get_cleaned_data()
