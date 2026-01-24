@@ -1,212 +1,40 @@
 
-import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the IQR method.
+    
+    Parameters:
+    data (pd.DataFrame): The DataFrame containing the data.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed from the specified column.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def clean_dataset(input_path, output_path):
-    try:
-        df = pd.read_csv(input_path)
-        print(f"Original dataset shape: {df.shape}")
-        
-        numeric_columns = df.select_dtypes(include=[np.number]).columns
-        
-        for col in numeric_columns:
-            original_len = len(df)
-            df = remove_outliers_iqr(df, col)
-            removed = original_len - len(df)
-            if removed > 0:
-                print(f"Removed {removed} outliers from column '{col}'")
-        
-        df.to_csv(output_path, index=False)
-        print(f"Cleaned dataset saved to {output_path}")
-        print(f"Final dataset shape: {df.shape}")
-        return True
-        
-    except FileNotFoundError:
-        print(f"Error: File {input_path} not found")
-        return False
-    except Exception as e:
-        print(f"Error during cleaning: {str(e)}")
-        return False
-
-if __name__ == "__main__":
-    clean_dataset("raw_data.csv", "cleaned_data.csv")
-import pandas as pd
-
-def clean_dataset(df, drop_na=True, rename_columns=True):
-    """
-    Clean a pandas DataFrame by handling missing values and standardizing column names.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_na (bool): If True, drop rows with any null values. Default True.
-        rename_columns (bool): If True, rename columns to lowercase with underscores. Default True.
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (pd.DataFrame): The DataFrame.
+    column (str): The column name.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+    dict: Dictionary containing mean, median, and standard deviation.
     """
-    cleaned_df = df.copy()
-    
-    if drop_na:
-        cleaned_df = cleaned_df.dropna()
-    
-    if rename_columns:
-        cleaned_df.columns = (
-            cleaned_df.columns
-            .str.lower()
-            .str.replace(r'[^a-z0-9]+', '_', regex=True)
-            .str.strip('_')
-        )
-    
-    return cleaned_df
-
-def validate_dataset(df, required_columns=None):
-    """
-    Validate a DataFrame for required columns and data types.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of required column names. Default None.
-    
-    Returns:
-        tuple: (bool, str) indicating validation success and message.
-    """
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    return True, "Dataset validation passed"
-
-if __name__ == "__main__":
-    sample_data = {
-        'User ID': [1, 2, None, 4],
-        'First Name': ['Alice', 'Bob', 'Charlie', None],
-        'Order Amount': [100.50, 200.75, 150.25, 300.00]
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std()
     }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
-    cleaned = clean_dataset(df)
-    print(cleaned)
-    
-    is_valid, message = validate_dataset(cleaned, ['user_id', 'order_amount'])
-    print(f"\nValidation: {is_valid} - {message}")
-import pandas as pd
-import numpy as np
-
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_duplicates (bool): Whether to remove duplicate rows
-        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    original_shape = df.shape
-    
-    # Create a copy to avoid modifying the original
-    cleaned_df = df.copy()
-    
-    # Remove duplicates if requested
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-        duplicates_removed = original_shape[0] - cleaned_df.shape[0]
-        print(f"Removed {duplicates_removed} duplicate rows")
-    
-    # Handle missing values
-    missing_before = cleaned_df.isnull().sum().sum()
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-            elif fill_missing == 'median':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            mode_value = cleaned_df[col].mode()
-            if not mode_value.empty:
-                cleaned_df[col] = cleaned_df[col].fillna(mode_value[0])
-    
-    missing_after = cleaned_df.isnull().sum().sum()
-    print(f"Handled {missing_before - missing_after} missing values")
-    
-    # Report cleaning statistics
-    print(f"Original shape: {original_shape}")
-    print(f"Cleaned shape: {cleaned_df.shape}")
-    print(f"Rows removed: {original_shape[0] - cleaned_df.shape[0]}")
-    print(f"Columns removed: {original_shape[1] - cleaned_df.shape[1]}")
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None, min_rows=1):
-    """
-    Validate that a DataFrame meets basic requirements.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of column names that must be present
-        min_rows (int): Minimum number of rows required
-    
-    Returns:
-        bool: True if validation passes, False otherwise
-    """
-    if df is None or df.empty:
-        print("DataFrame is None or empty")
-        return False
-    
-    if len(df) < min_rows:
-        print(f"DataFrame has fewer than {min_rows} rows")
-        return False
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            print(f"Missing required columns: {missing_cols}")
-            return False
-    
-    return True
-
-# Example usage
-if __name__ == "__main__":
-    # Create sample data with duplicates and missing values
-    sample_data = {
-        'id': [1, 2, 2, 3, 4, 5],
-        'value': [10.5, 20.3, 20.3, np.nan, 40.1, 50.0],
-        'category': ['A', 'B', 'B', 'A', np.nan, 'C']
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n" + "="*50 + "\n")
-    
-    # Clean the data
-    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
-    
-    print("\nCleaned DataFrame:")
-    print(cleaned)
-    
-    # Validate the cleaned data
-    is_valid = validate_dataframe(cleaned, required_columns=['id', 'value'], min_rows=3)
-    print(f"\nData validation passed: {is_valid}")
+    return stats
