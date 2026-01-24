@@ -1,117 +1,91 @@
+import csv
+import os
+from typing import List, Dict, Any, Optional
 
-import pandas as pd
-import numpy as np
-from pathlib import Path
+def read_csv_file(file_path: str) -> List[Dict[str, Any]]:
+    """Read a CSV file and return a list of dictionaries."""
+    data = []
+    try:
+        with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+    except Exception as e:
+        print(f"Error reading CSV file: {e}")
+    return data
 
-class CSVDataCleaner:
-    def __init__(self, file_path):
-        self.file_path = Path(file_path)
-        self.df = None
-        
-    def load_data(self):
+def clean_numeric_field(record: Dict[str, Any], field_name: str, default_value: float = 0.0) -> None:
+    """Clean a numeric field in a record, converting it to float."""
+    if field_name in record:
         try:
-            self.df = pd.read_csv(self.file_path)
-            print(f"Loaded {len(self.df)} rows from {self.file_path.name}")
-            return True
-        except FileNotFoundError:
-            print(f"Error: File {self.file_path} not found")
-            return False
-        except Exception as e:
-            print(f"Error loading file: {e}")
-            return False
-    
-    def show_missing_summary(self):
-        if self.df is None:
-            print("No data loaded")
-            return
-        
-        missing_counts = self.df.isnull().sum()
-        missing_percent = (missing_counts / len(self.df)) * 100
-        
-        print("\nMissing Value Summary:")
-        print("-" * 40)
-        for col in self.df.columns:
-            if missing_counts[col] > 0:
-                print(f"{col}: {missing_counts[col]} missing ({missing_percent[col]:.1f}%)")
-    
-    def fill_missing_numeric(self, strategy='mean'):
-        if self.df is None:
-            print("No data loaded")
-            return
-        
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        
-        for col in numeric_cols:
-            if self.df[col].isnull().any():
-                if strategy == 'mean':
-                    fill_value = self.df[col].mean()
-                elif strategy == 'median':
-                    fill_value = self.df[col].median()
-                elif strategy == 'zero':
-                    fill_value = 0
-                else:
-                    continue
-                
-                self.df[col].fillna(fill_value, inplace=True)
-                print(f"Filled missing values in {col} with {strategy} value: {fill_value:.2f}")
-    
-    def drop_columns_with_high_missing(self, threshold=50):
-        if self.df is None:
-            print("No data loaded")
-            return
-        
-        missing_percent = (self.df.isnull().sum() / len(self.df)) * 100
-        cols_to_drop = missing_percent[missing_percent > threshold].index.tolist()
-        
-        if cols_to_drop:
-            self.df.drop(columns=cols_to_drop, inplace=True)
-            print(f"Dropped columns with >{threshold}% missing values: {cols_to_drop}")
-        else:
-            print(f"No columns with >{threshold}% missing values found")
-    
-    def save_cleaned_data(self, output_path=None):
-        if self.df is None:
-            print("No data to save")
-            return
-        
-        if output_path is None:
-            output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
-        
-        self.df.to_csv(output_path, index=False)
-        print(f"Saved cleaned data to {output_path}")
-        return output_path
-    
-    def get_summary(self):
-        if self.df is None:
-            return {}
-        
-        return {
-            'original_rows': len(self.df),
-            'columns': list(self.df.columns),
-            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
-            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns),
-            'missing_values': int(self.df.isnull().sum().sum())
-        }
+            value = record[field_name].strip()
+            if value:
+                record[field_name] = float(value)
+            else:
+                record[field_name] = default_value
+        except (ValueError, AttributeError):
+            record[field_name] = default_value
 
-def process_csv_file(input_file, output_dir='cleaned_data'):
-    cleaner = CSVDataCleaner(input_file)
+def remove_duplicates(data: List[Dict[str, Any]], key_field: str) -> List[Dict[str, Any]]:
+    """Remove duplicate records based on a key field."""
+    seen = set()
+    unique_data = []
+    for record in data:
+        key = record.get(key_field)
+        if key not in seen:
+            seen.add(key)
+            unique_data.append(record)
+    return unique_data
+
+def filter_records(data: List[Dict[str, Any]], filter_func) -> List[Dict[str, Any]]:
+    """Filter records using a custom filter function."""
+    return [record for record in data if filter_func(record)]
+
+def write_csv_file(data: List[Dict[str, Any]], file_path: str, fieldnames: Optional[List[str]] = None) -> bool:
+    """Write data to a CSV file."""
+    if not data:
+        print("No data to write.")
+        return False
     
-    if not cleaner.load_data():
+    if fieldnames is None:
+        fieldnames = list(data[0].keys())
+    
+    try:
+        with open(file_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        return True
+    except Exception as e:
+        print(f"Error writing CSV file: {e}")
+        return False
+
+def process_csv(input_file: str, output_file: str, key_field: str = "id") -> None:
+    """Main function to process a CSV file: read, clean, deduplicate, and write."""
+    print(f"Processing {input_file}...")
+    
+    data = read_csv_file(input_file)
+    if not data:
+        print("No data loaded.")
         return
     
-    print("\nInitial data summary:")
-    summary = cleaner.get_summary()
-    for key, value in summary.items():
-        print(f"{key}: {value}")
+    print(f"Loaded {len(data)} records.")
     
-    cleaner.show_missing_summary()
-    cleaner.drop_columns_with_high_missing(threshold=60)
-    cleaner.fill_missing_numeric(strategy='median')
+    for record in data:
+        clean_numeric_field(record, "price")
+        clean_numeric_field(record, "quantity")
     
-    output_dir = Path(output_dir)
-    output_dir.mkdir(exist_ok=True)
+    data = remove_duplicates(data, key_field)
+    print(f"After removing duplicates: {len(data)} records.")
     
-    output_path = cleaner.save_cleaned_data(output_dir / f"cleaned_{Path(input_file).name}")
+    def valid_price_filter(record):
+        price = record.get("price", 0)
+        return price > 0
     
-    print("\nCleaning completed successfully")
-    return output_path
+    data = filter_records(data, valid_price_filter)
+    print(f"After filtering invalid prices: {len(data)} records.")
+    
+    if write_csv_file(data, output_file):
+        print(f"Cleaned data written to {output_file}")
