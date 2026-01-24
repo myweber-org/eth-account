@@ -445,3 +445,113 @@ def clean_dataframe(df: pd.DataFrame,
                 cleaned_df = normalize_column(cleaned_df, col)
     
     return cleaned_df
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistical measures
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean dataset by removing outliers from multiple numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each column
+    """
+    cleaned_df = df.copy()
+    all_stats = {}
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns and pd.api.types.is_numeric_dtype(cleaned_df[col]):
+            original_stats = calculate_statistics(cleaned_df, col)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_stats = calculate_statistics(cleaned_df, col)
+            
+            all_stats[col] = {
+                'original': original_stats,
+                'cleaned': cleaned_stats,
+                'removed_count': len(df) - len(cleaned_df)
+            }
+    
+    return cleaned_df, all_stats
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    sample_data = {
+        'temperature': np.random.normal(25, 5, 100),
+        'humidity': np.random.normal(60, 10, 100),
+        'pressure': np.random.normal(1013, 15, 100)
+    }
+    
+    # Add some outliers
+    sample_data['temperature'][0] = 100
+    sample_data['humidity'][1] = 150
+    sample_data['pressure'][2] = 2000
+    
+    df = pd.DataFrame(sample_data)
+    
+    print("Original dataset shape:", df.shape)
+    print("\nOriginal statistics:")
+    for col in df.columns:
+        print(f"{col}: mean={df[col].mean():.2f}, std={df[col].std():.2f}")
+    
+    cleaned_df, stats = clean_dataset(df, ['temperature', 'humidity', 'pressure'])
+    
+    print("\nCleaned dataset shape:", cleaned_df.shape)
+    print("\nCleaned statistics:")
+    for col in cleaned_df.columns:
+        print(f"{col}: mean={cleaned_df[col].mean():.2f}, std={cleaned_df[col].std():.2f}")
+    
+    print("\nRemoval summary:")
+    for col, col_stats in stats.items():
+        print(f"{col}: removed {col_stats['removed_count']} outliers")
