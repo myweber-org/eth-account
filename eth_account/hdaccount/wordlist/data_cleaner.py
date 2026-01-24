@@ -230,3 +230,124 @@ def clean_dataset(df, impute_strategy='median', outlier_method='iqr', normalize=
         cleaner.normalize_data()
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def normalize_column(dataframe, column, method='minmax'):
+    """
+    Normalize a column in a DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = dataframe.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        
+        if max_val == min_val:
+            df_copy[f'{column}_normalized'] = 0.5
+        else:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        
+        if std_val == 0:
+            df_copy[f'{column}_normalized'] = 0
+        else:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_copy
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_multiplier=1.5, normalize_method='minmax'):
+    """
+    Clean a dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        numeric_columns: List of numeric columns to process (None for all numeric)
+        outlier_multiplier: IQR multiplier for outlier removal
+        normalize_method: Normalization method
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column, outlier_multiplier)
+            cleaned_df = normalize_column(cleaned_df, column, normalize_method)
+    
+    return cleaned_df
+
+def get_dataset_statistics(dataframe):
+    """
+    Calculate basic statistics for numeric columns in a DataFrame.
+    
+    Args:
+        dataframe: pandas DataFrame
+    
+    Returns:
+        Dictionary with statistics for each numeric column
+    """
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    
+    stats_dict = {}
+    for col in numeric_cols:
+        stats_dict[col] = {
+            'mean': dataframe[col].mean(),
+            'median': dataframe[col].median(),
+            'std': dataframe[col].std(),
+            'min': dataframe[col].min(),
+            'max': dataframe[col].max(),
+            'count': dataframe[col].count(),
+            'missing': dataframe[col].isnull().sum()
+        }
+    
+    return stats_dict
