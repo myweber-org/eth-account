@@ -396,4 +396,28 @@ def clean_dataframe(df, duplicate_subset=None, fill_strategy='mean', normalize_c
             if col in cleaned_df.columns:
                 cleaned_df[col] = normalize_column(cleaned_df, col)
     
-    return cleaned_df
+    return cleaned_dfdef remove_duplicates(data_list):
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_numeric_strings(data_list):
+    cleaned = []
+    for item in data_list:
+        if isinstance(item, str):
+            try:
+                cleaned.append(float(item))
+            except ValueError:
+                cleaned.append(item)
+        else:
+            cleaned.append(item)
+    return cleaned
+
+def process_data(raw_data):
+    unique_data = remove_duplicates(raw_data)
+    final_data = clean_numeric_strings(unique_data)
+    return final_data
