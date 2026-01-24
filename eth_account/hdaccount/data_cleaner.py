@@ -445,3 +445,96 @@ def clean_dataset(data_path: str, output_path: Optional[str] = None) -> pd.DataF
         print(f"Cleaned data saved to {output_path}")
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def normalize_column(df: pd.DataFrame, column: str) -> pd.DataFrame:
+    """
+    Normalize specified column to range [0, 1].
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    col_min = df[column].min()
+    col_max = df[column].max()
+    
+    if col_max == col_min:
+        df[column] = 0.5
+    else:
+        df[column] = (df[column] - col_min) / (col_max - col_min)
+    
+    return df
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Handle missing values using specified strategy.
+    """
+    if strategy == 'mean':
+        return df.fillna(df.mean())
+    elif strategy == 'median':
+        return df.fillna(df.median())
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    elif strategy == 'drop':
+        return df.dropna()
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
+
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   normalize_columns: Optional[List[str]] = None,
+                   missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    df_clean = df.copy()
+    
+    if deduplicate:
+        df_clean = remove_duplicates(df_clean)
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            df_clean = normalize_column(df_clean, col)
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    
+    return df_clean
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Validate DataFrame for common data quality issues.
+    """
+    if df.empty:
+        return False
+    
+    if df.isnull().all().any():
+        return False
+    
+    if (df.nunique() == 1).all():
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None],
+        'B': [10, 20, 20, 40, 50, 60],
+        'C': [100, 200, 300, 400, 500, 600]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, normalize_columns=['B', 'C'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    print(f"\nData validation: {validate_dataframe(cleaned_df)}")
