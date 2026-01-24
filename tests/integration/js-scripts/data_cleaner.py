@@ -93,3 +93,87 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(
+    input_path: str,
+    output_path: str,
+    missing_strategy: str = 'mean',
+    columns_to_drop: Optional[list] = None
+) -> pd.DataFrame:
+    """
+    Clean CSV data by handling missing values and dropping specified columns.
+    
+    Parameters:
+    input_path: Path to input CSV file
+    output_path: Path to save cleaned CSV file
+    missing_strategy: Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    columns_to_drop: List of column names to remove
+    
+    Returns:
+    Cleaned DataFrame
+    """
+    
+    df = pd.read_csv(input_path)
+    
+    if columns_to_drop:
+        df = df.drop(columns=columns_to_drop, errors='ignore')
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if df[col].isnull().any():
+            if missing_strategy == 'mean':
+                fill_value = df[col].mean()
+            elif missing_strategy == 'median':
+                fill_value = df[col].median()
+            elif missing_strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+            elif missing_strategy == 'drop':
+                df = df.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+            
+            df[col] = df[col].fillna(fill_value)
+    
+    df.to_csv(output_path, index=False)
+    return df
+
+def validate_dataframe(df: pd.DataFrame) -> dict:
+    """
+    Validate DataFrame structure and content.
+    
+    Returns:
+    Dictionary with validation results
+    """
+    validation_result = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_result
+
+if __name__ == "__main__":
+    sample_df = pd.DataFrame({
+        'A': [1, 2, np.nan, 4],
+        'B': [5, np.nan, 7, 8],
+        'C': ['x', 'y', 'z', 'x']
+    })
+    
+    sample_df.to_csv('sample_data.csv', index=False)
+    
+    cleaned = clean_csv_data(
+        'sample_data.csv',
+        'cleaned_data.csv',
+        missing_strategy='mean',
+        columns_to_drop=['C']
+    )
+    
+    print("Validation results:", validate_dataframe(cleaned))
