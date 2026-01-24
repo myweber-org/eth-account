@@ -85,4 +85,74 @@ if __name__ == "__main__":
         display_weather(weather)
         
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error: {e}")import requests
+import json
+import sys
+from datetime import datetime
+
+class WeatherFetcher:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = "http://api.openweathermap.org/data/2.5/weather"
+    
+    def get_weather(self, city_name):
+        params = {
+            'q': city_name,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = requests.get(self.base_url, params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            if data['cod'] != 200:
+                return {"error": data.get('message', 'Unknown error')}
+            
+            weather_info = {
+                'city': data['name'],
+                'country': data['sys']['country'],
+                'temperature': data['main']['temp'],
+                'feels_like': data['main']['feels_like'],
+                'humidity': data['main']['humidity'],
+                'pressure': data['main']['pressure'],
+                'wind_speed': data['wind']['speed'],
+                'description': data['weather'][0]['description'],
+                'timestamp': datetime.fromtimestamp(data['dt']).isoformat()
+            }
+            
+            return weather_info
+            
+        except requests.exceptions.RequestException as e:
+            return {"error": f"Network error: {str(e)}"}
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            return {"error": f"Data parsing error: {str(e)}"}
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python fetch_weather_data.py <city_name>")
+        print("Example: python fetch_weather_data.py London")
+        sys.exit(1)
+    
+    city_name = ' '.join(sys.argv[1:])
+    
+    api_key = "your_api_key_here"  # Replace with actual API key
+    
+    fetcher = WeatherFetcher(api_key)
+    result = fetcher.get_weather(city_name)
+    
+    if 'error' in result:
+        print(f"Error: {result['error']}")
+        sys.exit(1)
+    
+    print(f"Weather in {result['city']}, {result['country']}:")
+    print(f"Temperature: {result['temperature']}°C (feels like {result['feels_like']}°C)")
+    print(f"Humidity: {result['humidity']}%")
+    print(f"Pressure: {result['pressure']} hPa")
+    print(f"Wind Speed: {result['wind_speed']} m/s")
+    print(f"Conditions: {result['description'].title()}")
+    print(f"Last Updated: {result['timestamp']}")
+
+if __name__ == "__main__":
+    main()
