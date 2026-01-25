@@ -1,76 +1,75 @@
-
 import pandas as pd
 import numpy as np
 
-def clean_dataframe(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Clean a pandas DataFrame by handling missing values and outliers.
+    Clean a pandas DataFrame by handling duplicates and missing values.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame to clean.
-    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop').
-    outlier_method (str): Method for outlier detection ('iqr', 'zscore').
-    columns (list): Specific columns to clean. If None, clean all numeric columns.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop').
     
     Returns:
     pd.DataFrame: Cleaned DataFrame.
     """
-    df_clean = df.copy()
+    cleaned_df = df.copy()
     
-    if columns is None:
-        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns.tolist()
-        columns = numeric_cols
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
     
-    for col in columns:
-        if col not in df_clean.columns:
-            continue
-            
-        if missing_strategy != 'drop':
-            if missing_strategy == 'mean':
-                fill_value = df_clean[col].mean()
-            elif missing_strategy == 'median':
-                fill_value = df_clean[col].median()
-            elif missing_strategy == 'mode':
-                fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else np.nan
-            else:
-                fill_value = 0
-            
-            df_clean[col].fillna(fill_value, inplace=True)
-        else:
-            df_clean = df_clean.dropna(subset=[col])
-        
-        if outlier_method == 'iqr':
-            Q1 = df_clean[col].quantile(0.25)
-            Q3 = df_clean[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            
-            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
-            df_clean = df_clean[mask]
-        
-        elif outlier_method == 'zscore':
-            mean_val = df_clean[col].mean()
-            std_val = df_clean[col].std()
-            
-            if std_val > 0:
-                z_scores = np.abs((df_clean[col] - mean_val) / std_val)
-                df_clean = df_clean[z_scores < 3]
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    else:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+                elif fill_missing == 'median':
+                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+                elif fill_missing == 'mode':
+                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
     
-    return df_clean.reset_index(drop=True)
+    return cleaned_df
 
-def remove_duplicates(df, subset=None, keep='first'):
+def validate_dataframe(df, required_columns=None):
     """
-    Remove duplicate rows from DataFrame.
+    Validate DataFrame structure and content.
     
     Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    subset (list): Columns to consider for duplicates.
-    keep (str): Which duplicates to keep ('first', 'last', False).
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
     
     Returns:
-    pd.DataFrame: DataFrame without duplicates.
+    tuple: (is_valid, error_message)
     """
-    return df.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
 
-def normalize
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 3, None],
+        'B': [4, None, 6, 6, 8],
+        'C': [7, 8, 9, 10, 11]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {is_valid} - {message}")
