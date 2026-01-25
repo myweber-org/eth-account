@@ -1,54 +1,51 @@
-
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_csv_data(input_file, output_file):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    column (str): The column name to clean.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
     """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
-
-def clean_dataset(df, numeric_columns):
-    """
-    Clean a dataset by removing outliers from multiple numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): The input DataFrame.
-    numeric_columns (list): List of column names to process.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        df_cleaned = df.copy()
+        
+        df_cleaned = df_cleaned.drop_duplicates()
+        print(f"Shape after dropping duplicates: {df_cleaned.shape}")
+        
+        df_cleaned = df_cleaned.dropna(how='all')
+        print(f"Shape after dropping all-NA rows: {df_cleaned.shape}")
+        
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df_cleaned[col].isnull().sum() > 0:
+                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
+        
+        text_cols = df_cleaned.select_dtypes(include=['object']).columns
+        for col in text_cols:
+            if df_cleaned[col].isnull().sum() > 0:
+                df_cleaned[col].fillna('Unknown', inplace=True)
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        print(f"Final shape: {df_cleaned.shape}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except pd.errors.EmptyDataError:
+        print(f"Error: File '{input_file}' is empty.")
+        return None
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return None
 
 if __name__ == "__main__":
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
-    df = pd.DataFrame(sample_data)
-    df.loc[::100, 'A'] = 500
-    
-    print("Original shape:", df.shape)
-    cleaned = clean_dataset(df, ['A', 'B', 'C'])
-    print("Cleaned shape:", cleaned.shape)
-    print("Outliers removed:", df.shape[0] - cleaned.shape[0])
+    cleaned_df = clean_csv_data('raw_data.csv', 'cleaned_data.csv')
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully.")
+        print(cleaned_df.head())
