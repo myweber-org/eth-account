@@ -221,4 +221,82 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """Handle missing values using specified strategy."""
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df[col].dtype in ['int64', 'float64']:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                fill_value = 0
+            
+            df_clean[col].fillna(fill_value, inplace=True)
+        else:
+            df_clean[col].fillna('Unknown', inplace=True)
+    
+    return df_clean
+
+def normalize_column(df, column, method='minmax'):
+    """Normalize specified column using min-max or z-score normalization."""
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val > min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val > 0:
+            df[column] = (df[column] - mean_val) / std_val
+    
+    return df
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """Detect outliers using Interquartile Range method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+def clean_dataset(df, duplicate_subset=None, missing_strategy='mean', 
+                  normalize_columns=None, outlier_columns=None):
+    """Complete dataset cleaning pipeline."""
+    df_clean = df.copy()
+    
+    df_clean = remove_duplicates(df_clean, subset=duplicate_subset)
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in df_clean.columns:
+                df_clean = normalize_column(df_clean, col)
+    
+    if outlier_columns:
+        outlier_report = {}
+        for col in outlier_columns:
+            if col in df_clean.columns:
+                outliers = detect_outliers_iqr(df_clean, col)
+                outlier_report[col] = len(outliers)
+    
+    return df_clean
