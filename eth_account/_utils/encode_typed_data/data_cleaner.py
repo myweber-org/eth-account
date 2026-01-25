@@ -88,4 +88,41 @@ def process_csv(input_file: str, output_file: str, key_field: str = "id") -> Non
     print(f"After filtering invalid prices: {len(data)} records.")
     
     if write_csv_file(data, output_file):
-        print(f"Cleaned data written to {output_file}")
+        print(f"Cleaned data written to {output_file}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_minmax(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    if max_val == min_val:
+        return dataframe[column].apply(lambda x: 0.5)
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(dataframe, column):
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    if std_val == 0:
+        return dataframe[column].apply(lambda x: 0)
+    standardized = (dataframe[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_mean(dataframe, column):
+    mean_val = dataframe[column].mean()
+    filled_series = dataframe[column].fillna(mean_val)
+    return filled_series
+
+def validate_numeric_range(dataframe, column, min_val, max_val):
+    invalid_mask = (dataframe[column] < min_val) | (dataframe[column] > max_val)
+    validation_result = ~invalid_mask
+    return validation_result
