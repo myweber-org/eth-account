@@ -1,359 +1,122 @@
-
-import pandas as pd
-import numpy as np
-
-def clean_csv_data(filepath, fill_method='mean', output_path=None):
-    """
-    Load a CSV file, clean missing values, and optionally save cleaned data.
-    
-    Args:
-        filepath (str): Path to input CSV file
-        fill_method (str): Method for filling missing values ('mean', 'median', 'mode', 'zero')
-        output_path (str, optional): Path to save cleaned CSV. If None, returns DataFrame
-    
-    Returns:
-        pd.DataFrame or None: Cleaned DataFrame if output_path is None, else None
-    """
-    
-    try:
-        df = pd.read_csv(filepath)
-        print(f"Loaded data with shape: {df.shape}")
-        
-        missing_count = df.isnull().sum().sum()
-        if missing_count > 0:
-            print(f"Found {missing_count} missing values")
-            
-            numeric_cols = df.select_dtypes(include=[np.number]).columns
-            
-            if fill_method == 'mean':
-                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
-            elif fill_method == 'median':
-                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-            elif fill_method == 'mode':
-                for col in numeric_cols:
-                    df[col] = df[col].fillna(df[col].mode()[0])
-            elif fill_method == 'zero':
-                df[numeric_cols] = df[numeric_cols].fillna(0)
-            else:
-                raise ValueError(f"Unknown fill method: {fill_method}")
-            
-            print(f"Missing values filled using '{fill_method}' method")
-        
-        if output_path:
-            df.to_csv(output_path, index=False)
-            print(f"Cleaned data saved to: {output_path}")
-            return None
-        else:
-            return df
-            
-    except FileNotFoundError:
-        print(f"Error: File not found at {filepath}")
-        return None
-    except Exception as e:
-        print(f"Error during data cleaning: {str(e)}")
-        return None
-
-def remove_outliers_iqr(df, column, multiplier=1.5):
-    """
-    Remove outliers from a DataFrame column using IQR method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-        multiplier (float): IQR multiplier for outlier detection
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        print(f"Column '{column}' not found in DataFrame")
-        return df
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - multiplier * IQR
-    upper_bound = Q3 + multiplier * IQR
-    
-    original_count = len(df)
-    df_clean = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    removed_count = original_count - len(df_clean)
-    
-    print(f"Removed {removed_count} outliers from '{column}'")
-    return df_clean
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'A': [1, 2, np.nan, 4, 5],
-        'B': [10, np.nan, 30, 40, 50],
-        'C': [100, 200, 300, 400, 500]
-    })
-    
-    sample_data.to_csv('sample_data.csv', index=False)
-    
-    cleaned_df = clean_csv_data('sample_data.csv', fill_method='mean')
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
+def remove_outliers_iqr(data, column, factor=1.5):
     """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Remove outliers using IQR method
     """
-    if column not in df.columns:
+    if column not in data.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
     IQR = Q3 - Q1
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
     
-    return filtered_df
+    return filtered_data, removed_count
 
-def calculate_basic_stats(df, column):
+def z_score_normalize(data, column):
     """
-    Calculate basic statistics for a column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
-    
-    Returns:
-    dict: Dictionary containing statistics
+    Normalize data using z-score normalization
     """
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    return stats
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean = data[column].mean()
+    std = data[column].std()
+    
+    if std == 0:
+        return data[column]
+    
+    normalized = (data[column] - mean) / std
+    return normalized
 
-def clean_dataset(df, numeric_columns):
+def min_max_normalize(data, column, feature_range=(0, 1)):
     """
-    Clean multiple numeric columns in a DataFrame.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
+    Normalize data using min-max scaling
     """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column]
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        min_target, max_target = feature_range
+        normalized = normalized * (max_target - min_target) + min_target
+    
+    return normalized
+
+def detect_skewed_columns(data, threshold=0.5):
+    """
+    Detect columns with skewed distributions
+    """
+    skewed_columns = []
+    
+    for column in data.select_dtypes(include=[np.number]).columns:
+        skewness = stats.skew(data[column].dropna())
+        if abs(skewness) > threshold:
+            skewed_columns.append((column, skewness))
+    
+    return sorted(skewed_columns, key=lambda x: abs(x[1]), reverse=True)
+
+def log_transform(data, column):
+    """
+    Apply log transformation to reduce skewness
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if data[column].min() <= 0:
+        transformed = np.log1p(data[column] - data[column].min() + 1)
+    else:
+        transformed = np.log(data[column])
+    
+    return transformed
+
+def clean_dataset(df, numeric_columns=None, outlier_factor=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
     cleaned_df = df.copy()
+    cleaning_report = {}
     
     for column in numeric_columns:
-        if column in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+        if column not in cleaned_df.columns:
+            continue
+        
+        original_count = len(cleaned_df)
+        
+        cleaned_df, removed = remove_outliers_iqr(cleaned_df, column, outlier_factor)
+        cleaning_report[column] = {
+            'outliers_removed': removed,
+            'percentage_removed': (removed / original_count) * 100
+        }
+        
+        if normalize_method == 'zscore':
+            cleaned_df[f'{column}_normalized'] = z_score_normalize(cleaned_df, column)
+        elif normalize_method == 'minmax':
+            cleaned_df[f'{column}_normalized'] = min_max_normalize(cleaned_df, column)
     
-    return cleaned_df
-
-if __name__ == "__main__":
-    # Example usage
-    sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
-    }
+    skewed_cols = detect_skewed_columns(cleaned_df[numeric_columns])
+    cleaning_report['skewed_columns'] = skewed_cols
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame shape:", df.shape)
+    for column, skewness in skewed_cols:
+        if abs(skewness) > 1.0:
+            cleaned_df[f'{column}_log'] = log_transform(cleaned_df, column)
     
-    cleaned_df = clean_dataset(df, ['A', 'B', 'C'])
-    print("Cleaned DataFrame shape:", cleaned_df.shape)
-    
-    for col in ['A', 'B', 'C']:
-        stats = calculate_basic_stats(cleaned_df, col)
-        print(f"\nStatistics for {col}:")
-        for key, value in stats.items():
-            print(f"  {key}: {value:.2f}")
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name
-    
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': len(df[column]),
-        'q1': df[column].quantile(0.25),
-        'q3': df[column].quantile(0.75)
-    }
-    
-    return stats
-
-def example_usage():
-    """
-    Example usage of the data cleaning functions.
-    """
-    np.random.seed(42)
-    
-    data = {
-        'id': range(1, 101),
-        'value': np.random.normal(100, 15, 100)
-    }
-    
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame shape:", df.shape)
-    print("Original statistics:", calculate_summary_statistics(df, 'value'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'value')
-    
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
-    print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'value'))
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    result_df = example_usage()
-    print(f"\nRemoved {100 - len(result_df)} outliers")
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to process
-    
-    Returns:
-        pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def calculate_basic_stats(df, column):
-    """
-    Calculate basic statistics for a DataFrame column.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        column (str): Column name to analyze
-    
-    Returns:
-        dict: Dictionary containing statistical measures
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
-    
-    return stats
-
-def clean_numeric_data(df, columns=None):
-    """
-    Clean numeric data by removing NaN values and converting to appropriate types.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        columns (list, optional): List of columns to clean. If None, cleans all numeric columns.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-            cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
-    
-    return cleaned_df
-
-if __name__ == "__main__":
-    sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 13, 12, 11, 14]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    
-    print("Original data:")
-    print(df)
-    print("\nBasic statistics:")
-    print(calculate_basic_stats(df, 'values'))
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nData after outlier removal:")
-    print(cleaned_df)
-    print("\nStatistics after cleaning:")
-    print(calculate_basic_stats(cleaned_df, 'values'))
+    return cleaned_df, cleaning_report
