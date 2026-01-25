@@ -232,4 +232,70 @@ if __name__ == "__main__":
     
     filtered = remove_outliers_iqr(cleaned, 'Age')
     print("DataFrame after removing age outliers:")
-    print(filtered)
+    print(filtered)import pandas as pd
+import numpy as np
+
+def remove_duplicates(df):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates()
+
+def fill_missing_values(df, strategy='mean'):
+    """
+    Fill missing values using specified strategy.
+    """
+    if strategy == 'mean':
+        return df.fillna(df.mean())
+    elif strategy == 'median':
+        return df.fillna(df.median())
+    elif strategy == 'mode':
+        return df.fillna(df.mode().iloc[0])
+    else:
+        return df.fillna(0)
+
+def normalize_column(df, column_name):
+    """
+    Normalize specified column to range [0,1].
+    """
+    if column_name in df.columns:
+        col = df[column_name]
+        df[column_name] = (col - col.min()) / (col.max() - col.min())
+    return df
+
+def filter_outliers(df, column_name, threshold=3):
+    """
+    Remove outliers based on z-score threshold.
+    """
+    if column_name in df.columns:
+        z_scores = np.abs((df[column_name] - df[column_name].mean()) / df[column_name].std())
+        return df[z_scores < threshold]
+    return df
+
+def clean_dataframe(df, operations=None):
+    """
+    Apply multiple cleaning operations sequentially.
+    """
+    if operations is None:
+        operations = ['remove_duplicates', 'fill_missing']
+    
+    if 'remove_duplicates' in operations:
+        df = remove_duplicates(df)
+    
+    if 'fill_missing' in operations:
+        df = fill_missing_values(df)
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None, 7],
+        'B': [10, 20, 20, 40, 50, 60, 1000]
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
