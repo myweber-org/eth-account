@@ -1,86 +1,81 @@
 
 import numpy as np
 import pandas as pd
+from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return self
     
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        self.df = self.df[z_scores < threshold]
+        return self
     
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val > min_val:
+                self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            if std_val > 0:
+                self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
     
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = 0
+        
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self
     
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    def get_cleaned_data(self):
+        return self.df
     
-    return filtered_df
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'cleaned_rows': len(self.df),
+            'columns': self.original_columns,
+            'remaining_columns': self.df.columns.tolist()
+        }
+        return summary
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a DataFrame column.
+def clean_dataset(df, config):
+    cleaner = DataCleaner(df)
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    for column in config.get('outlier_columns', []):
+        method = config.get('outlier_method', 'iqr')
+        if method == 'iqr':
+            cleaner.remove_outliers_iqr(column)
+        elif method == 'zscore':
+            cleaner.remove_outliers_zscore(column)
     
-    Returns:
-    dict: Dictionary containing summary statistics
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    for column in config.get('normalize_columns', []):
+        method = config.get('normalize_method', 'minmax')
+        cleaner.normalize_column(column, method)
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
-    }
+    for column in config.get('fill_missing_columns', []):
+        strategy = config.get('fill_strategy', 'mean')
+        cleaner.fill_missing(column, strategy)
     
-    return stats
-
-def main():
-    # Example usage
-    np.random.seed(42)
-    data = {
-        'values': np.concatenate([
-            np.random.normal(100, 15, 95),
-            np.random.normal(300, 50, 5)  # Outliers
-        ])
-    }
-    
-    df = pd.DataFrame(data)
-    
-    print("Original DataFrame:")
-    print(f"Shape: {df.shape}")
-    print(f"Summary statistics:")
-    stats = calculate_summary_statistics(df, 'values')
-    for key, value in stats.items():
-        print(f"  {key}: {value:.2f}")
-    
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    
-    print("\nCleaned DataFrame:")
-    print(f"Shape: {cleaned_df.shape}")
-    print(f"Rows removed: {len(df) - len(cleaned_df)}")
-    print(f"Summary statistics after cleaning:")
-    cleaned_stats = calculate_summary_statistics(cleaned_df, 'values')
-    for key, value in cleaned_stats.items():
-        print(f"  {key}: {value:.2f}")
-
-if __name__ == "__main__":
-    main()
+    return cleaner.get_cleaned_data()
