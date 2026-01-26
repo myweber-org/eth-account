@@ -254,4 +254,67 @@ if __name__ == "__main__":
     
     cleaned_df = clean_dataset(df, ['value'])
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
-    print(f"Outliers removed: {len(df) - len(cleaned_df)}")
+    print(f"Outliers removed: {len(df) - len(cleaned_df)}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in cleaned_df.columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+    return cleaned_df.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    normalized_df = df.copy()
+    for col in columns:
+        if col in normalized_df.columns:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            if max_val != min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+    return normalized_df
+
+def standardize_zscore(df, columns):
+    standardized_df = df.copy()
+    for col in columns:
+        if col in standardized_df.columns:
+            mean_val = standardized_df[col].mean()
+            std_val = standardized_df[col].std()
+            if std_val > 0:
+                standardized_df[col] = (standardized_df[col] - mean_val) / std_val
+    return standardized_df
+
+def handle_missing_values(df, strategy='mean'):
+    handled_df = df.copy()
+    numeric_cols = handled_df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            handled_df[col].fillna(handled_df[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            handled_df[col].fillna(handled_df[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            handled_df[col].fillna(handled_df[col].mode()[0], inplace=True)
+    elif strategy == 'drop':
+        handled_df.dropna(subset=numeric_cols, inplace=True)
+    
+    return handled_df
+
+def validate_dataframe(df):
+    validation_report = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    return validation_report
