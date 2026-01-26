@@ -72,3 +72,71 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'])
     print(f"\nData validation passed: {is_valid}")
+import pandas as pd
+
+def clean_dataset(df, remove_duplicates=True):
+    """
+    Clean a pandas DataFrame by removing null values and optionally duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        remove_duplicates (bool): Whether to remove duplicate rows.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    cleaned_df = cleaned_df.dropna()
+    
+    if remove_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Dataset is valid"
+
+def main():
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Alice'],
+        'age': [25, 30, None, 40, 25],
+        'score': [85.5, 92.0, 78.5, 88.0, 85.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print()
+    
+    is_valid, message = validate_dataset(cleaned_df, ['name', 'age', 'score'])
+    print(f"Validation result: {is_valid}")
+    print(f"Validation message: {message}")
+
+if __name__ == "__main__":
+    main()
