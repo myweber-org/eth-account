@@ -139,4 +139,79 @@ def main():
     print(f"Validation message: {message}")
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def impute_missing_values(data, column, method='mean'):
+    """
+    Impute missing values using specified method.
+    """
+    if method == 'mean':
+        fill_value = data[column].mean()
+    elif method == 'median':
+        fill_value = data[column].median()
+    elif method == 'mode':
+        fill_value = data[column].mode()[0]
+    else:
+        raise ValueError("Method must be 'mean', 'median', or 'mode'")
+    
+    data[column] = data[column].fillna(fill_value)
+    return data
+
+def remove_duplicates(data, subset=None, keep='first'):
+    """
+    Remove duplicate rows from dataset.
+    """
+    return data.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_column(data, column, method='zscore'):
+    """
+    Normalize column using specified method.
+    """
+    if method == 'zscore':
+        data[column] = stats.zscore(data[column])
+    elif method == 'minmax':
+        data[column] = (data[column] - data[column].min()) / (data[column].max() - data[column].min())
+    else:
+        raise ValueError("Method must be 'zscore' or 'minmax'")
+    return data
+
+def clean_dataset(data, outlier_columns=None, impute_columns=None, normalize_columns=None):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    cleaned_data = data.copy()
+    
+    # Remove duplicates
+    cleaned_data = remove_duplicates(cleaned_data)
+    
+    # Handle outliers
+    if outlier_columns:
+        for col in outlier_columns:
+            outliers, lower, upper = detect_outliers_iqr(cleaned_data, col)
+            cleaned_data[col] = np.clip(cleaned_data[col], lower, upper)
+    
+    # Impute missing values
+    if impute_columns:
+        for col, method in impute_columns.items():
+            cleaned_data = impute_missing_values(cleaned_data, col, method)
+    
+    # Normalize columns
+    if normalize_columns:
+        for col, method in normalize_columns.items():
+            cleaned_data = normalize_column(cleaned_data, col, method)
+    
+    return cleaned_data
