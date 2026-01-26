@@ -199,4 +199,122 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nData validation passed: {is_valid}")
+    print(f"\nData validation passed: {is_valid}")import pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, z_threshold=3, normalize=True):
+    """
+    Clean dataset by handling missing values, removing outliers, and normalizing.
+    
+    Parameters:
+    df: pandas DataFrame
+    numeric_columns: list of column names to process (default: all numeric columns)
+    z_threshold: z-score threshold for outlier removal
+    normalize: whether to apply min-max normalization
+    
+    Returns:
+    Cleaned pandas DataFrame
+    """
+    
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col not in df_clean.columns:
+            continue
+            
+        series = df_clean[col]
+        
+        if series.dtype in [np.float64, np.int64]:
+            median_val = series.median()
+            df_clean[col] = series.fillna(median_val)
+            
+            z_scores = np.abs(stats.zscore(df_clean[col]))
+            df_clean = df_clean[z_scores < z_threshold]
+            
+            if normalize and len(df_clean[col]) > 0:
+                min_val = df_clean[col].min()
+                max_val = df_clean[col].max()
+                if max_val > min_val:
+                    df_clean[col] = (df_clean[col] - min_val) / (max_val - min_val)
+    
+    df_clean = df_clean.reset_index(drop=True)
+    return df_clean
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using IQR method.
+    
+    Parameters:
+    df: pandas DataFrame
+    column: column name to check
+    
+    Returns:
+    Tuple of (lower_bound, upper_bound, outlier_indices)
+    """
+    if column not in df.columns:
+        return None, None, []
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    outlier_indices = outliers.index.tolist()
+    
+    return lower_bound, upper_bound, outlier_indices
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df: pandas DataFrame to validate
+    required_columns: list of required column names
+    
+    Returns:
+    Tuple of (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': [1, 2, 3, 4, 5, 100],
+        'feature2': [10, 20, 30, 40, 50, 60],
+        'feature3': [100, 200, 300, 400, 500, 600]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    cleaned_df = clean_dataset(df, z_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    is_valid, message = validate_dataframe(cleaned_df)
+    print(f"\nValidation: {is_valid} - {message}")
+    
+    lower, upper, outliers = detect_outliers_iqr(df, 'feature1')
+    print(f"\nOutlier detection for 'feature1':")
+    print(f"Lower bound: {lower}, Upper bound: {upper}")
+    print(f"Outlier indices: {outliers}")
