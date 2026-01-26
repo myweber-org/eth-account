@@ -73,3 +73,118 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+from typing import Optional, List, Dict, Union
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        return self
+        
+    def fill_missing_values(self, strategy: str = 'mean', 
+                           columns: Optional[List[str]] = None,
+                           custom_value: Optional[Union[int, float, str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+            
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col] = self.df[col].fillna(self.df[col].mean())
+                elif strategy == 'median':
+                    self.df[col] = self.df[col].fillna(self.df[col].median())
+                elif strategy == 'mode':
+                    self.df[col] = self.df[col].fillna(self.df[col].mode()[0])
+                elif strategy == 'custom' and custom_value is not None:
+                    self.df[col] = self.df[col].fillna(custom_value)
+                elif strategy == 'ffill':
+                    self.df[col] = self.df[col].fillna(method='ffill')
+                elif strategy == 'bfill':
+                    self.df[col] = self.df[col].fillna(method='bfill')
+                    
+        return self
+        
+    def remove_outliers(self, columns: List[str], 
+                       method: str = 'iqr',
+                       threshold: float = 1.5) -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                if method == 'iqr':
+                    Q1 = self.df[col].quantile(0.25)
+                    Q3 = self.df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - threshold * IQR
+                    upper_bound = Q3 + threshold * IQR
+                    self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+                elif method == 'zscore':
+                    from scipy import stats
+                    z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+                    mask = z_scores < threshold
+                    valid_indices = self.df[col].dropna().index[mask]
+                    self.df = self.df.loc[valid_indices]
+                    
+        return self
+        
+    def normalize_columns(self, columns: List[str], 
+                         method: str = 'minmax') -> 'DataCleaner':
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                if method == 'minmax':
+                    min_val = self.df[col].min()
+                    max_val = self.df[col].max()
+                    if max_val != min_val:
+                        self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+                elif method == 'zscore':
+                    mean_val = self.df[col].mean()
+                    std_val = self.df[col].std()
+                    if std_val != 0:
+                        self.df[col] = (self.df[col] - mean_val) / std_val
+                        
+        return self
+        
+    def get_cleaning_report(self) -> Dict:
+        report = {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicates_removed': self.original_shape[0] - self.df.shape[0]
+        }
+        return report
+        
+    def get_dataframe(self) -> pd.DataFrame:
+        return self.df.copy()
+        
+    def save_cleaned_data(self, filepath: str, format: str = 'csv'):
+        if format == 'csv':
+            self.df.to_csv(filepath, index=False)
+        elif format == 'excel':
+            self.df.to_excel(filepath, index=False)
+        elif format == 'parquet':
+            self.df.to_parquet(filepath, index=False)
+
+def load_and_clean_csv(filepath: str, 
+                      fill_strategy: str = 'mean',
+                      remove_outliers: bool = True) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates()
+    cleaner.fill_missing_values(strategy=fill_strategy)
+    
+    if remove_outliers:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        if numeric_cols:
+            cleaner.remove_outliers(numeric_cols)
+    
+    report = cleaner.get_cleaning_report()
+    print(f"Cleaning completed. Removed {report['rows_removed']} rows.")
+    
+    return cleaner.get_dataframe()
