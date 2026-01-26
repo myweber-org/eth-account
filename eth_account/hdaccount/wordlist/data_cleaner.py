@@ -282,4 +282,72 @@ class DataCleaner:
         return self.df
     
     def get_cleaned_data(self):
-        return self.df.copy()
+        return self.df.copy()import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_numeric_data(df, numeric_columns):
+    """
+    Clean numeric columns by removing outliers and filling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        numeric_columns (list): List of numeric column names
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    return cleaned_df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to save
+        output_path (str): Output file path
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': range(1, 21),
+        'value': [10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 
+                  21, 22, 23, 24, 25, 100, 120, 5, 8, 150]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original data shape:", df.shape)
+    
+    cleaned_df = clean_numeric_data(df, ['value'])
+    print("Cleaned data shape:", cleaned_df.shape)
+    
+    save_cleaned_data(cleaned_df, 'cleaned_data.csv')
