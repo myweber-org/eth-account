@@ -226,3 +226,100 @@ if __name__ == "__main__":
     cleaned_summary = get_data_summary(cleaned)
     for key, value in cleaned_summary.items():
         print(f"{key}: {value}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Args:
+        data (list or np.array): Input data
+        column (int): Index of column to process (for 2D arrays)
+    
+    Returns:
+        np.array: Data with outliers removed
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    if data.ndim == 1:
+        column_data = data
+    else:
+        column_data = data[:, column]
+    
+    q1 = np.percentile(column_data, 25)
+    q3 = np.percentile(column_data, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    if data.ndim == 1:
+        filtered_data = column_data[(column_data >= lower_bound) & (column_data <= upper_bound)]
+    else:
+        mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+        filtered_data = data[mask]
+    
+    return filtered_data
+
+def calculate_statistics(data):
+    """
+    Calculate basic statistics for the data.
+    
+    Args:
+        data (np.array): Input data
+    
+    Returns:
+        dict: Dictionary containing statistics
+    """
+    if len(data) == 0:
+        return {
+            'mean': 0,
+            'median': 0,
+            'std': 0,
+            'min': 0,
+            'max': 0
+        }
+    
+    return {
+        'mean': np.mean(data),
+        'median': np.median(data),
+        'std': np.std(data),
+        'min': np.min(data),
+        'max': np.max(data)
+    }
+
+def clean_dataset(data, column=0):
+    """
+    Main function to clean dataset by removing outliers.
+    
+    Args:
+        data (list or np.array): Input data
+        column (int): Column index for 2D arrays
+    
+    Returns:
+        tuple: (cleaned_data, stats_before, stats_after)
+    """
+    if isinstance(data, list):
+        data = np.array(data)
+    
+    stats_before = calculate_statistics(data if data.ndim == 1 else data[:, column])
+    
+    cleaned_data = remove_outliers_iqr(data, column)
+    
+    stats_after = calculate_statistics(cleaned_data if data.ndim == 1 else cleaned_data[:, column])
+    
+    return cleaned_data, stats_before, stats_after
+
+if __name__ == "__main__":
+    test_data = np.random.normal(100, 15, 1000)
+    test_data[50] = 500
+    test_data[150] = -200
+    
+    cleaned, before, after = clean_dataset(test_data)
+    
+    print(f"Original data points: {len(test_data)}")
+    print(f"Cleaned data points: {len(cleaned)}")
+    print(f"Outliers removed: {len(test_data) - len(cleaned)}")
+    print(f"\nStatistics before cleaning: {before}")
+    print(f"Statistics after cleaning: {after}")
