@@ -1,86 +1,129 @@
-import pandas as pd
-import numpy as np
 
-def clean_csv_data(input_file, output_file):
-    """
-    Load a CSV file, perform basic cleaning operations,
-    and save the cleaned data to a new file.
-    """
-    try:
-        df = pd.read_csv(input_file)
-        print(f"Original shape: {df.shape}")
-        
-        df_cleaned = df.copy()
-        
-        df_cleaned = df_cleaned.drop_duplicates()
-        print(f"Shape after dropping duplicates: {df_cleaned.shape}")
-        
-        df_cleaned = df_cleaned.dropna(how='all')
-        print(f"Shape after dropping all-NA rows: {df_cleaned.shape}")
-        
-        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if df_cleaned[col].isnull().sum() > 0:
-                df_cleaned[col].fillna(df_cleaned[col].median(), inplace=True)
-        
-        text_cols = df_cleaned.select_dtypes(include=['object']).columns
-        for col in text_cols:
-            if df_cleaned[col].isnull().sum() > 0:
-                df_cleaned[col].fillna('Unknown', inplace=True)
-        
-        df_cleaned.to_csv(output_file, index=False)
-        print(f"Cleaned data saved to: {output_file}")
-        print(f"Final shape: {df_cleaned.shape}")
-        
-        return df_cleaned
-        
-    except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-        return None
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty.")
-        return None
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-        return None
-
-if __name__ == "__main__":
-    cleaned_df = clean_csv_data('raw_data.csv', 'cleaned_data.csv')
-    if cleaned_df is not None:
-        print("Data cleaning completed successfully.")
-        print(cleaned_df.head())
 import pandas as pd
 import numpy as np
 from scipy import stats
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                
+                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
+                clean_df = clean_df[mask]
+        
+        self.df = clean_df.reset_index(drop=True)
+        return self
+    
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                z_scores = np.abs(stats.zscore(self.df[col].fillna(self.df[col].mean())))
+                mask = z_scores < threshold
+                clean_df = clean_df[mask]
+        
+        self.df = clean_df.reset_index(drop=True)
+        return self
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        normalized_df = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val != min_val:
+                    normalized_df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        self.df = normalized_df
+        return self
+    
+    def normalize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        normalized_df = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    normalized_df[col] = (self.df[col] - mean_val) / std_val
+        
+        self.df = normalized_df
+        return self
+    
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                filled_df[col] = self.df[col].fillna(self.df[col].mean())
+        
+        self.df = filled_df
+        return self
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
+                filled_df[col] = self.df[col].fillna(self.df[col].median())
+        
+        self.df = filled_df
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_removed_count(self):
+        return self.original_shape[0] - self.df.shape[0]
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': self.df.shape[0],
+            'removed_rows': self.get_removed_count(),
+            'columns': self.df.shape[1],
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns)
+        }
+        return summary
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_dataset(file_path):
-    df = pd.read_csv(file_path)
+def clean_dataset(df, method='iqr', normalize=False, fill_missing=True):
+    cleaner = DataCleaner(df)
     
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    if method == 'iqr':
+        cleaner.remove_outliers_iqr()
+    elif method == 'zscore':
+        cleaner.remove_outliers_zscore()
     
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
+    if fill_missing:
+        cleaner.fill_missing_mean()
     
-    for col in numeric_columns:
-        df = normalize_minmax(df, col)
+    if normalize:
+        cleaner.normalize_minmax()
     
-    return df
-
-if __name__ == "__main__":
-    cleaned_data = clean_dataset('sample_data.csv')
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning complete. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+    return cleaner.get_cleaned_data(), cleaner.get_summary()
