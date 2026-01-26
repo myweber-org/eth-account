@@ -1,110 +1,62 @@
-import numpy as np
+
 import pandas as pd
+import numpy as np
 from scipy import stats
 
-def remove_outliers_iqr(data, column, threshold=1.5):
-    """
-    Remove outliers using IQR method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
+def load_dataset(filepath):
+    """Load dataset from CSV file."""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, column):
+    """Remove outliers using IQR method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
-    
-    lower_bound = Q1 - threshold * IQR
-    upper_bound = Q3 + threshold * IQR
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def normalize_minmax(data, column):
-    """
-    Normalize data using min-max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
+def zscore_normalization(df, column):
+    """Normalize column using Z-score method."""
+    df[column + '_normalized'] = stats.zscore(df[column])
+    return df
 
-def standardize_zscore(data, column):
-    """
-    Standardize data using z-score normalization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
+def minmax_normalization(df, column):
+    """Normalize column using Min-Max scaling."""
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_scaled'] = (df[column] - min_val) / (max_val - min_val)
+    return df
 
-def handle_missing_values(data, strategy='mean'):
-    """
-    Handle missing values in numeric columns
-    """
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
-    
+def handle_missing_values(df, strategy='mean'):
+    """Handle missing values with specified strategy."""
     if strategy == 'mean':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].mean())
+        return df.fillna(df.mean())
     elif strategy == 'median':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].median())
+        return df.fillna(df.median())
     elif strategy == 'mode':
-        for col in numeric_cols:
-            data[col] = data[col].fillna(data[col].mode()[0])
-    elif strategy == 'drop':
-        data = data.dropna(subset=numeric_cols)
-    
-    return data
+        return df.fillna(df.mode().iloc[0])
+    else:
+        return df.dropna()
 
-def clean_dataset(data, outlier_columns=None, normalize_columns=None, 
-                  standardize_columns=None, missing_strategy='mean'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    cleaned_data = data.copy()
+def clean_dataset(input_file, output_file):
+    """Main data cleaning pipeline."""
+    df = load_dataset(input_file)
     
-    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
     
-    if outlier_columns:
-        for col in outlier_columns:
-            if col in cleaned_data.columns:
-                cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    for column in numeric_columns:
+        df = remove_outliers_iqr(df, column)
     
-    if normalize_columns:
-        for col in normalize_columns:
-            if col in cleaned_data.columns:
-                cleaned_data[f'{col}_normalized'] = normalize_minmax(cleaned_data, col)
+    df = handle_missing_values(df, strategy='median')
     
-    if standardize_columns:
-        for col in standardize_columns:
-            if col in cleaned_data.columns:
-                cleaned_data[f'{col}_standardized'] = standardize_zscore(cleaned_data, col)
+    for column in numeric_columns:
+        df = zscore_normalization(df, column)
+        df = minmax_normalization(df, column)
     
-    return cleaned_data
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned data saved to {output_file}")
+    return df
 
-def get_data_summary(data):
-    """
-    Generate statistical summary of the dataset
-    """
-    summary = {
-        'shape': data.shape,
-        'missing_values': data.isnull().sum().to_dict(),
-        'data_types': data.dtypes.to_dict(),
-        'numeric_stats': data.describe().to_dict() if data.select_dtypes(include=[np.number]).shape[1] > 0 else {}
-    }
-    return summary
+if __name__ == "__main__":
+    clean_dataset('raw_data.csv', 'cleaned_data.csv')
