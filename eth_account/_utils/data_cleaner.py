@@ -516,3 +516,22 @@ def process_dataset(file_path, output_path=None):
     except Exception as e:
         print(f"Error processing dataset: {str(e)}")
         return None
+import pandas as pd
+
+def filter_and_clean_dataframe(df, filter_column, filter_value, columns_to_clean):
+    """
+    Filters a DataFrame based on a column value and cleans specified columns
+    by stripping whitespace and converting to uppercase.
+    """
+    if filter_column not in df.columns:
+        raise ValueError(f"Column '{filter_column}' not found in DataFrame.")
+
+    filtered_df = df[df[filter_column] == filter_value].copy()
+
+    for col in columns_to_clean:
+        if col in filtered_df.columns:
+            filtered_df[col] = filtered_df[col].astype(str).str.strip().str.upper()
+        else:
+            print(f"Warning: Column '{col}' not found for cleaning.")
+
+    return filtered_df.reset_index(drop=True)
