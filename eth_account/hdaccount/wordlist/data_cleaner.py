@@ -136,4 +136,46 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.copy()
+    
+    cleaned_df = cleaned_df.dropna()
+    
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    existing_columns = set(df.columns)
+    required_set = set(required_columns)
+    
+    return required_set.issubset(existing_columns)
