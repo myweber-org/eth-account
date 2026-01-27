@@ -1,99 +1,105 @@
+
 import pandas as pd
 import numpy as np
-from typing import List, Optional
 
-def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+def remove_outliers_iqr(df, column):
     """
-    Remove duplicate rows from DataFrame.
+    Remove outliers from a specified column in a DataFrame using the IQR method.
     
-    Args:
-        df: Input DataFrame
-        subset: Columns to consider for identifying duplicates
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to clean.
     
     Returns:
-        DataFrame with duplicates removed
+    pd.DataFrame: DataFrame with outliers removed.
     """
-    return df.drop_duplicates(subset=subset, keep='first')
-
-def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
-    """
-    Normalize specified column using selected method.
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    Args:
-        df: Input DataFrame
-        column: Column name to normalize
-        method: Normalization method ('minmax' or 'zscore')
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
     
     Returns:
-        DataFrame with normalized column
+    dict: Dictionary containing summary statistics.
     """
-    df_copy = df.copy()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    if method == 'minmax':
-        min_val = df_copy[column].min()
-        max_val = df_copy[column].max()
-        if max_val > min_val:
-            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
     
-    elif method == 'zscore':
-        mean_val = df_copy[column].mean()
-        std_val = df_copy[column].std()
-        if std_val > 0:
-            df_copy[column] = (df_copy[column] - mean_val) / std_val
-    
-    return df_copy
+    return stats
 
-def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+def clean_dataset(df, columns_to_clean):
     """
-    Handle missing values in numeric columns.
+    Clean multiple columns in a DataFrame by removing outliers.
     
-    Args:
-        df: Input DataFrame
-        strategy: Imputation strategy ('mean', 'median', or 'drop')
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    columns_to_clean (list): List of column names to clean.
     
     Returns:
-        DataFrame with handled missing values
-    """
-    df_copy = df.copy()
-    numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
-    
-    if strategy == 'drop':
-        df_copy = df_copy.dropna(subset=numeric_cols)
-    elif strategy == 'mean':
-        for col in numeric_cols:
-            df_copy[col] = df_copy[col].fillna(df_copy[col].mean())
-    elif strategy == 'median':
-        for col in numeric_cols:
-            df_copy[col] = df_copy[col].fillna(df_copy[col].median())
-    
-    return df_copy
-
-def clean_dataframe(df: pd.DataFrame, 
-                   deduplicate: bool = True,
-                   normalize_cols: Optional[List[str]] = None,
-                   missing_strategy: str = 'mean') -> pd.DataFrame:
-    """
-    Comprehensive data cleaning pipeline.
-    
-    Args:
-        df: Input DataFrame
-        deduplicate: Whether to remove duplicates
-        normalize_cols: Columns to normalize
-        missing_strategy: Strategy for handling missing values
-    
-    Returns:
-        Cleaned DataFrame
+    pd.DataFrame: Cleaned DataFrame.
+    dict: Dictionary of summary statistics for each cleaned column.
     """
     cleaned_df = df.copy()
+    statistics = {}
     
-    if deduplicate:
-        cleaned_df = remove_duplicates(cleaned_df)
+    for column in columns_to_clean:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            
+            stats = calculate_summary_statistics(cleaned_df, column)
+            stats['outliers_removed'] = removed_count
+            statistics[column] = stats
     
-    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    return cleaned_df, statistics
+
+if __name__ == "__main__":
+    sample_data = {
+        'temperature': [22, 23, 24, 25, 26, 27, 28, 29, 30, 100],
+        'humidity': [45, 46, 47, 48, 49, 50, 51, 52, 53, 200],
+        'pressure': [1013, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 500]
+    }
     
-    if normalize_cols:
-        for col in normalize_cols:
-            if col in cleaned_df.columns:
-                cleaned_df = normalize_column(cleaned_df, col)
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
     
-    return cleaned_df
+    columns_to_clean = ['temperature', 'humidity', 'pressure']
+    cleaned_df, stats = clean_dataset(df, columns_to_clean)
+    
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    print("Summary Statistics:")
+    for column, column_stats in stats.items():
+        print(f"\n{column}:")
+        for stat_name, stat_value in column_stats.items():
+            print(f"  {stat_name}: {stat_value}")
