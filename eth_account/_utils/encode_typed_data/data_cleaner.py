@@ -126,3 +126,79 @@ def validate_data(data, required_columns, allow_nan=False):
             return False, f"NaN values found in columns: {nan_columns}"
     
     return True, "Data validation passed"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_minmax(dataframe, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    """
+    df_normalized = dataframe.copy()
+    for col in columns:
+        if col in df_normalized.columns:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def detect_skewed_columns(dataframe, skew_threshold=0.5):
+    """
+    Identify columns with significant skewness.
+    """
+    skewed_cols = []
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > skew_threshold:
+            skewed_cols.append((col, skewness))
+    return sorted(skewed_cols, key=lambda x: abs(x[1]), reverse=True)
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5):
+    """
+    Perform comprehensive data cleaning on numeric columns.
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_threshold)
+    
+    cleaned_df = normalize_minmax(cleaned_df, numeric_columns)
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    """
+    validation_results = {
+        'has_data': not dataframe.empty,
+        'row_count': len(dataframe),
+        'column_count': len(dataframe.columns),
+        'missing_values': dataframe.isnull().sum().sum(),
+        'duplicate_rows': dataframe.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        validation_results['missing_required_columns'] = missing_columns
+    
+    return validation_results
