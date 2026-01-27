@@ -93,3 +93,82 @@ if __name__ == "__main__":
     
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("Cleaned statistics:", calculate_summary_statistics(cleaned_df, 'value'))
+import pandas as pd
+import numpy as np
+import re
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean and preprocess CSV data by handling missing values,
+    standardizing formats, and removing duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Standardize column names
+        df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
+        
+        # Handle missing values
+        for col in df.columns:
+            if df[col].dtype == 'object':
+                df[col] = df[col].fillna('unknown')
+            else:
+                df[col] = df[col].fillna(df[col].median())
+        
+        # Remove special characters from text columns
+        text_columns = df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            df[col] = df[col].apply(lambda x: re.sub(r'[^\w\s]', '', str(x)))
+        
+        # Convert date columns if present
+        date_columns = [col for col in df.columns if 'date' in col]
+        for col in date_columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning complete. Cleaned file saved as: {output_file}")
+        return True
+        
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+def validate_data(file_path):
+    """
+    Validate the cleaned data for basic quality checks.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        validation_results = {
+            'total_rows': len(df),
+            'total_columns': len(df.columns),
+            'missing_values': df.isnull().sum().sum(),
+            'duplicate_rows': df.duplicated().sum(),
+            'data_types': df.dtypes.to_dict()
+        }
+        
+        print("Data Validation Results:")
+        for key, value in validation_results.items():
+            print(f"{key}: {value}")
+        
+        return validation_results
+        
+    except Exception as e:
+        print(f"Validation error: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    if clean_csv_data(input_csv, output_csv):
+        validate_data(output_csv)
