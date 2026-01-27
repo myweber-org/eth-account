@@ -1,39 +1,85 @@
-def remove_duplicates(data_list):
-    """
-    Remove duplicate entries from a list while preserving order.
-    Returns a new list with unique elements.
-    """
-    seen = set()
-    unique_list = []
-    for item in data_list:
-        if item not in seen:
-            seen.add(item)
-            unique_list.append(item)
-    return unique_list
 
-def clean_numeric_data(values, default=0):
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
     """
-    Clean numeric data by converting strings to floats,
-    handling None values, and replacing invalid entries with default.
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
     """
-    cleaned = []
-    for val in values:
-        if val is None:
-            cleaned.append(default)
-        elif isinstance(val, str):
-            try:
-                cleaned.append(float(val))
-            except ValueError:
-                cleaned.append(default)
-        else:
-            cleaned.append(float(val))
-    return cleaned
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def main():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    data = {
+        'values': np.random.normal(100, 15, 1000).tolist() + [500, -200, 1000]
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original statistics:")
+    original_stats = calculate_statistics(df, 'values')
+    for key, value in original_stats.items():
+        print(f"{key}: {value:.2f}")
+    
+    print(f"\nOriginal shape: {df.shape}")
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    
+    print("\nCleaned statistics:")
+    cleaned_stats = calculate_statistics(cleaned_df, 'values')
+    for key, value in cleaned_stats.items():
+        print(f"{key}: {value:.2f}")
+    
+    print(f"\nCleaned shape: {cleaned_df.shape}")
+    print(f"Outliers removed: {len(df) - len(cleaned_df)}")
 
 if __name__ == "__main__":
-    sample_data = [1, 2, 2, 3, 4, 4, 5]
-    print("Original:", sample_data)
-    print("Cleaned:", remove_duplicates(sample_data))
-    
-    numeric_data = ["1.5", "invalid", None, "3.7", 2.0]
-    print("Numeric data:", numeric_data)
-    print("Cleaned numeric:", clean_numeric_data(numeric_data))
+    main()
