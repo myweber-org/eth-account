@@ -418,4 +418,69 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=2)
     print(f"Validation result: {is_valid}")
-    print(f"Validation message: {message}")
+    print(f"Validation message: {message}")import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for identifying duplicates
+        keep: determines which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    rows_removed = len(df) - len(cleaned_df)
+    
+    if rows_removed > 0:
+        print(f"Removed {rows_removed} duplicate rows")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of column names that must be present
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to appropriate dtype and handling errors.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to clean
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    for col in columns:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    
+    return df
