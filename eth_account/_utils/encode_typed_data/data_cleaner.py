@@ -1,69 +1,128 @@
-import pandas as pd
+
 import numpy as np
+import pandas as pd
 
-def load_data(filepath):
-    """Load data from a CSV file."""
-    try:
-        df = pd.read_csv(filepath)
-        print(f"Data loaded successfully. Shape: {df.shape}")
-        return df
-    except FileNotFoundError:
-        print(f"Error: File not found at {filepath}")
-        return None
-
-def remove_outliers(df, column, threshold=3):
-    """Remove outliers using the Z-score method."""
-    if column not in df.columns:
-        print(f"Column '{column}' not found in DataFrame.")
-        return df
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
     
-    z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
-    df_clean = df[z_scores < threshold]
-    removed_count = len(df) - len(df_clean)
-    print(f"Removed {removed_count} outliers from column '{column}'.")
-    return df_clean
-
-def normalize_column(df, column):
-    """Normalize a column to range [0, 1]."""
-    if column not in df.columns:
-        print(f"Column '{column}' not found in DataFrame.")
-        return df
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier (default 1.5)
     
-    min_val = df[column].min()
-    max_val = df[column].max()
+    Returns:
+        Filtered DataFrame without outliers
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling to range [0, 1].
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
     
     if max_val == min_val:
-        print(f"Column '{column}' has constant values. Normalization skipped.")
-        return df
+        data[f'{column}_normalized'] = 0.5
+    else:
+        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
     
-    df[column] = (df[column] - min_val) / (max_val - min_val)
-    print(f"Column '{column}' normalized to range [0, 1].")
-    return df
+    return data
 
-def clean_data(df, numeric_columns):
-    """Main function to clean the dataset."""
-    if df is None or df.empty:
-        print("DataFrame is empty or None.")
-        return df
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
     
-    df_clean = df.copy()
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
     
-    for col in numeric_columns:
-        if col in df_clean.columns:
-            df_clean = remove_outliers(df_clean, col)
-            df_clean = normalize_column(df_clean, col)
-        else:
-            print(f"Skipping column '{col}' as it does not exist.")
+    Returns:
+        DataFrame with standardized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    print(f"Data cleaning complete. Final shape: {df_clean.shape}")
-    return df_clean
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        data[f'{column}_standardized'] = 0
+    else:
+        data[f'{column}_standardized'] = (data[column] - mean_val) / std_val
+    
+    return data
 
-if __name__ == "__main__":
-    data_path = "sample_data.csv"
-    numeric_cols = ["feature1", "feature2", "feature3"]
+def clean_dataset(data, numeric_columns, outlier_multiplier=1.5, normalize=True, standardize=False):
+    """
+    Comprehensive data cleaning pipeline.
     
-    raw_data = load_data(data_path)
-    if raw_data is not None:
-        cleaned_data = clean_data(raw_data, numeric_cols)
-        cleaned_data.to_csv("cleaned_data.csv", index=False)
-        print("Cleaned data saved to 'cleaned_data.csv'.")
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names to process
+        outlier_multiplier: IQR multiplier for outlier removal
+        normalize: whether to apply min-max normalization
+        standardize: whether to apply z-score standardization
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            
+            if normalize:
+                cleaned_data = normalize_minmax(cleaned_data, column)
+            
+            if standardize:
+                cleaned_data = standardize_zscore(cleaned_data, column)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns, allow_nan=False):
+    """
+    Validate data structure and content.
+    
+    Args:
+        data: pandas DataFrame to validate
+        required_columns: list of required column names
+        allow_nan: whether NaN values are allowed
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    if not allow_nan:
+        nan_columns = data.columns[data.isna().any()].tolist()
+        if nan_columns:
+            return False, f"NaN values found in columns: {nan_columns}"
+    
+    return True, "Data validation passed"
