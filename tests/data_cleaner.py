@@ -62,4 +62,73 @@ if __name__ == "__main__":
         cleaned_df = clean_csv_data(input_file, fill_method='median')
         save_cleaned_data(cleaned_df, output_file)
     except Exception as e:
-        print(f"Error during data cleaning: {e}")
+        print(f"Error during data cleaning: {e}")import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from a DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in specified columns using a given strategy.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                fill_value = 0
+            df_filled[col].fillna(fill_value, inplace=True)
+        else:
+            df_filled[col].fillna('Unknown', inplace=True)
+    return df_filled
+
+def normalize_column(df, column):
+    """
+    Normalize a numeric column to range [0, 1].
+    """
+    if df[column].dtype in [np.float64, np.int64]:
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val > min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a column using the IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def clean_dataframe(df, operations):
+    """
+    Apply a sequence of cleaning operations to a DataFrame.
+    operations: list of tuples (function_name, kwargs)
+    """
+    cleaned_df = df.copy()
+    for func_name, kwargs in operations:
+        if func_name == 'remove_duplicates':
+            cleaned_df = remove_duplicates(cleaned_df, **kwargs)
+        elif func_name == 'fill_missing':
+            cleaned_df = fill_missing_values(cleaned_df, **kwargs)
+        elif func_name == 'normalize':
+            cleaned_df = normalize_column(cleaned_df, **kwargs)
+        elif func_name == 'remove_outliers':
+            cleaned_df = remove_outliers_iqr(cleaned_df, **kwargs)
+    return cleaned_df
