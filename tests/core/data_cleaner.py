@@ -1,138 +1,99 @@
-
-import numpy as np
 import pandas as pd
+import numpy as np
+from typing import List, Optional
 
-def remove_outliers_iqr(data, column, factor=1.5):
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
     """
-    Remove outliers using the Interquartile Range method.
+    Remove duplicate rows from DataFrame.
     
     Args:
-        data: pandas DataFrame
-        column: column name to process
-        factor: multiplier for IQR (default 1.5)
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
     Returns:
-        DataFrame with outliers removed
+        DataFrame with duplicates removed
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    
-    lower_bound = q1 - factor * iqr
-    upper_bound = q3 + factor * iqr
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return df.drop_duplicates(subset=subset, keep='first')
 
-def normalize_minmax(data, column):
+def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
     """
-    Normalize data using Min-Max scaling to range [0, 1].
+    Normalize specified column using selected method.
     
     Args:
-        data: pandas DataFrame
-        column: column name to normalize
+        df: Input DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
     
     Returns:
         DataFrame with normalized column
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    df_copy = df.copy()
     
-    min_val = data[column].min()
-    max_val = data[column].max()
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val > min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
     
-    if max_val == min_val:
-        data[column + '_normalized'] = 0.5
-    else:
-        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val > 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
     
-    return data
+    return df_copy
 
-def standardize_zscore(data, column):
-    """
-    Standardize data using Z-score normalization.
-    
-    Args:
-        data: pandas DataFrame
-        column: column name to standardize
-    
-    Returns:
-        DataFrame with standardized column
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        data[column + '_standardized'] = 0
-    else:
-        data[column + '_standardized'] = (data[column] - mean_val) / std_val
-    
-    return data
-
-def handle_missing_values(data, strategy='mean'):
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
     """
     Handle missing values in numeric columns.
     
     Args:
-        data: pandas DataFrame
-        strategy: imputation strategy ('mean', 'median', 'mode', or 'drop')
+        df: Input DataFrame
+        strategy: Imputation strategy ('mean', 'median', or 'drop')
     
     Returns:
         DataFrame with handled missing values
     """
-    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    df_copy = df.copy()
+    numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
     
     if strategy == 'drop':
-        return data.dropna(subset=numeric_cols)
+        df_copy = df_copy.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        for col in numeric_cols:
+            df_copy[col] = df_copy[col].fillna(df_copy[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df_copy[col] = df_copy[col].fillna(df_copy[col].median())
     
-    for col in numeric_cols:
-        if data[col].isnull().any():
-            if strategy == 'mean':
-                fill_value = data[col].mean()
-            elif strategy == 'median':
-                fill_value = data[col].median()
-            elif strategy == 'mode':
-                fill_value = data[col].mode()[0]
-            else:
-                raise ValueError(f"Unknown strategy: {strategy}")
-            
-            data[col] = data[col].fillna(fill_value)
-    
-    return data
+    return df_copy
 
-def clean_dataset(data, config):
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   normalize_cols: Optional[List[str]] = None,
+                   missing_strategy: str = 'mean') -> pd.DataFrame:
     """
-    Apply multiple cleaning operations based on configuration.
+    Comprehensive data cleaning pipeline.
     
     Args:
-        data: pandas DataFrame
-        config: dictionary with cleaning configuration
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        normalize_cols: Columns to normalize
+        missing_strategy: Strategy for handling missing values
     
     Returns:
         Cleaned DataFrame
     """
-    cleaned_data = data.copy()
+    cleaned_df = df.copy()
     
-    if 'missing_values' in config:
-        cleaned_data = handle_missing_values(cleaned_data, config['missing_values'])
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
     
-    if 'outlier_removal' in config:
-        for col in config['outlier_removal'].get('columns', []):
-            factor = config['outlier_removal'].get('factor', 1.5)
-            cleaned_data = remove_outliers_iqr(cleaned_data, col, factor)
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
     
-    if 'normalization' in config:
-        for col in config['normalization'].get('minmax', []):
-            cleaned_data = normalize_minmax(cleaned_data, col)
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
     
-    if 'standardization' in config:
-        for col in config['standardization'].get('zscore', []):
-            cleaned_data = standardize_zscore(cleaned_data, col)
-    
-    return cleaned_data
+    return cleaned_df
