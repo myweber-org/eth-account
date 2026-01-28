@@ -1,85 +1,97 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
+from typing import List, Optional
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        clean_df = self.df.copy()
-        for col in columns:
-            if col in clean_df.columns:
-                Q1 = clean_df[col].quantile(0.25)
-                Q3 = clean_df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
-        
-        removed_count = len(self.df) - len(clean_df)
-        self.df = clean_df
-        return removed_count
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
     
-    def normalize_data(self, columns=None, method='zscore'):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-        
-        normalized_df = self.df.copy()
-        for col in columns:
-            if col in normalized_df.columns:
-                if method == 'zscore':
-                    normalized_df[col] = stats.zscore(normalized_df[col])
-                elif method == 'minmax':
-                    col_min = normalized_df[col].min()
-                    col_max = normalized_df[col].max()
-                    normalized_df[col] = (normalized_df[col] - col_min) / (col_max - col_min)
-                elif method == 'robust':
-                    median = normalized_df[col].median()
-                    iqr = normalized_df[col].quantile(0.75) - normalized_df[col].quantile(0.25)
-                    normalized_df[col] = (normalized_df[col] - median) / iqr
-        
-        self.df = normalized_df
-        return self.df
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
     
-    def handle_missing_values(self, strategy='mean', fill_value=None):
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-        categorical_cols = self.df.select_dtypes(exclude=[np.number]).columns
-        
-        if strategy == 'drop':
-            self.df = self.df.dropna()
-        elif strategy == 'fill':
-            if fill_value is not None:
-                self.df = self.df.fillna(fill_value)
-            else:
-                for col in numeric_cols:
-                    self.df[col] = self.df[col].fillna(self.df[col].mean())
-                for col in categorical_cols:
-                    self.df[col] = self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else 'Unknown')
-        
-        return self.df
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
+    """
+    Normalize specified column using selected method.
     
-    def get_cleaning_report(self):
-        report = {
-            'original_rows': self.original_shape[0],
-            'current_rows': len(self.df),
-            'original_columns': self.original_shape[1],
-            'current_columns': self.df.shape[1],
-            'rows_removed': self.original_shape[0] - len(self.df),
-            'missing_values': self.df.isnull().sum().sum()
-        }
-        return report
+    Args:
+        df: Input DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
     
-    def save_cleaned_data(self, filepath, format='csv'):
-        if format == 'csv':
-            self.df.to_csv(filepath, index=False)
-        elif format == 'excel':
-            self.df.to_excel(filepath, index=False)
-        elif format == 'parquet':
-            self.df.to_parquet(filepath, index=False)
-        return filepath
+    Returns:
+        DataFrame with normalized column
+    """
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val > min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val > 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Handle missing values in numeric columns.
+    
+    Args:
+        df: Input DataFrame
+        strategy: Imputation strategy ('mean', 'median', or 'drop')
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        df_copy = df_copy.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        df_copy[numeric_cols] = df_copy[numeric_cols].fillna(df_copy[numeric_cols].mean())
+    elif strategy == 'median':
+        df_copy[numeric_cols] = df_copy[numeric_cols].fillna(df_copy[numeric_cols].median())
+    
+    return df_copy
+
+def clean_dataframe(df: pd.DataFrame, 
+                   deduplicate: bool = True,
+                   normalize_cols: Optional[List[str]] = None,
+                   missing_strategy: str = 'mean') -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        normalize_cols: Columns to normalize
+        missing_strategy: Strategy for handling missing values
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    if normalize_cols:
+        for col in normalize_cols:
+            if col in cleaned_df.columns:
+                cleaned_df = normalize_column(cleaned_df, col)
+    
+    return cleaned_df
