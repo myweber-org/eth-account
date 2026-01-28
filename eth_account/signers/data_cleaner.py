@@ -74,4 +74,60 @@ def validate_email_column(df, email_column):
         lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
     )
     
-    return validated_df
+    return validated_dfimport pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame with nulls removed and duplicates dropped.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate that the input is a pandas DataFrame and not empty.
+    
+    Parameters:
+    df: Input to validate
+    
+    Returns:
+    bool: True if valid, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input must be a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    return True
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     sample_data = pd.DataFrame({
+#         'A': [1, 2, None, 4, 2],
+#         'B': [5, 6, 7, None, 6],
+#         'C': [8, 9, 10, 11, 9]
+#     })
+#     
+#     if validate_dataframe(sample_data):
+#         cleaned_data = clean_dataset(sample_data)
+#         print("Original shape:", sample_data.shape)
+#         print("Cleaned shape:", cleaned_data.shape)
+#         print("\nCleaned data:")
+#         print(cleaned_data)
