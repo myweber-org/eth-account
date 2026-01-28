@@ -1,57 +1,50 @@
-import csv
-import re
-from typing import List, Dict, Any
+import pandas as pd
+import numpy as np
 
-def remove_duplicates(data: List[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
-    seen = set()
-    unique_data = []
-    for row in data:
-        if row[key] not in seen:
-            seen.add(row[key])
-            unique_data.append(row)
-    return unique_data
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+    """
+    Load a CSV file, handle missing values, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        # Check for missing values
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values.")
+            
+            if missing_strategy == 'mean':
+                # Fill numeric columns with mean
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+                # Fill non-numeric with mode
+                non_numeric_cols = df.select_dtypes(exclude=[np.number]).columns
+                for col in non_numeric_cols:
+                    df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+            elif missing_strategy == 'drop':
+                df = df.dropna()
+            else:
+                raise ValueError("Strategy must be 'mean' or 'drop'")
+        
+        # Remove duplicate rows
+        duplicates = df.duplicated().sum()
+        if duplicates > 0:
+            print(f"Removing {duplicates} duplicate rows.")
+            df = df.drop_duplicates()
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}. New shape: {df.shape}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+        return False
+    except Exception as e:
+        print(f"Error during cleaning: {e}")
+        return False
 
-def normalize_string(value: str) -> str:
-    if not isinstance(value, str):
-        return value
-    value = value.strip()
-    value = re.sub(r'\s+', ' ', value)
-    return value.lower()
-
-def clean_numeric(value: Any) -> float:
-    if isinstance(value, (int, float)):
-        return float(value)
-    if isinstance(value, str):
-        cleaned = re.sub(r'[^\d.-]', '', value)
-        try:
-            return float(cleaned)
-        except ValueError:
-            return 0.0
-    return 0.0
-
-def validate_email(email: str) -> bool:
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, email))
-
-def process_csv(input_path: str, output_path: str, key_column: str) -> None:
-    with open(input_path, 'r', newline='', encoding='utf-8') as infile:
-        reader = csv.DictReader(infile)
-        data = list(reader)
-    
-    cleaned_data = remove_duplicates(data, key_column)
-    
-    for row in cleaned_data:
-        for field in row:
-            if field.endswith('_str'):
-                row[field] = normalize_string(row[field])
-            elif field.endswith('_num'):
-                row[field] = clean_numeric(row[field])
-            elif field == 'email':
-                if not validate_email(row[field]):
-                    row[field] = ''
-    
-    fieldnames = cleaned_data[0].keys() if cleaned_data else []
-    with open(output_path, 'w', newline='', encoding='utf-8') as outfile:
-        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(cleaned_data)
+if __name__ == "__main__":
+    # Example usage
+    clean_csv_data('raw_data.csv', 'cleaned_data.csv', missing_strategy='mean')
