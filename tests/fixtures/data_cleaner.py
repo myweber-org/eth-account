@@ -1,93 +1,78 @@
 import pandas as pd
-import sys
+import numpy as np
+from scipy import stats
 
-def remove_duplicates(input_file, output_file=None, subset=None, keep='first'):
+def load_and_clean_data(filepath):
     """
-    Remove duplicate rows from a CSV file.
-    
-    Args:
-        input_file (str): Path to input CSV file
-        output_file (str, optional): Path to output CSV file. If None, overwrites input file
-        subset (list, optional): Columns to consider for identifying duplicates
-        keep (str): Which duplicate to keep - 'first', 'last', or False to drop all duplicates
-    
-    Returns:
-        int: Number of duplicate rows removed
+    Load a CSV file and perform basic data cleaning.
     """
     try:
-        df = pd.read_csv(input_file)
-        initial_rows = len(df)
-        
-        df_clean = df.drop_duplicates(subset=subset, keep=keep)
-        final_rows = len(df_clean)
-        
-        duplicates_removed = initial_rows - final_rows
-        
-        if output_file is None:
-            output_file = input_file
-        
-        df_clean.to_csv(output_file, index=False)
-        
-        print(f"Removed {duplicates_removed} duplicate rows")
-        print(f"Original rows: {initial_rows}, Cleaned rows: {final_rows}")
-        print(f"Saved to: {output_file}")
-        
-        return duplicates_removed
-        
+        df = pd.read_csv(filepath)
+        print(f"Loaded data with shape: {df.shape}")
     except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found")
-        return -1
-    except pd.errors.EmptyDataError:
-        print(f"Error: File '{input_file}' is empty")
-        return -1
+        print(f"Error: File not found at {filepath}")
+        return None
     except Exception as e:
-        print(f"Error processing file: {str(e)}")
-        return -1
+        print(f"Error loading file: {e}")
+        return None
+
+    # Remove duplicate rows
+    initial_rows = df.shape[0]
+    df.drop_duplicates(inplace=True)
+    duplicates_removed = initial_rows - df.shape[0]
+    print(f"Removed {duplicates_removed} duplicate rows.")
+
+    # Handle missing values: fill numeric columns with median, drop rows for categorical if too many missing
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if df[col].isnull().sum() > 0:
+            median_val = df[col].median()
+            df[col].fillna(median_val, inplace=True)
+            print(f"Filled missing values in {col} with median: {median_val}")
+
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+    for col in categorical_cols:
+        missing_count = df[col].isnull().sum()
+        if missing_count > 0:
+            if missing_count / len(df) < 0.1:  # Less than 10% missing
+                mode_val = df[col].mode()[0]
+                df[col].fillna(mode_val, inplace=True)
+                print(f"Filled missing values in {col} with mode: {mode_val}")
+            else:
+                df.dropna(subset=[col], inplace=True)
+                print(f"Dropped rows with missing values in {col}")
+
+    # Remove outliers using Z-score for numeric columns (optional, based on threshold)
+    z_threshold = 3
+    for col in numeric_cols:
+        z_scores = np.abs(stats.zscore(df[col]))
+        outlier_indices = np.where(z_scores > z_threshold)[0]
+        if len(outlier_indices) > 0:
+            df = df.drop(df.index[outlier_indices])
+            print(f"Removed {len(outlier_indices)} outliers from {col} based on Z-score > {z_threshold}")
+
+    # Normalize numeric columns to range [0, 1] (optional)
+    for col in numeric_cols:
+        if df[col].max() - df[col].min() > 0:  # Avoid division by zero
+            df[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+            print(f"Normalized column {col} to range [0, 1]")
+
+    print(f"Final data shape: {df.shape}")
+    return df
+
+def save_cleaned_data(df, output_filepath):
+    """
+    Save the cleaned DataFrame to a CSV file.
+    """
+    if df is not None:
+        df.to_csv(output_filepath, index=False)
+        print(f"Cleaned data saved to {output_filepath}")
+    else:
+        print("No data to save.")
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python data_cleaner.py <input_file> [output_file]")
-        print("Example: python data_cleaner.py data.csv cleaned_data.csv")
-        sys.exit(1)
-    
-    input_file = sys.argv[1]
-    output_file = sys.argv[2] if len(sys.argv) > 2 else None
-    
-    remove_duplicates(input_file, output_file)
-import numpy as np
-import pandas as pd
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
 
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-
-def normalize_minmax(data, column):
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
-
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df = normalize_minmax(cleaned_df, col)
-    return cleaned_df
-
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature_a': np.random.normal(100, 15, 200),
-        'feature_b': np.random.exponential(50, 200),
-        'category': np.random.choice(['X', 'Y', 'Z'], 200)
-    })
-    
-    numeric_cols = ['feature_a', 'feature_b']
-    result = clean_dataset(sample_data, numeric_cols)
-    print(f"Original shape: {sample_data.shape}")
-    print(f"Cleaned shape: {result.shape}")
-    print(result.head())
+    cleaned_df = load_and_clean_data(input_file)
+    save_cleaned_data(cleaned_df, output_file)
