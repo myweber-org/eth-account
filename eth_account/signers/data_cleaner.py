@@ -1,103 +1,118 @@
-import pandas as pd
-import numpy as np
+import re
 from typing import List, Optional
 
-def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+def remove_special_characters(text: str, keep_spaces: bool = True) -> str:
     """
-    Remove duplicate rows from DataFrame.
+    Remove all non-alphanumeric characters from the input string.
     
     Args:
-        df: Input DataFrame
-        subset: Columns to consider for identifying duplicates
+        text: The input string to clean.
+        keep_spaces: If True, spaces are preserved. If False, spaces are removed.
     
     Returns:
-        DataFrame with duplicates removed
+        The cleaned string containing only alphanumeric characters and optionally spaces.
     """
-    return df.drop_duplicates(subset=subset, keep='first')
+    if keep_spaces:
+        pattern = r'[^A-Za-z0-9 ]+'
+    else:
+        pattern = r'[^A-Za-z0-9]+'
+    
+    return re.sub(pattern, '', text)
 
-def normalize_column(df: pd.DataFrame, column: str, method: str = 'minmax') -> pd.DataFrame:
+def normalize_whitespace(text: str) -> str:
     """
-    Normalize specified column using given method.
+    Replace multiple consecutive whitespace characters with a single space.
     
     Args:
-        df: Input DataFrame
-        column: Column name to normalize
-        method: Normalization method ('minmax' or 'zscore')
+        text: The input string to normalize.
     
     Returns:
-        DataFrame with normalized column
+        String with normalized whitespace.
     """
-    df_copy = df.copy()
-    
-    if method == 'minmax':
-        min_val = df_copy[column].min()
-        max_val = df_copy[column].max()
-        if max_val > min_val:
-            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
-    
-    elif method == 'zscore':
-        mean_val = df_copy[column].mean()
-        std_val = df_copy[column].std()
-        if std_val > 0:
-            df_copy[column] = (df_copy[column] - mean_val) / std_val
-    
-    return df_copy
+    return re.sub(r'\s+', ' ', text).strip()
 
-def handle_missing_values(df: pd.DataFrame, strategy: str = 'mean') -> pd.DataFrame:
+def clean_text_pipeline(text: str, 
+                       remove_special: bool = True,
+                       normalize_ws: bool = True,
+                       to_lowercase: bool = False) -> str:
     """
-    Handle missing values in numeric columns.
+    Apply a series of cleaning operations to the input text.
     
     Args:
-        df: Input DataFrame
-        strategy: Imputation strategy ('mean', 'median', or 'drop')
+        text: The input string to process.
+        remove_special: Whether to remove special characters.
+        normalize_ws: Whether to normalize whitespace.
+        to_lowercase: Whether to convert text to lowercase.
     
     Returns:
-        DataFrame with handled missing values
+        The processed text after applying all specified operations.
     """
-    df_copy = df.copy()
-    numeric_cols = df_copy.select_dtypes(include=[np.number]).columns
+    processed = text
     
-    if strategy == 'drop':
-        return df_copy.dropna(subset=numeric_cols)
+    if remove_special:
+        processed = remove_special_characters(processed)
     
-    for col in numeric_cols:
-        if strategy == 'mean':
-            fill_value = df_copy[col].mean()
-        elif strategy == 'median':
-            fill_value = df_copy[col].median()
-        else:
-            continue
-        
-        df_copy[col] = df_copy[col].fillna(fill_value)
+    if normalize_ws:
+        processed = normalize_whitespace(processed)
     
-    return df_copy
+    if to_lowercase:
+        processed = processed.lower()
+    
+    return processed
 
-def clean_dataframe(df: pd.DataFrame, 
-                   deduplicate: bool = True,
-                   normalize_cols: Optional[List[str]] = None,
-                   missing_strategy: str = 'mean') -> pd.DataFrame:
+def batch_clean_texts(texts: List[str], **kwargs) -> List[str]:
     """
-    Comprehensive data cleaning pipeline.
+    Apply cleaning pipeline to a list of text strings.
     
     Args:
-        df: Input DataFrame
-        deduplicate: Whether to remove duplicates
-        normalize_cols: Columns to normalize
-        missing_strategy: Strategy for handling missing values
+        texts: List of strings to clean.
+        **kwargs: Arguments to pass to clean_text_pipeline.
     
     Returns:
-        Cleaned DataFrame
+        List of cleaned text strings.
     """
-    cleaned_df = df.copy()
+    return [clean_text_pipeline(text, **kwargs) for text in texts]
+
+def validate_email(email: str) -> bool:
+    """
+    Validate if a string is a properly formatted email address.
     
-    if deduplicate:
-        cleaned_df = remove_duplicates(cleaned_df)
+    Args:
+        email: The string to validate as an email.
     
-    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    Returns:
+        True if the string matches email format, False otherwise.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def extract_hashtags(text: str) -> List[str]:
+    """
+    Extract all hashtags from a text string.
     
-    if normalize_cols:
-        for col in normalize_cols:
-            if col in cleaned_df.columns:
-                cleaned_df = normalize_column(cleaned_df, col)
+    Args:
+        text: The input string containing hashtags.
     
-    return cleaned_df
+    Returns:
+        List of hashtag strings without the '#' symbol.
+    """
+    hashtags = re.findall(r'#(\w+)', text)
+    return hashtags
+
+if __name__ == "__main__":
+    # Example usage
+    sample_text = "Hello, World!  This   is   a   test...  #python #cleaning"
+    
+    cleaned = clean_text_pipeline(
+        sample_text, 
+        remove_special=True, 
+        normalize_ws=True, 
+        to_lowercase=True
+    )
+    
+    print(f"Original: {sample_text}")
+    print(f"Cleaned: {cleaned}")
+    print(f"Hashtags: {extract_hashtags(sample_text)}")
+    
+    test_email = "user@example.com"
+    print(f"Email '{test_email}' valid: {validate_email(test_email)}")
