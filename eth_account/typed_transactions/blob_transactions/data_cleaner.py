@@ -1,86 +1,59 @@
 import pandas as pd
-
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
-    """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
-    
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
-        fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
-    
-    Returns:
-        pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.copy()
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-            elif fill_missing == 'median':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            mode_val = cleaned_df[col].mode()
-            if not mode_val.empty:
-                cleaned_df[col] = cleaned_df[col].fillna(mode_val.iloc[0])
-    
-    return cleaned_df
-
-def validate_data(df, required_columns=None):
-    """
-    Validate the DataFrame for required columns and data types.
-    
-    Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of required column names.
-    
-    Returns:
-        tuple: (is_valid, error_message)
-    """
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            return False, f"Missing required columns: {missing_cols}"
-    
-    return True, "Data validation passed"
-import pandas as pd
 import numpy as np
-from scipy import stats
 
-def load_and_clean_data(filepath):
-    df = pd.read_csv(filepath)
+def remove_missing_values(df, threshold=0.5):
+    """
+    Remove columns with missing values exceeding threshold percentage.
+    """
+    missing_percent = df.isnull().sum() / len(df)
+    columns_to_drop = missing_percent[missing_percent > threshold].index
+    return df.drop(columns=columns_to_drop)
+
+def normalize_numeric_columns(df, columns=None):
+    """
+    Normalize specified numeric columns using min-max scaling.
+    If columns is None, normalize all numeric columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    # Remove duplicate rows
-    df = df.drop_duplicates()
-    
-    # Handle missing values
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
-    
-    # Remove outliers using z-score
-    z_scores = np.abs(stats.zscore(df[numeric_cols]))
-    df = df[(z_scores < 3).all(axis=1)]
-    
-    # Normalize numeric columns
-    df[numeric_cols] = (df[numeric_cols] - df[numeric_cols].min()) / (df[numeric_cols].max() - df[numeric_cols].min())
-    
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val > min_val:
+                df[col] = (df[col] - min_val) / (max_val - min_val)
     return df
 
-def save_cleaned_data(df, output_path):
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
-
-if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
+def encode_categorical(df, columns=None, method='onehot'):
+    """
+    Encode categorical columns using specified method.
+    Supported methods: 'onehot', 'label'
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=['object', 'category']).columns
     
-    cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+    if method == 'onehot':
+        return pd.get_dummies(df, columns=columns, drop_first=True)
+    elif method == 'label':
+        for col in columns:
+            if col in df.columns:
+                df[col] = df[col].astype('category').cat.codes
+        return df
+    else:
+        raise ValueError("Method must be 'onehot' or 'label'")
+
+def clean_dataset(df, missing_threshold=0.5, normalize=True, encode=True):
+    """
+    Complete data cleaning pipeline.
+    """
+    df_clean = df.copy()
+    df_clean = remove_missing_values(df_clean, missing_threshold)
+    
+    if normalize:
+        df_clean = normalize_numeric_columns(df_clean)
+    
+    if encode:
+        df_clean = encode_categorical(df_clean)
+    
+    return df_clean
