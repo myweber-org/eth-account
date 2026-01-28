@@ -76,3 +76,83 @@ if __name__ == "__main__":
 
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    strategy (str): Imputation strategy ('mean', 'median', or 'drop').
+    
+    Returns:
+    pd.DataFrame: DataFrame with missing values handled.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        cleaned_df = df.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        cleaned_df = df.copy()
+        for col in numeric_cols:
+            cleaned_df[col].fillna(df[col].mean(), inplace=True)
+    elif strategy == 'median':
+        cleaned_df = df.copy()
+        for col in numeric_cols:
+            cleaned_df[col].fillna(df[col].median(), inplace=True)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
+    
+    return cleaned_df
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    columns (list): List of column names to standardize. If None, all numeric columns are used.
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    standardized_df = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val > 0:
+                standardized_df[col] = (df[col] - mean_val) / std_val
+    
+    return standardized_df
