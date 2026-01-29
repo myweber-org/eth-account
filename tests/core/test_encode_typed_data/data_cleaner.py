@@ -439,3 +439,94 @@ if __name__ == "__main__":
     print(f"Original shape: {df.shape}")
     print(f"Cleaned shape: {result.shape}")
     print(result.head())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        mask = z_scores < threshold
+        self.df = self.df[mask]
+        return self.df
+    
+    def normalize_column(self, column, method='minmax'):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[f'{column}_normalized'] = (self.df[column] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[f'{column}_normalized'] = (self.df[column] - mean_val) / std_val
+        
+        else:
+            raise ValueError("Method must be 'minmax' or 'zscore'")
+        
+        return self.df
+    
+    def fill_missing_with_strategy(self, column, strategy='mean'):
+        if column not in self.numeric_columns:
+            raise ValueError(f"Column {column} is not numeric")
+        
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            raise ValueError("Strategy must be 'mean', 'median', or 'mode'")
+        
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self.df
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+    
+    def generate_summary(self):
+        summary = {
+            'original_shape': self.df.shape,
+            'numeric_columns': self.numeric_columns,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def process_dataset(file_path):
+    df = pd.read_csv(file_path)
+    cleaner = DataCleaner(df)
+    
+    for col in cleaner.numeric_columns:
+        cleaner.fill_missing_with_strategy(col, strategy='median')
+        cleaner.remove_outliers_zscore(col, threshold=3)
+        cleaner.normalize_column(col, method='zscore')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    summary = cleaner.generate_summary()
+    
+    return cleaned_df, summary
