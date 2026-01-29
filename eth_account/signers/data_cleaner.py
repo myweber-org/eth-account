@@ -1,105 +1,122 @@
-
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-def remove_outliers_iqr(data, column, threshold=1.5):
+def clean_csv_data(filepath, fill_method='mean', drop_threshold=0.5):
     """
-    Remove outliers using IQR method
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        filepath: Path to the CSV file
+        fill_method: Method for filling missing values ('mean', 'median', 'mode', 'zero')
+        drop_threshold: Drop columns with missing values above this ratio (0.0 to 1.0)
+    
+    Returns:
+        Cleaned DataFrame and cleaning report
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    q1 = data[column].quantile(0.25)
-    q3 = data[column].quantile(0.75)
-    iqr = q3 - q1
-    lower_bound = q1 - threshold * iqr
-    upper_bound = q3 + threshold * iqr
-    
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
-
-def remove_outliers_zscore(data, column, threshold=3):
-    """
-    Remove outliers using Z-score method
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    z_scores = np.abs(stats.zscore(data[column].dropna()))
-    filtered_indices = np.where(z_scores < threshold)[0]
-    filtered_data = data.iloc[filtered_indices]
-    return filtered_data
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using Min-Max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def normalize_zscore(data, column):
-    """
-    Normalize data using Z-score standardization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    normalized = (data[column] - mean_val) / std_val
-    return normalized
-
-def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    cleaned_data = data.copy()
-    
-    for column in numeric_columns:
-        if column not in cleaned_data.columns:
-            continue
-            
-        if outlier_method == 'iqr':
-            cleaned_data = remove_outliers_iqr(cleaned_data, column)
-        elif outlier_method == 'zscore':
-            cleaned_data = remove_outliers_zscore(cleaned_data, column)
+    try:
+        df = pd.read_csv(filepath)
+        original_shape = df.shape
+        cleaning_report = {
+            'original_rows': original_shape[0],
+            'original_columns': original_shape[1],
+            'missing_values': df.isnull().sum().sum(),
+            'dropped_columns': []
+        }
         
-        if normalize_method == 'minmax':
-            cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
-        elif normalize_method == 'zscore':
-            cleaned_data[f'{column}_normalized'] = normalize_zscore(cleaned_data, column)
-    
-    return cleaned_data
+        # Drop columns with too many missing values
+        missing_ratio = df.isnull().sum() / len(df)
+        columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index.tolist()
+        if columns_to_drop:
+            df = df.drop(columns=columns_to_drop)
+            cleaning_report['dropped_columns'] = columns_to_drop
+        
+        # Fill remaining missing values
+        if fill_method == 'mean':
+            df = df.fillna(df.mean(numeric_only=True))
+        elif fill_method == 'median':
+            df = df.fillna(df.median(numeric_only=True))
+        elif fill_method == 'mode':
+            df = df.fillna(df.mode().iloc[0])
+        elif fill_method == 'zero':
+            df = df.fillna(0)
+        else:
+            raise ValueError(f"Unsupported fill method: {fill_method}")
+        
+        cleaning_report['final_rows'] = df.shape[0]
+        cleaning_report['final_columns'] = df.shape[1]
+        cleaning_report['remaining_missing'] = df.isnull().sum().sum()
+        
+        return df, cleaning_report
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None, None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None, None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None, None
 
-def get_data_summary(data):
+def validate_dataframe(df, required_columns=None, min_rows=1):
     """
-    Generate statistical summary of the dataset
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of column names that must be present
+        min_rows: Minimum number of rows required
+    
+    Returns:
+        Boolean indicating if validation passed
     """
-    summary = {
-        'total_rows': len(data),
-        'total_columns': len(data.columns),
-        'missing_values': data.isnull().sum().to_dict(),
-        'data_types': data.dtypes.to_dict(),
-        'numeric_columns': data.select_dtypes(include=[np.number]).columns.tolist(),
-        'categorical_columns': data.select_dtypes(include=['object']).columns.tolist()
-    }
+    if df is None or df.empty:
+        return False
     
-    numeric_data = data.select_dtypes(include=[np.number])
-    if not numeric_data.empty:
-        summary['numeric_stats'] = numeric_data.describe().to_dict()
+    if len(df) < min_rows:
+        return False
     
-    return summary
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def save_cleaned_data(df, output_path, index=False):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Args:
+        df: Cleaned DataFrame
+        output_path: Path to save the cleaned data
+        index: Whether to include index in output
+    
+    Returns:
+        Boolean indicating success
+    """
+    try:
+        df.to_csv(output_path, index=index)
+        print(f"Cleaned data saved to {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df, report = clean_csv_data(input_file, fill_method='median', drop_threshold=0.3)
+    
+    if cleaned_df is not None:
+        print(f"Cleaning Report: {report}")
+        
+        if validate_dataframe(cleaned_df, min_rows=10):
+            save_cleaned_data(cleaned_df, output_file)
+        else:
+            print("Data validation failed")
+    else:
+        print("Data cleaning failed")
