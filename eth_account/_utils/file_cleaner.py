@@ -133,3 +133,91 @@ def main():
 if __name__ == "__main__":
     import time
     main()
+import os
+import shutil
+import tempfile
+from pathlib import Path
+
+def clean_temporary_files(directory, extensions=None, days_old=7):
+    """
+    Remove temporary files from a directory based on extension and age.
+    
+    Args:
+        directory (str): Path to directory to clean
+        extensions (list): List of file extensions to target (e.g., ['.tmp', '.temp'])
+        days_old (int): Only remove files older than this many days
+    """
+    if extensions is None:
+        extensions = ['.tmp', '.temp', '.log', '.cache']
+    
+    target_dir = Path(directory)
+    if not target_dir.exists():
+        raise FileNotFoundError(f"Directory {directory} does not exist")
+    
+    if not target_dir.is_dir():
+        raise NotADirectoryError(f"{directory} is not a directory")
+    
+    current_time = os.path.getmtime(target_dir)
+    removed_count = 0
+    total_size = 0
+    
+    for item in target_dir.rglob('*'):
+        if item.is_file():
+            file_ext = item.suffix.lower()
+            
+            if file_ext in extensions:
+                file_age = current_time - os.path.getmtime(item)
+                age_in_days = file_age / (60 * 60 * 24)
+                
+                if age_in_days > days_old:
+                    try:
+                        file_size = item.stat().st_size
+                        item.unlink()
+                        removed_count += 1
+                        total_size += file_size
+                        print(f"Removed: {item.name} ({file_size} bytes)")
+                    except (PermissionError, OSError) as e:
+                        print(f"Failed to remove {item.name}: {e}")
+    
+    print(f"\nCleaning complete:")
+    print(f"  Files removed: {removed_count}")
+    print(f"  Total space freed: {total_size} bytes")
+    return removed_count, total_size
+
+def create_sample_temporary_files(directory, count=5):
+    """
+    Create sample temporary files for testing purposes.
+    
+    Args:
+        directory (str): Directory to create test files in
+        count (int): Number of files to create
+    """
+    test_dir = Path(directory)
+    test_dir.mkdir(exist_ok=True)
+    
+    extensions = ['.tmp', '.temp', '.log']
+    
+    for i in range(count):
+        ext = extensions[i % len(extensions)]
+        temp_file = test_dir / f"test_file_{i}{ext}"
+        temp_file.write_text(f"This is a temporary test file #{i}\n" * 100)
+        
+        if i % 2 == 0:
+            old_time = os.path.getmtime(temp_file) - (10 * 24 * 60 * 60)
+            os.utime(temp_file, (old_time, old_time))
+    
+    print(f"Created {count} sample temporary files in {directory}")
+
+if __name__ == "__main__":
+    # Example usage
+    test_dir = tempfile.mkdtemp(prefix="clean_test_")
+    print(f"Test directory: {test_dir}")
+    
+    try:
+        create_sample_temporary_files(test_dir, 8)
+        print("\n" + "="*50)
+        removed, size = clean_temporary_files(test_dir, days_old=5)
+    finally:
+        if Path(test_dir).exists():
+            shutil.rmtree(test_dir)
+            print(f"\nCleaned up test directory: {test_dir}")
