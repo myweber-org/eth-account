@@ -274,3 +274,146 @@ def validate_dataframe(df, required_columns=None):
             return False
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process (default: all numeric columns)
+        factor: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            
+            if max_val > min_val:
+                df_normalized[col] = (df[col] - min_val) / (max_val - min_val)
+    
+    return df_normalized
+
+def remove_outliers_zscore(df, columns=None, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to process
+        threshold: Z-score threshold for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            mask = z_scores < threshold
+            valid_indices = df[col].dropna().index[mask]
+            df_clean = df_clean.loc[valid_indices.union(df[col].index[df[col].isna()])]
+    
+    return df_clean.reset_index(drop=True)
+
+def clean_dataset(df, outlier_method='iqr', normalize=True, outlier_params=None, normalize_columns=None):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: pandas DataFrame
+        outlier_method: 'iqr' or 'zscore'
+        normalize: whether to normalize data
+        outlier_params: dictionary of parameters for outlier removal
+        normalize_columns: specific columns to normalize
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if outlier_params is None:
+        outlier_params = {}
+    
+    df_clean = df.copy()
+    
+    if outlier_method == 'iqr':
+        df_clean = remove_outliers_iqr(df_clean, **outlier_params)
+    elif outlier_method == 'zscore':
+        df_clean = remove_outliers_zscore(df_clean, **outlier_params)
+    
+    if normalize:
+        df_clean = normalize_minmax(df_clean, columns=normalize_columns)
+    
+    return df_clean
+
+def validate_cleaning(df_original, df_cleaned):
+    """
+    Validate the cleaning process by comparing statistics.
+    
+    Args:
+        df_original: original DataFrame
+        df_cleaned: cleaned DataFrame
+    
+    Returns:
+        Dictionary with validation metrics
+    """
+    validation = {
+        'original_rows': len(df_original),
+        'cleaned_rows': len(df_cleaned),
+        'rows_removed': len(df_original) - len(df_cleaned),
+        'removal_percentage': (len(df_original) - len(df_cleaned)) / len(df_original) * 100
+    }
+    
+    numeric_cols = df_original.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        if col in df_original.columns and col in df_cleaned.columns:
+            validation[f'{col}_original_range'] = (df_original[col].min(), df_original[col].max())
+            validation[f'{col}_cleaned_range'] = (df_cleaned[col].min(), df_cleaned[col].max())
+            validation[f'{col}_original_std'] = df_original[col].std()
+            validation[f'{col}_cleaned_std'] = df_cleaned[col].std()
+    
+    return validation
