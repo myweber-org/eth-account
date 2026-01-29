@@ -148,3 +148,104 @@ def clean_dataset(input_file, output_file, outlier_method='iqr', normalize_metho
 
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_basic_stats(df, column):
+    """
+    Calculate basic statistics for a DataFrame column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+    
+    Returns:
+        dict: Dictionary containing statistics
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing NaN values and converting to appropriate types.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to clean. If None, clean all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+            cleaned_df = cleaned_df.dropna(subset=[col])
+    
+    return cleaned_df
+
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    data = {
+        'temperature': [22.5, 23.1, 21.8, 100.2, 22.9, 23.5, -10.3, 22.7, 23.0, 22.4],
+        'humidity': [45, 47, 46, 48, 200, 46, 44, 47, 46, 45],
+        'pressure': [1013, 1012, 1014, 1013, 1012, 1015, 1013, 1014, 1012, 1013]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_numeric_data(df)
+    print("After cleaning numeric data:")
+    print(cleaned_df)
+    print("\n")
+    
+    for column in ['temperature', 'humidity']:
+        filtered_df = remove_outliers_iqr(cleaned_df, column)
+        stats = calculate_basic_stats(filtered_df, column)
+        
+        print(f"Statistics for {column} after outlier removal:")
+        for key, value in stats.items():
+            print(f"  {key}: {value:.2f}")
+        print("\n")
+
+if __name__ == "__main__":
+    example_usage()
