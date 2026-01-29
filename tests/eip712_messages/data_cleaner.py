@@ -1,61 +1,59 @@
 
 import pandas as pd
-import numpy as np
-from scipy import stats
+import re
 
-def load_and_clean_data(filepath):
-    df = pd.read_csv(filepath)
-    df = remove_outliers_iqr(df)
-    df = normalize_numeric_columns(df)
-    return df
-
-def remove_outliers_iqr(df, factor=1.5):
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - factor * IQR
-        upper_bound = Q3 + factor * IQR
-        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
-    return df
-
-def normalize_numeric_columns(df):
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numeric_cols:
-        df[col] = (df[col] - df[col].mean()) / df[col].std()
-    return df
-
-def save_cleaned_data(df, output_path):
-    df.to_csv(output_path, index=False)
-
-if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
-    print(f"Data cleaning complete. Saved to {output_file}")
-import pandas as pd
-import numpy as np
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def clean_dataset(file_path, output_path):
-    df = pd.read_csv(file_path)
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: Optional dictionary to rename columns
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lowercase, remove extra spaces)
     
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
-    print(f"Original rows: {len(pd.read_csv(file_path))}, Cleaned rows: {len(df)}")
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for column in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[column] = cleaned_df[column].apply(
+                lambda x: re.sub(r'\s+', ' ', str(x).strip().lower()) if pd.notna(x) else x
+            )
+    
+    return cleaned_df
 
-if __name__ == "__main__":
-    clean_dataset("raw_data.csv", "cleaned_data.csv")
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    
+    Args:
+        email: String email to validate
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email))) if pd.notna(email) else False
+
+def filter_valid_emails(df, email_column):
+    """
+    Filter DataFrame to only include rows with valid email addresses.
+    
+    Args:
+        df: pandas DataFrame
+        email_column: Name of column containing email addresses
+    
+    Returns:
+        DataFrame with only valid email rows
+    """
+    mask = df[email_column].apply(validate_email)
+    return df[mask].reset_index(drop=True)
