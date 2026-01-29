@@ -68,3 +68,90 @@ def clean_dataset(data, columns_to_clean):
             cleaned_data = remove_outliers_iqr(cleaned_data, column)
     
     return cleaned_data
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    return filtered_df
+
+def normalize_minmax(dataframe, columns):
+    """
+    Normalize specified columns using min-max scaling
+    """
+    df_normalized = dataframe.copy()
+    for col in columns:
+        if col in dataframe.columns:
+            min_val = dataframe[col].min()
+            max_val = dataframe[col].max()
+            if max_val != min_val:
+                df_normalized[col] = (dataframe[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def standardize_zscore(dataframe, columns):
+    """
+    Standardize specified columns using z-score normalization
+    """
+    df_standardized = dataframe.copy()
+    for col in columns:
+        if col in dataframe.columns:
+            mean_val = dataframe[col].mean()
+            std_val = dataframe[col].std()
+            if std_val > 0:
+                df_standardized[col] = (dataframe[col] - mean_val) / std_val
+    return df_standardized
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    df_processed = dataframe.copy()
+    
+    if columns is None:
+        columns = dataframe.columns
+    
+    for col in columns:
+        if col in dataframe.columns and dataframe[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = dataframe[col].mean()
+            elif strategy == 'median':
+                fill_value = dataframe[col].median()
+            elif strategy == 'mode':
+                fill_value = dataframe[col].mode()[0]
+            elif strategy == 'drop':
+                df_processed = df_processed.dropna(subset=[col])
+                continue
+            else:
+                fill_value = 0
+            
+            df_processed[col] = df_processed[col].fillna(fill_value)
+    
+    return df_processed
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content
+    """
+    if dataframe.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if len(dataframe) < min_rows:
+        raise ValueError(f"DataFrame has fewer than {min_rows} rows")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
