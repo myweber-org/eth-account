@@ -323,3 +323,46 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate row(s).")
+
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        if fill_missing == 'mean':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+        else:
+            raise ValueError("fill_missing must be 'mean', 'median', or 'drop'")
+        print("Missing values handled.")
+
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, np.nan],
+        'B': [5, np.nan, 5, 8, 9],
+        'C': ['x', 'y', 'x', 'z', 'z']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame (drop duplicates, fill with mean):")
+    cleaned = clean_dataframe(df, drop_duplicates=True, fill_missing='mean')
+    print(cleaned)
