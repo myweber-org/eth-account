@@ -47,4 +47,77 @@ def clean_csv_data(input_file, output_file, missing_strategy='mean'):
 
 if __name__ == "__main__":
     # Example usage
-    clean_csv_data('raw_data.csv', 'cleaned_data.csv', missing_strategy='mean')
+    clean_csv_data('raw_data.csv', 'cleaned_data.csv', missing_strategy='mean')import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Cleans a pandas DataFrame by removing duplicates and standardizing column names.
+    """
+    # Create a copy to avoid modifying the original
+    df_clean = df.copy()
+
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_')
+
+    # Remove duplicate rows
+    initial_rows = df_clean.shape[0]
+    df_clean = df_clean.drop_duplicates()
+    removed_rows = initial_rows - df_clean.shape[0]
+
+    # Fill missing numeric values with column median
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+
+    # Fill missing categorical values with mode
+    categorical_cols = df_clean.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 'Unknown')
+
+    # Remove leading/trailing whitespace from string columns
+    for col in categorical_cols:
+        df_clean[col] = df_clean[col].str.strip()
+
+    # Log cleaning summary
+    print(f"Cleaning complete. Removed {removed_rows} duplicate rows.")
+    print(f"Final dataset shape: {df_clean.shape}")
+    
+    return df_clean
+
+def validate_data(df):
+    """
+    Performs basic validation on the cleaned DataFrame.
+    """
+    validation_results = {
+        'has_duplicates': df.duplicated().any(),
+        'missing_values': df.isnull().sum().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Customer ID': [1, 2, 2, 3, 4],
+        'First Name': ['John', 'Jane', 'Jane', 'Bob', None],
+        'Last Name': ['Doe', 'Smith', 'Smith', 'Johnson', 'Williams'],
+        'Age': [25, 30, 30, None, 35],
+        'Purchase Amount': [100.50, 200.75, 200.75, 150.00, 300.25]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original dataset:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned dataset:")
+    print(cleaned_df)
+    
+    validation = validate_data(cleaned_df)
+    print("\nValidation results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
