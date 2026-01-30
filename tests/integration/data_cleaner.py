@@ -1,92 +1,95 @@
 
 import pandas as pd
+import re
 
-def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean.
-        drop_duplicates (bool): Whether to remove duplicate rows. Default True.
-        fill_missing (str or dict): Method to fill missing values. 
-            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
-            If None, missing values are not filled. Default None.
+        df (pd.DataFrame): Input DataFrame to clean
+        column_mapping (dict, optional): Dictionary mapping original column names to new names
+        drop_duplicates (bool): Whether to remove duplicate rows
+        normalize_text (bool): Whether to normalize text columns (strip whitespace, lowercase)
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+        pd.DataFrame: Cleaned DataFrame
     """
     cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
     
     if drop_duplicates:
         initial_rows = len(cleaned_df)
         cleaned_df = cleaned_df.drop_duplicates()
         removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows.")
+        print(f"Removed {removed} duplicate rows")
     
-    if fill_missing is not None:
-        if cleaned_df.isnull().sum().sum() > 0:
-            if isinstance(fill_missing, dict):
-                cleaned_df = cleaned_df.fillna(fill_missing)
-                print("Filled missing values using provided dictionary.")
-            elif fill_missing == 'mean':
-                cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
-                print("Filled missing values with column means.")
-            elif fill_missing == 'median':
-                cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
-                print("Filled missing values with column medians.")
-            elif fill_missing == 'mode':
-                for col in cleaned_df.columns:
-                    if cleaned_df[col].dtype == 'object':
-                        mode_val = cleaned_df[col].mode()
-                        if not mode_val.empty:
-                            cleaned_df[col] = cleaned_df[col].fillna(mode_val.iloc[0])
-                print("Filled missing values with column modes.")
-            else:
-                print(f"Warning: Unsupported fill_missing method '{fill_missing}'. Skipping.")
-        else:
-            print("No missing values found.")
+    if normalize_text:
+        for column in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[column] = cleaned_df[column].astype(str).str.strip().str.lower()
+            cleaned_df[column] = cleaned_df[column].apply(
+                lambda x: re.sub(r'\s+', ' ', x) if isinstance(x, str) else x
+            )
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    missing_values = cleaned_df.isnull().sum().sum()
+    if missing_values > 0:
+        print(f"Warning: Dataset contains {missing_values} missing values")
     
     return cleaned_df
 
-def validate_dataset(df, required_columns=None):
+def validate_email_column(df, email_column='email'):
     """
-    Validate a DataFrame for basic integrity checks.
+    Validate email addresses in a specified column.
     
     Args:
-        df (pd.DataFrame): DataFrame to validate.
-        required_columns (list): List of column names that must be present.
+        df (pd.DataFrame): Input DataFrame
+        email_column (str): Name of the column containing email addresses
     
     Returns:
-        dict: Dictionary containing validation results.
+        pd.DataFrame: DataFrame with additional 'email_valid' column
     """
-    validation_results = {
-        'total_rows': len(df),
-        'total_columns': len(df.columns),
-        'missing_values': df.isnull().sum().sum(),
-        'duplicate_rows': df.duplicated().sum(),
-        'column_types': df.dtypes.to_dict()
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    validated_df = df.copy()
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validated_df['email_valid'] = validated_df[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    valid_count = validated_df['email_valid'].sum()
+    total_count = len(validated_df)
+    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
+    
+    return validated_df
+
+def sample_data_for_testing():
+    """Create sample data for testing the cleaning functions."""
+    data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown  '],
+        'email': ['john@example.com', 'jane@example.com', 'JOHN@example.com', 'invalid-email', 'alice@test.org'],
+        'age': [25, 30, 25, 35, 28],
+        'city': ['New York', 'Los Angeles', 'New York', 'Chicago', 'Boston']
     }
     
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        validation_results['missing_required_columns'] = missing_cols
-        validation_results['all_required_columns_present'] = len(missing_cols) == 0
-    
-    return validation_results
+    return pd.DataFrame(data)
 
 if __name__ == "__main__":
-    sample_data = {
-        'A': [1, 2, 2, 4, None],
-        'B': [5, None, 7, 8, 9],
-        'C': ['x', 'y', 'x', 'z', None]
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
+    df = sample_data_for_testing()
+    print("Original dataset:")
     print(df)
-    print("\nValidation results:")
-    print(validate_dataset(df))
+    print("\n" + "="*50 + "\n")
     
-    cleaned = clean_dataset(df, fill_missing='mean')
-    print("\nCleaned DataFrame:")
+    cleaned = clean_dataset(df, drop_duplicates=True, normalize_text=True)
+    print("Cleaned dataset:")
     print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    validated = validate_email_column(cleaned, 'email')
+    print("Dataset with email validation:")
+    print(validated[['name', 'email', 'email_valid']])
