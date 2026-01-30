@@ -198,3 +198,43 @@ def main():
 
 if __name__ == "__main__":
     main()
+import os
+import shutil
+from pathlib import Path
+
+def organize_files(source_dir, organize_by='extension'):
+    """
+    Organize files in the source directory into subfolders based on criteria.
+    """
+    if not os.path.isdir(source_dir):
+        print(f"Error: Source directory '{source_dir}' does not exist.")
+        return
+
+    for item in os.listdir(source_dir):
+        item_path = os.path.join(source_dir, item)
+
+        if os.path.isfile(item_path):
+            if organize_by == 'extension':
+                file_ext = Path(item).suffix.lower()
+                if file_ext:
+                    folder_name = file_ext[1:] + '_files'
+                else:
+                    folder_name = 'no_extension_files'
+            else:
+                folder_name = 'other_files'
+
+            target_dir = os.path.join(source_dir, folder_name)
+            os.makedirs(target_dir, exist_ok=True)
+
+            try:
+                shutil.move(item_path, os.path.join(target_dir, item))
+                print(f"Moved: {item} -> {folder_name}/")
+            except Exception as e:
+                print(f"Failed to move {item}: {e}")
+
+if __name__ == "__main__":
+    target_directory = input("Enter the directory path to organize: ").strip()
+    if target_directory:
+        organize_files(target_directory)
+    else:
+        print("No directory provided. Exiting.")
