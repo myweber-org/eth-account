@@ -1,59 +1,42 @@
 
 import pandas as pd
-import re
+import numpy as np
 
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
-    """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
-    
-    Args:
-        df: pandas DataFrame to clean
-        column_mapping: Optional dictionary to rename columns
-        drop_duplicates: Whether to remove duplicate rows
-        normalize_text: Whether to normalize text columns (strip, lowercase, remove extra spaces)
-    
-    Returns:
-        Cleaned pandas DataFrame
-    """
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_column(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(df, numeric_columns):
     cleaned_df = df.copy()
-    
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
-    
-    if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
-    
-    if normalize_text:
-        for column in cleaned_df.select_dtypes(include=['object']).columns:
-            cleaned_df[column] = cleaned_df[column].apply(
-                lambda x: re.sub(r'\s+', ' ', str(x).strip().lower()) if pd.notna(x) else x
-            )
-    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = normalize_column(cleaned_df, col)
+    cleaned_df = cleaned_df.dropna()
     return cleaned_df
 
-def validate_email(email):
-    """
-    Validate email format using regex pattern.
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200),
+        'category': np.random.choice(['A', 'B', 'C'], 200)
+    }
+    df = pd.DataFrame(sample_data)
+    df.loc[10, 'feature1'] = 500
+    df.loc[20, 'feature2'] = 1000
     
-    Args:
-        email: String email to validate
-    
-    Returns:
-        Boolean indicating if email is valid
-    """
-    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return bool(re.match(pattern, str(email))) if pd.notna(email) else False
-
-def filter_valid_emails(df, email_column):
-    """
-    Filter DataFrame to only include rows with valid email addresses.
-    
-    Args:
-        df: pandas DataFrame
-        email_column: Name of column containing email addresses
-    
-    Returns:
-        DataFrame with only valid email rows
-    """
-    mask = df[email_column].apply(validate_email)
-    return df[mask].reset_index(drop=True)
+    numeric_cols = ['feature1', 'feature2']
+    result_df = clean_dataset(df, numeric_cols)
+    print(f"Original shape: {df.shape}")
+    print(f"Cleaned shape: {result_df.shape}")
+    print(result_df.head())
