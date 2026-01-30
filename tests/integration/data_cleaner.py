@@ -1,95 +1,48 @@
 
 import pandas as pd
-import re
 
-def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def clean_dataset(df, drop_duplicates=True, fill_na=None):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Clean a pandas DataFrame by handling missing values and duplicates.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        column_mapping (dict, optional): Dictionary mapping original column names to new names
-        drop_duplicates (bool): Whether to remove duplicate rows
-        normalize_text (bool): Whether to normalize text columns (strip whitespace, lowercase)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_na (str or dict): Method to fill missing values.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: Cleaned DataFrame.
     """
     cleaned_df = df.copy()
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    if fill_na is not None:
+        if isinstance(fill_na, dict):
+            cleaned_df.fillna(fill_na, inplace=True)
+        else:
+            cleaned_df.fillna(fill_na, inplace=True)
     
     if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
-    
-    if normalize_text:
-        for column in cleaned_df.select_dtypes(include=['object']).columns:
-            cleaned_df[column] = cleaned_df[column].astype(str).str.strip().str.lower()
-            cleaned_df[column] = cleaned_df[column].apply(
-                lambda x: re.sub(r'\s+', ' ', x) if isinstance(x, str) else x
-            )
-    
-    cleaned_df = cleaned_df.reset_index(drop=True)
-    
-    missing_values = cleaned_df.isnull().sum().sum()
-    if missing_values > 0:
-        print(f"Warning: Dataset contains {missing_values} missing values")
+        cleaned_df.drop_duplicates(inplace=True)
     
     return cleaned_df
 
-def validate_email_column(df, email_column='email'):
+def validate_dataframe(df, required_columns=None):
     """
-    Validate email addresses in a specified column.
+    Validate DataFrame structure and content.
     
-    Args:
-        df (pd.DataFrame): Input DataFrame
-        email_column (str): Name of the column containing email addresses
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
     
     Returns:
-        pd.DataFrame: DataFrame with additional 'email_valid' column
+    tuple: (is_valid, error_message)
     """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    if df.empty:
+        return False, "DataFrame is empty"
     
-    validated_df = df.copy()
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
     
-    validated_df['email_valid'] = validated_df[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
-    )
-    
-    valid_count = validated_df['email_valid'].sum()
-    total_count = len(validated_df)
-    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
-    
-    return validated_df
-
-def sample_data_for_testing():
-    """Create sample data for testing the cleaning functions."""
-    data = {
-        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown  '],
-        'email': ['john@example.com', 'jane@example.com', 'JOHN@example.com', 'invalid-email', 'alice@test.org'],
-        'age': [25, 30, 25, 35, 28],
-        'city': ['New York', 'Los Angeles', 'New York', 'Chicago', 'Boston']
-    }
-    
-    return pd.DataFrame(data)
-
-if __name__ == "__main__":
-    df = sample_data_for_testing()
-    print("Original dataset:")
-    print(df)
-    print("\n" + "="*50 + "\n")
-    
-    cleaned = clean_dataset(df, drop_duplicates=True, normalize_text=True)
-    print("Cleaned dataset:")
-    print(cleaned)
-    print("\n" + "="*50 + "\n")
-    
-    validated = validate_email_column(cleaned, 'email')
-    print("Dataset with email validation:")
-    print(validated[['name', 'email', 'email_valid']])
+    return True, "DataFrame is valid"
