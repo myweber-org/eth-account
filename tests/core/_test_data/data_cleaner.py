@@ -311,3 +311,96 @@ if __name__ == "__main__":
         print(f"Error: File '{input_file}' not found.")
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        fill_missing (bool): Whether to fill missing values.
+        fill_value: Value to use for filling missing data.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+        dict: Dictionary containing statistics for each numeric column.
+    """
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    stats = {}
+    
+    for col in numeric_cols:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max()
+        }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 3, None],
+        'B': [4, None, 6, 7, 8],
+        'C': ['x', 'y', 'y', 'z', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
+    print(f"\nValidation: {is_valid} - {message}")
+    
+    stats = calculate_statistics(cleaned)
+    print("\nStatistics:")
+    for col, col_stats in stats.items():
+        print(f"{col}: {col_stats}")
