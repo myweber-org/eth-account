@@ -220,4 +220,110 @@ if __name__ == "__main__":
     
     cleaned_data = clean_dataset(sample_data, ['feature_a', 'feature_b'])
     print("\nCleaned data shape:", cleaned_data.shape)
-    print("Cleaned statistics:", get_statistics(cleaned_data))
+    print("Cleaned statistics:", get_statistics(cleaned_data))import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    drop_duplicates (bool): Whether to drop duplicate rows
+    fill_missing (bool): Whether to fill missing values
+    fill_value: Value to use for filling missing data
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def normalize_column(df, column_name):
+    """
+    Normalize a column to have values between 0 and 1.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_name (str): Name of column to normalize
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    col_min = df_copy[column_name].min()
+    col_max = df_copy[column_name].max()
+    
+    if col_max == col_min:
+        df_copy[column_name] = 0.5
+    else:
+        df_copy[column_name] = (df_copy[column_name] - col_min) / (col_max - col_min)
+    
+    return df_copy
+
+def remove_outliers(df, column_name, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_name (str): Name of column to process
+    method (str): Method for outlier detection ('iqr' or 'zscore')
+    threshold (float): Threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df_copy[column_name].quantile(0.25)
+        Q3 = df_copy[column_name].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        df_copy = df_copy[(df_copy[column_name] >= lower_bound) & 
+                         (df_copy[column_name] <= upper_bound)]
+    
+    elif method == 'zscore':
+        from scipy import stats
+        z_scores = stats.zscore(df_copy[column_name])
+        df_copy = df_copy[(abs(z_scores) < threshold)]
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df_copy
