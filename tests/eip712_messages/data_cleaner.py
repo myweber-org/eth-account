@@ -39,4 +39,27 @@ if __name__ == "__main__":
     result_df = clean_dataset(df, numeric_cols)
     print(f"Original shape: {df.shape}")
     print(f"Cleaned shape: {result_df.shape}")
-    print(result_df.head())
+    print(result_df.head())import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicate rows.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = df.copy()
+    
+    cleaned_df = cleaned_df.dropna()
+    
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
