@@ -37,4 +37,122 @@ if __name__ == "__main__":
     api_key = sys.argv[1]
     city = sys.argv[2]
     weather_info = get_weather(api_key, city)
-    display_weather(weather_info)
+    display_weather(weather_info)import requests
+import json
+from datetime import datetime
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class WeatherFetcher:
+    def __init__(self, api_key, base_url="http://api.openweathermap.org/data/2.5"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+
+    def get_current_weather(self, city_name, units="metric"):
+        endpoint = f"{self.base_url}/weather"
+        params = {
+            "q": city_name,
+            "appid": self.api_key,
+            "units": units
+        }
+        
+        try:
+            response = self.session.get(endpoint, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            return {
+                "city": data["name"],
+                "country": data["sys"]["country"],
+                "temperature": data["main"]["temp"],
+                "feels_like": data["main"]["feels_like"],
+                "humidity": data["main"]["humidity"],
+                "pressure": data["main"]["pressure"],
+                "weather": data["weather"][0]["description"],
+                "wind_speed": data["wind"]["speed"],
+                "timestamp": datetime.fromtimestamp(data["dt"]).isoformat()
+            }
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request failed for {city_name}: {e}")
+            return None
+        except (KeyError, IndexError) as e:
+            logger.error(f"Invalid response format for {city_name}: {e}")
+            return None
+
+    def get_forecast(self, city_name, days=5, units="metric"):
+        endpoint = f"{self.base_url}/forecast"
+        params = {
+            "q": city_name,
+            "appid": self.api_key,
+            "units": units,
+            "cnt": days * 8
+        }
+        
+        try:
+            response = self.session.get(endpoint, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            forecast = []
+            for item in data["list"]:
+                forecast.append({
+                    "datetime": datetime.fromtimestamp(item["dt"]).isoformat(),
+                    "temperature": item["main"]["temp"],
+                    "feels_like": item["main"]["feels_like"],
+                    "humidity": item["main"]["humidity"],
+                    "weather": item["weather"][0]["description"],
+                    "wind_speed": item["wind"]["speed"]
+                })
+            
+            return forecast
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Forecast request failed for {city_name}: {e}")
+            return None
+        except (KeyError, IndexError) as e:
+            logger.error(f"Invalid forecast response format for {city_name}: {e}")
+            return None
+
+def save_to_json(data, filename):
+    try:
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=2)
+        logger.info(f"Data saved to {filename}")
+        return True
+    except IOError as e:
+        logger.error(f"Failed to save data to {filename}: {e}")
+        return False
+
+def main():
+    api_key = "your_api_key_here"
+    cities = ["London", "New York", "Tokyo", "Paris", "Sydney"]
+    
+    fetcher = WeatherFetcher(api_key)
+    
+    all_weather_data = {}
+    
+    for city in cities:
+        logger.info(f"Fetching weather for {city}")
+        current = fetcher.get_current_weather(city)
+        forecast = fetcher.get_forecast(city, days=3)
+        
+        if current and forecast:
+            all_weather_data[city] = {
+                "current": current,
+                "forecast": forecast
+            }
+            logger.info(f"Successfully fetched data for {city}")
+        else:
+            logger.warning(f"Failed to fetch complete data for {city}")
+    
+    if all_weather_data:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"weather_data_{timestamp}.json"
+        save_to_json(all_weather_data, filename)
+
+if __name__ == "__main__":
+    main()
