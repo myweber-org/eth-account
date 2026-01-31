@@ -389,4 +389,33 @@ if __name__ == "__main__":
     
     cleaned_df = clean_dataframe(df, fill_missing='median')
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    print(cleaned_df)import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove rows with null values and standardize column names.
+    """
+    # Drop rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_cleaned.columns = df_cleaned.columns.str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+def filter_by_threshold(df, column, threshold):
+    """
+    Filter rows where the specified column value is greater than the threshold.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    filtered_df = df[df[column] > threshold]
+    return filtered_df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save the cleaned DataFrame to a CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Data saved to {output_path}")
