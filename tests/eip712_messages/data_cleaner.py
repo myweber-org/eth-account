@@ -143,4 +143,95 @@ def example_usage():
     return cleaned_df
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    cleaned_data = example_usage()import csv
+import sys
+from typing import List, Dict, Any
+
+def read_csv(filepath: str) -> List[Dict[str, Any]]:
+    """Read CSV file and return list of dictionaries."""
+    data = []
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                data.append(row)
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+        sys.exit(1)
+    return data
+
+def remove_duplicates(data: List[Dict[str, Any]], key: str) -> List[Dict[str, Any]]:
+    """Remove duplicate rows based on a specified key column."""
+    seen = set()
+    unique_data = []
+    for row in data:
+        if key in row:
+            value = row[key]
+            if value not in seen:
+                seen.add(value)
+                unique_data.append(row)
+    return unique_data
+
+def convert_column_types(data: List[Dict[str, Any]], conversions: Dict[str, type]) -> List[Dict[str, Any]]:
+    """Convert specified columns to given data types."""
+    converted_data = []
+    for row in data:
+        new_row = row.copy()
+        for col, target_type in conversions.items():
+            if col in new_row:
+                try:
+                    if target_type == int:
+                        new_row[col] = int(float(new_row[col]))
+                    elif target_type == float:
+                        new_row[col] = float(new_row[col])
+                    elif target_type == bool:
+                        new_row[col] = new_row[col].lower() in ('true', '1', 'yes', 'y')
+                except (ValueError, TypeError):
+                    new_row[col] = None
+        converted_data.append(new_row)
+    return converted_data
+
+def write_csv(data: List[Dict[str, Any]], filepath: str) -> None:
+    """Write data to CSV file."""
+    if not data:
+        print("No data to write.")
+        return
+    fieldnames = data[0].keys()
+    try:
+        with open(filepath, 'w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"Successfully wrote {len(data)} rows to '{filepath}'.")
+    except Exception as e:
+        print(f"Error writing CSV: {e}")
+
+def clean_csv(input_file: str, output_file: str, unique_key: str, type_conversions: Dict[str, type]) -> None:
+    """Main function to clean CSV data."""
+    print(f"Reading data from '{input_file}'...")
+    data = read_csv(input_file)
+    print(f"Original rows: {len(data)}")
+    
+    if unique_key:
+        data = remove_duplicates(data, unique_key)
+        print(f"After duplicate removal: {len(data)} rows")
+    
+    if type_conversions:
+        data = convert_column_types(data, type_conversions)
+        print("Column type conversions applied.")
+    
+    write_csv(data, output_file)
+
+if __name__ == "__main__":
+    input_csv = "input_data.csv"
+    output_csv = "cleaned_data.csv"
+    key_column = "id"
+    conversions = {
+        "age": int,
+        "score": float,
+        "active": bool
+    }
+    clean_csv(input_csv, output_csv, key_column, conversions)
