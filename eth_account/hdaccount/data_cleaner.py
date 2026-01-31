@@ -202,3 +202,39 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+
+def clean_dataset(df, column_name):
+    """
+    Clean a specific column in a DataFrame.
+    Removes duplicates, strips whitespace, and converts to lowercase.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+
+    # Remove duplicate rows based on the specified column
+    df_cleaned = df.drop_duplicates(subset=[column_name])
+
+    # Strip whitespace and convert to lowercase for the specified column
+    df_cleaned[column_name] = df_cleaned[column_name].astype(str).str.strip().str.lower()
+
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+
+    return df_cleaned
+
+def validate_email_column(df, email_column='email'):
+    """
+    Basic email format validation for a column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+
+    # Simple regex pattern for email validation
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    email_valid = df[email_column].astype(str).str.match(pattern)
+
+    # Add validation result as a new column
+    df['email_valid'] = email_valid
+
+    return df
