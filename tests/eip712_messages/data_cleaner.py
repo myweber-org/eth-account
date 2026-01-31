@@ -235,3 +235,91 @@ if __name__ == "__main__":
         "active": bool
     }
     clean_csv(input_csv, output_csv, key_column, conversions)
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    handling missing values in numeric columns.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing values in numeric columns with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(
+        df_cleaned[numeric_cols].median()
+    )
+    
+    # For non-numeric columns, fill with mode (most frequent value)
+    non_numeric_cols = df_cleaned.select_dtypes(exclude=[np.number]).columns
+    for col in non_numeric_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()
+            if not mode_value.empty:
+                df_cleaned[col] = df_cleaned[col].fillna(mode_value.iloc[0])
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate that DataFrame has no null values after cleaning.
+    """
+    null_counts = df.isnull().sum()
+    total_nulls = null_counts.sum()
+    
+    if total_nulls == 0:
+        return True, "Data validation passed: No null values found."
+    else:
+        error_msg = f"Data validation failed: {total_nulls} null values remain."
+        return False, error_msg
+
+def process_data_file(input_path, output_path=None):
+    """
+    Main function to read, clean, and save data.
+    """
+    try:
+        # Read data
+        if input_path.endswith('.csv'):
+            df = pd.read_csv(input_path)
+        elif input_path.endswith('.xlsx'):
+            df = pd.read_excel(input_path)
+        else:
+            raise ValueError("Unsupported file format. Use .csv or .xlsx")
+        
+        # Clean data
+        df_cleaned = clean_dataframe(df)
+        
+        # Validate cleaning
+        is_valid, message = validate_dataframe(df_cleaned)
+        print(message)
+        
+        # Save cleaned data
+        if output_path:
+            if output_path.endswith('.csv'):
+                df_cleaned.to_csv(output_path, index=False)
+            elif output_path.endswith('.xlsx'):
+                df_cleaned.to_excel(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df_cleaned, is_valid
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None, False
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None, False
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df, success = process_data_file(input_file, output_file)
+    
+    if success and cleaned_df is not None:
+        print(f"Data cleaning completed successfully.")
+        print(f"Original shape: {pd.read_csv(input_file).shape}")
+        print(f"Cleaned shape: {cleaned_df.shape}")
