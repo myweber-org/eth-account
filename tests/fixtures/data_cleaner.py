@@ -1,131 +1,108 @@
-
-def remove_duplicates_preserve_order(input_list):
-    seen = set()
-    result = []
-    for item in input_list:
-        if item not in seen:
-            seen.add(item)
-            result.append(item)
-    return result
-import numpy as np
 import pandas as pd
-from scipy import stats
+import numpy as np
 
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Args:
+        input_file (str): Path to input CSV file
+        output_file (str): Path to save cleaned CSV file
+        missing_strategy (str): Strategy for handling missing values
+                               'mean', 'median', 'drop', or 'zero'
+    """
+    try:
+        # Read CSV file
+        df = pd.read_csv(input_file)
         
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
-                df_clean = df_clean[mask]
+        # Remove duplicate rows
+        initial_rows = len(df)
+        df = df.drop_duplicates()
+        duplicates_removed = initial_rows - len(df)
         
-        self.df = df_clean.reset_index(drop=True)
-        return self
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
         
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_normalized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val > min_val:
-                    df_normalized[col] = (self.df[col] - min_val) / (max_val - min_val)
+        if missing_strategy == 'mean':
+            for col in numeric_cols:
+                df[col] = df[col].fillna(df[col].mean())
+        elif missing_strategy == 'median':
+            for col in numeric_cols:
+                df[col] = df[col].fillna(df[col].median())
+        elif missing_strategy == 'drop':
+            df = df.dropna(subset=numeric_cols)
+        elif missing_strategy == 'zero':
+            df[numeric_cols] = df[numeric_cols].fillna(0)
         
-        self.df = df_normalized
-        return self
+        # Remove outliers using IQR method for numeric columns
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
         
-    def standardize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_standardized = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                mean_val = self.df[col].mean()
-                std_val = self.df[col].std()
-                if std_val > 0:
-                    df_standardized[col] = (self.df[col] - mean_val) / std_val
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
         
-        self.df = df_standardized
-        return self
+        # Print cleaning summary
+        print(f"Data cleaning completed:")
+        print(f"  - Removed {duplicates_removed} duplicate rows")
+        print(f"  - Final dataset has {len(df)} rows and {len(df.columns)} columns")
+        print(f"  - Cleaned data saved to: {output_file}")
         
-    def handle_missing(self, strategy='mean', columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_filled = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and self.df[col].isnull().any():
-                if strategy == 'mean':
-                    fill_value = self.df[col].mean()
-                elif strategy == 'median':
-                    fill_value = self.df[col].median()
-                elif strategy == 'mode':
-                    fill_value = self.df[col].mode()[0]
-                elif strategy == 'zero':
-                    fill_value = 0
-                else:
-                    continue
-                    
-                df_filled[col] = self.df[col].fillna(fill_value)
+        return df
         
-        self.df = df_filled
-        return self
-        
-    def get_cleaned_data(self):
-        return self.df
-        
-    def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
-        
-    def get_summary(self):
-        summary = {
-            'original_rows': self.original_shape[0],
-            'cleaned_rows': self.df.shape[0],
-            'removed_rows': self.get_removed_count(),
-            'columns': self.df.shape[1],
-            'missing_values': self.df.isnull().sum().sum()
-        }
-        return summary
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except pd.errors.EmptyDataError:
+        print(f"Error: Input file '{input_file}' is empty.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
 
-def example_usage():
-    np.random.seed(42)
-    data = {
-        'feature1': np.random.normal(100, 15, 1000),
-        'feature2': np.random.exponential(50, 1000),
-        'feature3': np.random.uniform(0, 1, 1000)
+def validate_dataframe(df):
+    """
+    Validate dataframe for common data quality issues.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': len(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': len(df.select_dtypes(include=['object']).columns)
     }
     
-    df = pd.DataFrame(data)
-    df.loc[np.random.choice(df.index, 50), 'feature1'] = np.nan
+    # Check for infinite values in numeric columns
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    infinite_count = 0
+    for col in numeric_cols:
+        infinite_count += np.isinf(df[col]).sum()
+    validation_results['infinite_values'] = int(infinite_count)
     
-    cleaner = DataCleaner(df)
-    result = (cleaner
-              .handle_missing(strategy='mean')
-              .remove_outliers_iqr(threshold=1.5)
-              .standardize_zscore()
-              .get_cleaned_data())
-    
-    print(f"Original shape: {df.shape}")
-    print(f"Cleaned shape: {result.shape}")
-    print(f"Summary: {cleaner.get_summary()}")
-    
-    return result
+    return validation_results
 
 if __name__ == "__main__":
-    cleaned_data = example_usage()
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    # Clean the data
+    cleaned_df = clean_csv_data(input_csv, output_csv, missing_strategy='median')
+    
+    if cleaned_df is not None:
+        # Validate the cleaned data
+        validation = validate_dataframe(cleaned_df)
+        print("\nData Validation Results:")
+        for key, value in validation.items():
+            print(f"  {key}: {value}")
