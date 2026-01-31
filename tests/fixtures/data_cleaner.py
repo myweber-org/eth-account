@@ -303,3 +303,11 @@ if __name__ == "__main__":
         print(f"\nStatistics for {column}:")
         for stat_name, stat_value in column_stats.items():
             print(f"  {stat_name}: {stat_value:.2f}")
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
