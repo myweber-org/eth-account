@@ -93,4 +93,135 @@ if __name__ == "__main__":
     print(f"Cleaned shape: {cleaned.shape}")
     
     if validate_data(cleaned, ['feature1', 'feature2', 'feature3']):
-        save_cleaned_data(cleaned, 'cleaned_data.csv')
+        save_cleaned_data(cleaned, 'cleaned_data.csv')import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Columns to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    original_shape = df.shape
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    removed_count = original_shape[0] - cleaned_df.shape[0]
+    
+    print(f"Removed {removed_count} duplicate rows")
+    print(f"Original shape: {original_shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    
+    return cleaned_df
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): 'mean', 'median', 'mode', or 'drop'
+        columns (list, optional): Specific columns to clean
+    
+    Returns:
+        pd.DataFrame: DataFrame with missing values handled
+    """
+    if df.empty:
+        return df
+    
+    if columns is None:
+        columns = df.columns
+    
+    df_cleaned = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            if strategy == 'mean':
+                df_cleaned[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_cleaned[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_cleaned[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_cleaned = df_cleaned.dropna(subset=[col])
+    
+    return df_cleaned
+
+def validate_data(df, rules):
+    """
+    Validate DataFrame against specified rules.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        rules (dict): Validation rules
+    
+    Returns:
+        dict: Validation results
+    """
+    results = {
+        'passed': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    for column, rule in rules.items():
+        if column in df.columns:
+            if 'min' in rule:
+                if df[column].min() < rule['min']:
+                    results['passed'] = False
+                    results['errors'].append(f"{column}: Value below minimum {rule['min']}")
+            
+            if 'max' in rule:
+                if df[column].max() > rule['max']:
+                    results['passed'] = False
+                    results['errors'].append(f"{column}: Value above maximum {rule['max']}")
+            
+            if 'allowed_values' in rule:
+                invalid_values = df[~df[column].isin(rule['allowed_values'])][column].unique()
+                if len(invalid_values) > 0:
+                    results['warnings'].append(f"{column}: Contains unexpected values: {invalid_values}")
+    
+    return results
+
+def main():
+    # Example usage
+    data = {
+        'id': [1, 2, 3, 1, 4, 5, 3],
+        'name': ['Alice', 'Bob', 'Charlie', 'Alice', 'David', 'Eve', 'Charlie'],
+        'age': [25, 30, 35, 25, 28, np.nan, 35],
+        'score': [85, 92, 78, 85, 95, 88, 78]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Remove duplicates
+    df_clean = remove_duplicates(df, subset=['id', 'name'])
+    
+    # Clean missing values
+    df_clean = clean_missing_values(df_clean, strategy='mean', columns=['age'])
+    
+    print("\nCleaned DataFrame:")
+    print(df_clean)
+    
+    # Validate data
+    validation_rules = {
+        'age': {'min': 18, 'max': 100},
+        'score': {'min': 0, 'max': 100}
+    }
+    
+    validation_results = validate_data(df_clean, validation_rules)
+    print("\nValidation Results:")
+    print(validation_results)
+
+if __name__ == "__main__":
+    main()
