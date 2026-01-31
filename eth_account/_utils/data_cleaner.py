@@ -3,6 +3,9 @@ import pandas as pd
 import numpy as np
 from scipy import stats
 
+def load_dataset(filepath):
+    return pd.read_csv(filepath)
+
 def remove_outliers_iqr(df, column):
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
@@ -11,94 +14,25 @@ def remove_outliers_iqr(df, column):
     upper_bound = Q3 + 1.5 * IQR
     return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def normalize_minmax(df, column):
+def normalize_column(df, column):
     min_val = df[column].min()
     max_val = df[column].max()
     df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
     return df
 
-def clean_dataset(file_path):
-    df = pd.read_csv(file_path)
-    
-    numeric_cols = df.select_dtypes(include=[np.number]).columns
-    
-    for col in numeric_cols:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_minmax(df, col)
-    
-    df = df.dropna()
-    
-    return df
+def clean_dataframe(df, numeric_columns):
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_column(df, col)
+    return df.reset_index(drop=True)
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
 
 if __name__ == "__main__":
-    cleaned_data = clean_dataset('raw_data.csv')
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning complete. Original shape: {pd.read_csv('raw_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
-import numpy as np
-import pandas as pd
-
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Args:
-        df: pandas DataFrame
-        column: Column name to clean
-    
-    Returns:
-        DataFrame with outliers removed
-    """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
-
-def calculate_statistics(df, column):
-    """
-    Calculate basic statistics for a column.
-    
-    Args:
-        df: pandas DataFrame
-        column: Column name to analyze
-    
-    Returns:
-        Dictionary with statistics
-    """
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
-    
-    return stats
-
-def clean_dataset(df, numeric_columns):
-    """
-    Clean a dataset by removing outliers from multiple numeric columns.
-    
-    Args:
-        df: pandas DataFrame
-        numeric_columns: List of column names to clean
-    
-    Returns:
-        Cleaned DataFrame
-    """
-    cleaned_df = df.copy()
-    
-    for column in numeric_columns:
-        if column in cleaned_df.columns:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
-    
-    return cleaned_df
+    raw_data = load_dataset('raw_dataset.csv')
+    numeric_cols = ['feature1', 'feature2', 'feature3']
+    cleaned_df = clean_dataframe(raw_data, numeric_cols)
+    save_cleaned_data(cleaned_df, 'cleaned_dataset.csv')
