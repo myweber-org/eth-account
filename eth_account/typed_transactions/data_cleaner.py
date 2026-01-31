@@ -147,3 +147,153 @@ def validate_data(data, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "Dataset is valid"
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> pd.DataFrame:
+        """
+        Remove duplicate rows from the DataFrame.
+        
+        Args:
+            subset: List of column names to consider for identifying duplicates.
+                    If None, all columns are used.
+            keep: Determines which duplicates to keep.
+                  'first': Keep the first occurrence.
+                  'last': Keep the last occurrence.
+                  False: Remove all duplicates.
+                  
+        Returns:
+            Cleaned DataFrame with duplicates removed.
+        """
+        cleaned_df = self.df.drop_duplicates(subset=subset, keep=keep)
+        removed_count = len(self.df) - len(cleaned_df)
+        
+        print(f"Original shape: {self.original_shape}")
+        print(f"New shape: {cleaned_df.shape}")
+        print(f"Removed {removed_count} duplicate rows")
+        
+        return cleaned_df
+    
+    def fill_missing_values(self, column: str, value: any = None, method: str = 'mean') -> pd.DataFrame:
+        """
+        Fill missing values in a specified column.
+        
+        Args:
+            column: Name of the column to fill missing values.
+            value: Specific value to use for filling.
+            method: Method to use if value is not provided.
+                   'mean': Fill with column mean.
+                   'median': Fill with column median.
+                   'mode': Fill with most frequent value.
+                   
+        Returns:
+            DataFrame with filled missing values.
+        """
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        missing_count = self.df[column].isnull().sum()
+        
+        if value is not None:
+            self.df[column] = self.df[column].fillna(value)
+        elif method == 'mean':
+            self.df[column] = self.df[column].fillna(self.df[column].mean())
+        elif method == 'median':
+            self.df[column] = self.df[column].fillna(self.df[column].median())
+        elif method == 'mode':
+            self.df[column] = self.df[column].fillna(self.df[column].mode()[0])
+        else:
+            raise ValueError(f"Unsupported method: {method}")
+            
+        print(f"Filled {missing_count} missing values in column '{column}'")
+        return self.df
+    
+    def remove_outliers_iqr(self, column: str, multiplier: float = 1.5) -> pd.DataFrame:
+        """
+        Remove outliers using the Interquartile Range method.
+        
+        Args:
+            column: Name of the column to check for outliers.
+            multiplier: IQR multiplier for outlier detection.
+            
+        Returns:
+            DataFrame with outliers removed.
+        """
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        original_len = len(self.df)
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        removed_count = original_len - len(self.df)
+        
+        print(f"Removed {removed_count} outliers from column '{column}'")
+        print(f"Lower bound: {lower_bound:.2f}, Upper bound: {upper_bound:.2f}")
+        
+        return self.df
+    
+    def get_summary(self) -> dict:
+        """
+        Get summary statistics of the cleaning operations.
+        
+        Returns:
+            Dictionary containing summary information.
+        """
+        return {
+            'original_rows': self.original_shape[0],
+            'current_rows': len(self.df),
+            'original_columns': self.original_shape[1],
+            'current_columns': len(self.df.columns),
+            'rows_removed': self.original_shape[0] - len(self.df),
+            'missing_values': self.df.isnull().sum().to_dict()
+        }
+
+def create_sample_data() -> pd.DataFrame:
+    """Create sample DataFrame for testing."""
+    np.random.seed(42)
+    
+    data = {
+        'id': range(1, 101),
+        'value': np.random.randn(100),
+        'category': np.random.choice(['A', 'B', 'C', None], 100),
+        'score': np.random.randint(1, 100, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[10:15, 'value'] = np.nan
+    df.loc[95:99, 'score'] = 200
+    
+    df = pd.concat([df, df.iloc[0:5]], ignore_index=True)
+    
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Initial DataFrame:")
+    print(cleaner.df.head())
+    print("\n" + "="*50)
+    
+    cleaned_df = cleaner.remove_duplicates()
+    cleaned_df = cleaner.fill_missing_values('value', method='mean')
+    cleaned_df = cleaner.remove_outliers_iqr('score')
+    
+    print("\n" + "="*50)
+    summary = cleaner.get_summary()
+    print("Cleaning Summary:")
+    for key, value in summary.items():
+        print(f"{key}: {value}")
