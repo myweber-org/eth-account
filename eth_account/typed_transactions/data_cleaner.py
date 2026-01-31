@@ -296,4 +296,97 @@ if __name__ == "__main__":
     summary = cleaner.get_summary()
     print("Cleaning Summary:")
     for key, value in summary.items():
-        print(f"{key}: {value}")
+        print(f"{key}: {value}")import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (str): Method to fill missing values. Options: 'mean', 'median', 'mode', or 'drop'. Default is 'mean'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Removed {len(df) - len(cleaned_df)} duplicate rows.")
+    
+    if fill_missing == 'drop':
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.dropna()
+        print(f"Dropped {initial_rows - len(cleaned_df)} rows with missing values.")
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                fill_value = cleaned_df[col].mean()
+            else:
+                fill_value = cleaned_df[col].median()
+            cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+            print(f"Filled missing values in column '{col}' with {fill_missing}: {fill_value:.2f}")
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            mode_value = cleaned_df[col].mode()
+            if not mode_value.empty:
+                cleaned_df[col] = cleaned_df[col].fillna(mode_value.iloc[0])
+                print(f"Filled missing values in column '{col}' with mode: {mode_value.iloc[0]}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, check_duplicates=True, check_missing=True):
+    """
+    Validate a DataFrame by checking for duplicates and missing values.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    check_duplicates (bool): Whether to check for duplicate rows.
+    check_missing (bool): Whether to check for missing values.
+    
+    Returns:
+    dict: Dictionary containing validation results.
+    """
+    validation_results = {}
+    
+    if check_duplicates:
+        duplicate_count = df.duplicated().sum()
+        validation_results['duplicate_rows'] = duplicate_count
+        if duplicate_count > 0:
+            print(f"Warning: Found {duplicate_count} duplicate rows.")
+    
+    if check_missing:
+        missing_counts = df.isnull().sum()
+        total_missing = missing_counts.sum()
+        validation_results['missing_values'] = total_missing
+        validation_results['missing_by_column'] = missing_counts[missing_counts > 0].to_dict()
+        
+        if total_missing > 0:
+            print(f"Warning: Found {total_missing} missing values across {len(validation_results['missing_by_column'])} columns.")
+            for col, count in validation_results['missing_by_column'].items():
+                print(f"  Column '{col}': {count} missing values")
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, np.nan],
+        'B': [5, np.nan, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_dataframe(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df, fill_missing='median')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
