@@ -34,3 +34,71 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset('raw_data.csv')
     cleaned_data.to_csv('cleaned_data.csv', index=False)
     print(f"Data cleaning complete. Original shape: {pd.read_csv('raw_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to clean
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_statistics(df, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to analyze
+    
+    Returns:
+        Dictionary with statistics
+    """
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean a dataset by removing outliers from multiple numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+        numeric_columns: List of column names to clean
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df
