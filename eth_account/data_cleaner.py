@@ -114,4 +114,87 @@ if __name__ == "__main__":
     
     normalized_df = normalize_column(df, 'values', method='minmax')
     print("DataFrame with normalized column:")
-    print(normalized_df)
+    print(normalized_df)import pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+    """
+    Clean a CSV file by handling missing values.
+    
+    Args:
+        input_file (str): Path to input CSV file.
+        output_file (str): Path to save cleaned CSV file.
+        missing_strategy (str): Strategy for handling missing values.
+            Options: 'mean', 'median', 'mode', 'drop'.
+    
+    Returns:
+        bool: True if cleaning successful, False otherwise.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        if missing_strategy == 'drop':
+            df_cleaned = df.dropna()
+        else:
+            for column in df.select_dtypes(include=[np.number]).columns:
+                if df[column].isnull().any():
+                    if missing_strategy == 'mean':
+                        fill_value = df[column].mean()
+                    elif missing_strategy == 'median':
+                        fill_value = df[column].median()
+                    elif missing_strategy == 'mode':
+                        fill_value = df[column].mode()[0]
+                    else:
+                        fill_value = 0
+                    
+                    df[column] = df[column].fillna(fill_value)
+            
+            df_cleaned = df
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Args:
+        df (pd.DataFrame): Dataframe to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "Dataframe is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Dataframe is valid"
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    success = clean_csv_data('sample_data.csv', 'cleaned_data.csv', 'mean')
+    
+    if success:
+        cleaned_df = pd.read_csv('cleaned_data.csv')
+        print(f"Cleaned data shape: {cleaned_df.shape}")
+        print(cleaned_df.head())
