@@ -76,4 +76,65 @@ def validate_data(df, required_columns):
         'is_valid': len(missing_columns) == 0 and len(columns_with_nulls) == 0,
         'missing_columns': missing_columns,
         'columns_with_nulls': columns_with_nulls
-    }
+    }import csv
+import re
+from typing import List, Dict, Optional
+
+def clean_string(value: str) -> str:
+    """Remove extra whitespace and normalize string."""
+    if not isinstance(value, str):
+        return str(value)
+    cleaned = re.sub(r'\s+', ' ', value.strip())
+    return cleaned
+
+def validate_email(email: str) -> bool:
+    """Validate email format."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def clean_csv_row(row: Dict[str, str]) -> Dict[str, str]:
+    """Clean all string values in a CSV row dictionary."""
+    cleaned_row = {}
+    for key, value in row.items():
+        cleaned_row[key] = clean_string(value)
+    return cleaned_row
+
+def read_and_clean_csv(filepath: str) -> List[Dict[str, str]]:
+    """Read CSV file and clean all rows."""
+    cleaned_data = []
+    try:
+        with open(filepath, 'r', newline='', encoding='utf-8') as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                cleaned_row = clean_csv_row(row)
+                cleaned_data.append(cleaned_row)
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+    except Exception as e:
+        print(f"Error reading CSV: {e}")
+    
+    return cleaned_data
+
+def filter_valid_emails(data: List[Dict[str, str]], email_field: str = 'email') -> List[Dict[str, str]]:
+    """Filter rows with valid email addresses."""
+    valid_rows = []
+    for row in data:
+        if email_field in row and validate_email(row[email_field]):
+            valid_rows.append(row)
+    return valid_rows
+
+def write_cleaned_csv(data: List[Dict[str, str]], output_path: str) -> None:
+    """Write cleaned data to a new CSV file."""
+    if not data:
+        print("No data to write.")
+        return
+    
+    fieldnames = data[0].keys()
+    try:
+        with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            writer.writerows(data)
+        print(f"Cleaned data written to: {output_path}")
+    except Exception as e:
+        print(f"Error writing CSV: {e}")
