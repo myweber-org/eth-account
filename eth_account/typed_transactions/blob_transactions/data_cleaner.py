@@ -1,102 +1,50 @@
-import numpy as np
 import pandas as pd
-from scipy import stats
+import re
 
-def remove_outliers_iqr(data, column, multiplier=1.5):
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, case_normalization='lower'):
     """
-    Remove outliers using IQR method
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
     """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    cleaned_df = df.copy()
     
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
+    if remove_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df.drop_duplicates(inplace=True)
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
     
-    lower_bound = Q1 - multiplier * IQR
-    upper_bound = Q3 + multiplier * IQR
+    if columns_to_clean is None:
+        columns_to_clean = cleaned_df.select_dtypes(include=['object']).columns
     
-    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    outliers_removed = len(data) - len(filtered_data)
-    
-    return filtered_data, outliers_removed
-
-def normalize_minmax(data, column):
-    """
-    Normalize data using min-max scaling
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    min_val = data[column].min()
-    max_val = data[column].max()
-    
-    if max_val == min_val:
-        return data[column].apply(lambda x: 0.5)
-    
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
-
-def standardize_zscore(data, column):
-    """
-    Standardize data using z-score normalization
-    """
-    if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    
-    if std_val == 0:
-        return data[column].apply(lambda x: 0)
-    
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
-
-def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5, normalization_method='standardize'):
-    """
-    Comprehensive data cleaning pipeline
-    """
-    if numeric_columns is None:
-        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_data = data.copy()
-    cleaning_report = {}
-    
-    for col in numeric_columns:
-        if col not in data.columns:
-            continue
+    for col in columns_to_clean:
+        if col in cleaned_df.columns and cleaned_df[col].dtype == 'object':
+            if case_normalization == 'lower':
+                cleaned_df[col] = cleaned_df[col].str.lower()
+            elif case_normalization == 'upper':
+                cleaned_df[col] = cleaned_df[col].str.upper()
+            elif case_normalization == 'title':
+                cleaned_df[col] = cleaned_df[col].str.title()
             
-        # Remove outliers
-        cleaned_data, outliers_removed = remove_outliers_iqr(cleaned_data, col, outlier_multiplier)
-        cleaning_report[f'{col}_outliers_removed'] = outliers_removed
-        
-        # Apply normalization
-        if normalization_method == 'minmax':
-            cleaned_data[f'{col}_normalized'] = normalize_minmax(cleaned_data, col)
-        elif normalization_method == 'standardize':
-            cleaned_data[f'{col}_standardized'] = standardize_zscore(cleaned_data, col)
-        else:
-            raise ValueError("normalization_method must be 'minmax' or 'standardize'")
+            cleaned_df[col] = cleaned_df[col].str.strip()
+            cleaned_df[col] = cleaned_df[col].replace(r'\s+', ' ', regex=True)
     
-    cleaning_report['original_rows'] = len(data)
-    cleaning_report['cleaned_rows'] = len(cleaned_data)
-    cleaning_report['rows_removed'] = len(data) - len(cleaned_data)
-    
-    return cleaned_data, cleaning_report
+    return cleaned_df
 
-def validate_data(data, required_columns=None, allow_nan=False):
+def validate_email_column(df, email_column):
     """
-    Validate data structure and content
+    Validate email addresses in a specified column and return a boolean mask.
     """
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in data.columns]
-        if missing_columns:
-            raise ValueError(f"Missing required columns: {missing_columns}")
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
     
-    if not allow_nan:
-        nan_count = data.isna().sum().sum()
-        if nan_count > 0:
-            raise ValueError(f"Data contains {nan_count} NaN values")
-    
-    return True
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return df[email_column].str.match(email_pattern, na=False)
+
+def remove_special_characters(text, keep_chars="a-zA-Z0-9\s"):
+    """
+    Remove special characters from a string, keeping only specified character sets.
+    """
+    if pd.isna(text):
+        return text
+    pattern = f'[^{keep_chars}]'
+    return re.sub(pattern, '', str(text))
