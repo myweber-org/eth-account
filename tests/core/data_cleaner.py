@@ -127,4 +127,11 @@ if __name__ == "__main__":
     print("Original dataset shape:", df.shape)
     print("Cleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned data summary:")
-    print(cleaned_df.describe())
+    print(cleaned_df.describe())def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
