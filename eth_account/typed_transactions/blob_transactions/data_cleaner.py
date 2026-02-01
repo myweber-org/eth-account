@@ -132,3 +132,11 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(df)
     print(f"Cleaned dataset shape: {cleaned_df.shape}")
     print(f"Outliers removed: {len(df) - len(cleaned_df)}")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
