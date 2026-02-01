@@ -488,3 +488,142 @@ def validate_dataframe(dataframe, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    if len(numeric_cols) == 0:
+        return pd.DataFrame()
+    
+    stats = df[numeric_cols].agg(['mean', 'median', 'std', 'min', 'max'])
+    return stats
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    if strategy not in ['mean', 'median', 'mode', 'drop']:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    df_clean = df.copy()
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        df_clean = df_clean.dropna(subset=numeric_cols)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            mode_val = df_clean[col].mode()
+            if not mode_val.empty:
+                df_clean[col].fillna(mode_val[0], inplace=True)
+    else:
+        for col in numeric_cols:
+            if strategy == 'mean':
+                fill_val = df_clean[col].mean()
+            else:  # median
+                fill_val = df_clean[col].median()
+            df_clean[col].fillna(fill_val, inplace=True)
+    
+    return df_clean
+
+def normalize_data(df, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    df_norm = df.copy()
+    
+    if columns is None:
+        columns = df_norm.select_dtypes(include=[np.number]).columns
+    
+    for col in columns:
+        if col in df_norm.columns and np.issubdtype(df_norm[col].dtype, np.number):
+            col_min = df_norm[col].min()
+            col_max = df_norm[col].max()
+            
+            if col_max != col_min:
+                df_norm[col] = (df_norm[col] - col_min) / (col_max - col_min)
+            else:
+                df_norm[col] = 0
+    
+    return df_norm
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': [1.1, 2.2, 3.3, 4.4, 5.5, 6.6]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df = remove_outliers_iqr(df, 'A')
+    print("DataFrame after removing outliers from column 'A':")
+    print(cleaned_df)
+    print()
+    
+    stats = calculate_summary_statistics(df)
+    print("Summary statistics:")
+    print(stats)
+    print()
+    
+    df_with_nan = df.copy()
+    df_with_nan.loc[2, 'B'] = np.nan
+    df_filled = handle_missing_values(df_with_nan, strategy='mean')
+    print("DataFrame after handling missing values:")
+    print(df_filled)
+    print()
+    
+    normalized_df = normalize_data(df, columns=['A', 'B'])
+    print("Normalized DataFrame:")
+    print(normalized_df)
