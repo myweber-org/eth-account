@@ -228,4 +228,101 @@ def validate_data(data, required_columns=None, allow_nan=False):
     if len(numeric_columns) == 0:
         raise ValueError("No numeric columns found in dataset")
     
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+from typing import Optional, Union, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep=keep)
+        return self
+        
+    def convert_dtypes(self, columns: Union[str, List[str]], target_type: str) -> 'DataCleaner':
+        if isinstance(columns, str):
+            columns = [columns]
+            
+        type_map = {
+            'int': pd.Int64Dtype(),
+            'float': float,
+            'str': str,
+            'datetime': 'datetime64[ns]',
+            'category': 'category'
+        }
+        
+        if target_type not in type_map:
+            raise ValueError(f"Unsupported type: {target_type}")
+            
+        for col in columns:
+            if col in self.df.columns:
+                try:
+                    self.df[col] = self.df[col].astype(type_map[target_type])
+                except Exception as e:
+                    print(f"Warning: Could not convert {col} to {target_type}: {e}")
+                    
+        return self
+        
+    def fill_missing(self, strategy: str = 'mean', value: Optional[Union[int, float, str]] = None) -> 'DataCleaner':
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        if strategy == 'mean' and len(numeric_cols) > 0:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
+        elif strategy == 'median' and len(numeric_cols) > 0:
+            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
+        elif strategy == 'mode':
+            for col in self.df.columns:
+                if not self.df[col].empty:
+                    mode_val = self.df[col].mode()
+                    if not mode_val.empty:
+                        self.df[col] = self.df[col].fillna(mode_val.iloc[0])
+        elif strategy == 'value' and value is not None:
+            self.df = self.df.fillna(value)
+        elif strategy == 'ffill':
+            self.df = self.df.fillna(method='ffill')
+        elif strategy == 'bfill':
+            self.df = self.df.fillna(method='bfill')
+            
+        return self
+        
+    def get_summary(self) -> dict:
+        removed_rows = self.original_shape[0] - self.df.shape[0]
+        removed_cols = self.original_shape[1] - self.df.shape[1]
+        
+        missing_counts = self.df.isnull().sum().to_dict()
+        dtypes = self.df.dtypes.astype(str).to_dict()
+        
+        return {
+            'original_shape': self.original_shape,
+            'current_shape': self.df.shape,
+            'removed_rows': removed_rows,
+            'removed_cols': removed_cols,
+            'missing_values': missing_counts,
+            'dtypes': dtypes
+        }
+        
+    def get_dataframe(self) -> pd.DataFrame:
+        return self.df.copy()
+
+def clean_dataset(df: pd.DataFrame, 
+                  remove_dups: bool = True,
+                  fill_strategy: str = 'mean',
+                  type_conversions: Optional[dict] = None) -> pd.DataFrame:
+    
+    cleaner = DataCleaner(df)
+    
+    if remove_dups:
+        cleaner.remove_duplicates()
+        
+    if type_conversions:
+        for col, target_type in type_conversions.items():
+            cleaner.convert_dtypes(col, target_type)
+            
+    cleaner.fill_missing(strategy=fill_strategy)
+    
+    summary = cleaner.get_summary()
+    print(f"Data cleaning complete. Removed {summary['removed_rows']} duplicate rows.")
+    
+    return cleaner.get_dataframe()
