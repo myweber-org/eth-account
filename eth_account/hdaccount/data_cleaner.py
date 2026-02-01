@@ -223,3 +223,11 @@ if __name__ == "__main__":
     
     # Export to CSV
     export_cleaned_data(cleaned_data, 'cleaned_data.csv', 'csv')
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
