@@ -41,4 +41,11 @@ if __name__ == "__main__":
     cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
-    print(cleaned[['feature_a_normalized', 'feature_b_standardized']].head())
+    print(cleaned[['feature_a_normalized', 'feature_b_standardized']].head())def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
