@@ -128,3 +128,98 @@ if __name__ == "__main__":
     cleaned_df = cleaner.get_cleaned_data()
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataset(df):
+    """
+    Clean dataset by removing duplicates, handling missing values,
+    and standardizing column formats.
+    """
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Fill missing numeric values with median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df[col] = df[col].fillna(df[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    # Standardize date columns
+    date_columns = [col for col in df.columns if 'date' in col.lower()]
+    for col in date_columns:
+        try:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+        except:
+            pass
+    
+    # Remove outliers using IQR method for numeric columns
+    for col in numeric_cols:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+    
+    # Reset index after cleaning
+    df = df.reset_index(drop=True)
+    
+    return df
+
+def validate_data(df, required_columns):
+    """
+    Validate that required columns exist and have no null values.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    null_counts = df[required_columns].isnull().sum()
+    if null_counts.any():
+        raise ValueError(f"Null values found in required columns: {null_counts[null_counts > 0].to_dict()}")
+    
+    return True
+
+def export_cleaned_data(df, output_path, format='csv'):
+    """
+    Export cleaned data to specified format.
+    """
+    if format == 'csv':
+        df.to_csv(output_path, index=False)
+    elif format == 'excel':
+        df.to_excel(output_path, index=False)
+    elif format == 'parquet':
+        df.to_parquet(output_path, index=False)
+    else:
+        raise ValueError(f"Unsupported format: {format}")
+    
+    print(f"Data exported successfully to {output_path}")
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 150],
+        'salary': [50000, 60000, 60000, 70000, 80000, 1000000],
+        'join_date': ['2022-01-01', '2022-02-01', '2022-02-01', '2023-01-15', '2023-03-01', '2020-12-01']
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    cleaned_data = clean_dataset(sample_data)
+    print("Cleaned data shape:", cleaned_data.shape)
+    
+    try:
+        validate_data(cleaned_data, ['id', 'name', 'age'])
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
+    
+    # Export to CSV
+    export_cleaned_data(cleaned_data, 'cleaned_data.csv', 'csv')
