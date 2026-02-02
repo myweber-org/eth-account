@@ -1,75 +1,119 @@
-import numpy as np
-import pandas as pd
 
-def remove_outliers_iqr(data, column):
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a pandas Series using the IQR method.
-    Returns a cleaned Series with outliers set to NaN.
-    """
-    if not isinstance(data, pd.Series):
-        raise TypeError("Input data must be a pandas Series")
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    Q1 = data.quantile(0.25)
-    Q3 = data.quantile(0.75)
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
+    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
     
-    cleaned_data = data.copy()
-    cleaned_data[(cleaned_data < lower_bound) | (cleaned_data > upper_bound)] = np.nan
-    return cleaned_data
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def normalize_minmax(data):
+def calculate_basic_stats(df, column):
     """
-    Normalize data using min-max scaling to range [0, 1].
-    Handles NaN values by ignoring them in calculation.
+    Calculate basic statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing statistics
     """
-    if not isinstance(data, pd.Series):
-        raise TypeError("Input data must be a pandas Series")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    min_val = data.min(skipna=True)
-    max_val = data.max(skipna=True)
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
     
-    if min_val == max_val:
-        return pd.Series([0.5] * len(data), index=data.index)
-    
-    normalized = (data - min_val) / (max_val - min_val)
-    return normalized
+    return stats
 
-def clean_dataframe(df, numeric_columns=None):
+def normalize_column(df, column, method='minmax'):
     """
-    Clean a DataFrame by removing outliers and normalizing numeric columns.
-    If numeric_columns is None, automatically select all numeric columns.
-    Returns a new cleaned DataFrame.
+    Normalize a DataFrame column using specified method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
     """
-    if not isinstance(df, pd.DataFrame):
-        raise TypeError("Input must be a pandas DataFrame")
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    cleaned_df = df.copy()
+    df_copy = df.copy()
     
-    if numeric_columns is None:
-        numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
     
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            # Remove outliers
-            cleaned_df[col] = remove_outliers_iqr(cleaned_df[col], col)
-            # Normalize remaining values
-            cleaned_df[col] = normalize_minmax(cleaned_df[col])
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val > 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
     
-    return cleaned_df
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_copy
 
-def calculate_statistics(df):
+def handle_missing_values(df, column, strategy='mean'):
     """
-    Calculate basic statistics for numeric columns in DataFrame.
-    Returns a summary DataFrame with count, mean, std, min, and max.
+    Handle missing values in a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
     """
-    numeric_df = df.select_dtypes(include=[np.number])
-    stats = pd.DataFrame({
-        'count': numeric_df.count(),
-        'mean': numeric_df.mean(),
-        'std': numeric_df.std(),
-        'min': numeric_df.min(),
-        'max': numeric_df.max()
-    })
-    return stats.T
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    
+    if strategy == 'mean':
+        fill_value = df_copy[column].mean()
+    elif strategy == 'median':
+        fill_value = df_copy[column].median()
+    elif strategy == 'mode':
+        fill_value = df_copy[column].mode()[0] if not df_copy[column].mode().empty else np.nan
+    elif strategy == 'drop':
+        df_copy = df_copy.dropna(subset=[column])
+        return df_copy
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    df_copy[column] = df_copy[column].fillna(fill_value)
+    return df_copy
