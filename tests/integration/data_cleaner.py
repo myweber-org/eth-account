@@ -290,4 +290,91 @@ def example_usage():
     return cleaned_data
 
 if __name__ == "__main__":
+    example_usage()import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column, threshold=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers.index.tolist()
+    
+    def remove_outliers(self, columns, method='iqr', threshold=1.5):
+        outlier_indices = set()
+        for col in columns:
+            if method == 'iqr':
+                indices = self.detect_outliers_iqr(col, threshold)
+                outlier_indices.update(indices)
+        
+        self.df = self.df.drop(index=list(outlier_indices)).reset_index(drop=True)
+        removed_count = self.original_shape[0] - self.df.shape[0]
+        return removed_count
+    
+    def normalize_column(self, column, method='zscore'):
+        if method == 'zscore':
+            self.df[f'{column}_normalized'] = stats.zscore(self.df[column])
+        elif method == 'minmax':
+            self.df[f'{column}_normalized'] = (self.df[column] - self.df[column].min()) / (self.df[column].max() - self.df[column].min())
+        return self.df
+    
+    def fill_missing(self, strategy='mean', custom_value=None):
+        for col in self.df.columns:
+            if self.df[col].isnull().any():
+                if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif custom_value is not None:
+                    self.df[col].fillna(custom_value, inplace=True)
+        return self.df
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': self.df.shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+        return summary
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.randint(1, 100, 1000)
+    }
+    df = pd.DataFrame(data)
+    
+    cleaner = DataCleaner(df)
+    removed = cleaner.remove_outliers(['feature_a', 'feature_b'])
+    cleaner.fill_missing(strategy='mean')
+    cleaner.normalize_column('feature_a', method='zscore')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    summary = cleaner.get_summary()
+    
+    print(f"Removed {removed} outliers")
+    print(f"Final shape: {cleaned_df.shape}")
+    print(f"Summary: {summary}")
+    
+    return cleaned_df
+
+if __name__ == "__main__":
     example_usage()
