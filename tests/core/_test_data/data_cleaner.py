@@ -4,11 +4,11 @@ import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Remove outliers from a DataFrame column using the IQR method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
+    column (str): Column name to clean
     
     Returns:
     pd.DataFrame: DataFrame with outliers removed
@@ -29,11 +29,11 @@ def remove_outliers_iqr(df, column):
 
 def calculate_summary_statistics(df, column):
     """
-    Calculate summary statistics for a column after outlier removal.
+    Calculate summary statistics for a column.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
+    column (str): Column name
     
     Returns:
     dict: Dictionary containing summary statistics
@@ -47,46 +47,71 @@ def calculate_summary_statistics(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': df[column].count()
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
     }
     
     return stats
 
-def clean_dataset(df, numeric_columns=None):
+def normalize_column(df, column, method='minmax'):
     """
-    Clean dataset by removing outliers from all numeric columns.
+    Normalize a column using specified method.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
+    column (str): Column name to normalize
+    method (str): Normalization method ('minmax' or 'zscore')
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame
+    pd.DataFrame: DataFrame with normalized column
     """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    cleaned_df = df.copy()
+    df_copy = df.copy()
     
-    for column in numeric_columns:
-        if column in df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - min_val) / (max_val - min_val)
+        else:
+            df_copy[f'{column}_normalized'] = 0.5
     
-    return cleaned_df
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val > 0:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - mean_val) / std_val
+        else:
+            df_copy[f'{column}_normalized'] = 0
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_copy
 
 if __name__ == "__main__":
-    # Example usage
     sample_data = {
-        'A': np.random.normal(100, 15, 1000),
-        'B': np.random.exponential(50, 1000),
-        'C': np.random.uniform(0, 200, 1000)
+        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 13, 12, 11, 10]
     }
     
     df = pd.DataFrame(sample_data)
-    print(f"Original shape: {df.shape}")
+    print("Original DataFrame:")
+    print(df)
+    print()
     
-    cleaned_df = clean_dataset(df, ['A', 'B'])
-    print(f"Cleaned shape: {cleaned_df.shape}")
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("DataFrame after removing outliers:")
+    print(cleaned_df)
+    print()
     
-    stats = calculate_summary_statistics(cleaned_df, 'A')
-    print(f"Summary statistics for column A: {stats}")
+    stats = calculate_summary_statistics(df, 'values')
+    print("Summary statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value}")
+    print()
+    
+    normalized_df = normalize_column(df, 'values', method='minmax')
+    print("DataFrame with normalized column:")
+    print(normalized_df)
