@@ -495,3 +495,104 @@ def clean_dataset(input_file, output_file, outlier_method='iqr', normalize_metho
 
 if __name__ == "__main__":
     cleaned_df = clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', fill_value=None):
+    """
+    Clean a pandas DataFrame by handling duplicates and null values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    handle_nulls (str): How to handle null values. Options: 'drop', 'fill', 'ignore'.
+    fill_value: Value to fill nulls with if handle_nulls is 'fill'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if handle_nulls == 'drop':
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.dropna()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} rows with null values.")
+    elif handle_nulls == 'fill':
+        if fill_value is not None:
+            cleaned_df = cleaned_df.fillna(fill_value)
+            print(f"Filled null values with {fill_value}.")
+        else:
+            cleaned_df = cleaned_df.fillna(0)
+            print("Filled null values with 0.")
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_counts': df.isnull().sum().to_dict(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_columns'] = missing_columns
+        validation_results['all_required_present'] = len(missing_columns) == 0
+    
+    return validation_results
+
+def sample_data_cleaning():
+    """
+    Example usage of the data cleaning functions.
+    """
+    data = {
+        'id': [1, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Charlie', None, 'David', 'Eve'],
+        'score': [85, 92, None, 78, 78, 88],
+        'department': ['HR', 'IT', 'IT', 'Finance', 'Finance', 'HR']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_dataset(df, required_columns=['id', 'name', 'score'])
+    print("Validation Results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
+    
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataset(
+        df, 
+        drop_duplicates=True, 
+        handle_nulls='fill', 
+        fill_value=0
+    )
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    cleaned_data = sample_data_cleaning()
