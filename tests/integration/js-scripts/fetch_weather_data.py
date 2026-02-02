@@ -127,3 +127,70 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import os
+from typing import Optional, Dict, Any
+
+def get_current_weather(city: str, api_key: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Fetch current weather data for a given city using OpenWeatherMap API.
+    
+    Args:
+        city: Name of the city to get weather for
+        api_key: OpenWeatherMap API key. If None, tries to get from env var.
+    
+    Returns:
+        Dictionary containing weather data
+    
+    Raises:
+        ValueError: If API key is not provided or found
+        requests.exceptions.RequestException: If API request fails
+    """
+    if api_key is None:
+        api_key = os.environ.get("OPENWEATHER_API_KEY")
+        if api_key is None:
+            raise ValueError("API key must be provided or set as OPENWEATHER_API_KEY environment variable")
+    
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        "q": city,
+        "appid": api_key,
+        "units": "metric"
+    }
+    
+    response = requests.get(base_url, params=params)
+    response.raise_for_status()
+    
+    return response.json()
+
+def format_weather_data(weather_data: Dict[str, Any]) -> str:
+    """
+    Format weather data into a human-readable string.
+    
+    Args:
+        weather_data: Raw weather data from OpenWeatherMap API
+    
+    Returns:
+        Formatted weather information string
+    """
+    main_data = weather_data.get("main", {})
+    weather_desc = weather_data.get("weather", [{}])[0]
+    
+    return f"""
+Weather in {weather_data.get("name", "Unknown")}:
+  Temperature: {main_data.get("temp", "N/A")}°C
+  Feels like: {main_data.get("feels_like", "N/A")}°C
+  Humidity: {main_data.get("humidity", "N/A")}%
+  Pressure: {main_data.get("pressure", "N/A")} hPa
+  Conditions: {weather_desc.get("description", "N/A")}
+  Wind Speed: {weather_data.get("wind", {}).get("speed", "N/A")} m/s
+"""
+
+if __name__ == "__main__":
+    try:
+        weather = get_current_weather("London")
+        print(format_weather_data(weather))
+    except ValueError as e:
+        print(f"Configuration error: {e}")
+    except requests.exceptions.RequestException as e:
+        print(f"API request failed: {e}")
