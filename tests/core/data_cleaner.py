@@ -165,3 +165,24 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset(sample_data, ['A', 'B', 'C'])
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
+def clean_data(data):
+    """
+    Remove null values and duplicates from a list.
+    
+    Args:
+        data (list): Input list containing data.
+    
+    Returns:
+        list: Cleaned list with no nulls and unique values.
+    """
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list")
+    
+    filtered = [item for item in data if item is not None]
+    unique = []
+    seen = set()
+    for item in filtered:
+        if item not in seen:
+            seen.add(item)
+            unique.append(item)
+    return unique
