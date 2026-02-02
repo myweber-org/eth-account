@@ -140,4 +140,99 @@ def process_dataframe(df, numeric_columns=None, outlier_multiplier=1.5,
             elif normalization_method == 'normalize':
                 processed_df[f'{col}_normalized'] = normalize_minmax(processed_df, col)
     
-    return processed_df
+    return processed_dfimport pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+        outlier_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    # Handle missing values
+    if strategy == 'mean':
+        df_clean = df_clean.fillna(df_clean.mean())
+    elif strategy == 'median':
+        df_clean = df_clean.fillna(df_clean.median())
+    elif strategy == 'mode':
+        df_clean = df_clean.fillna(df_clean.mode().iloc[0])
+    elif strategy == 'drop':
+        df_clean = df_clean.dropna()
+    
+    # Handle outliers using Z-score method
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        z_scores = np.abs((df_clean[col] - df_clean[col].mean()) / df_clean[col].std())
+        df_clean = df_clean[z_scores < outlier_threshold]
+    
+    # Reset index after outlier removal
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list): Columns to consider for duplicates
+        keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        pd.DataFrame: DataFrame without duplicates
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_data(df, method='minmax'):
+    """
+    Normalize numeric columns in DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        method (str): Normalization method ('minmax', 'zscore')
+    
+    Returns:
+        pd.DataFrame: Normalized DataFrame
+    """
+    df_norm = df.copy()
+    numeric_cols = df_norm.select_dtypes(include=[np.number]).columns
+    
+    if method == 'minmax':
+        for col in numeric_cols:
+            df_norm[col] = (df_norm[col] - df_norm[col].min()) / (df_norm[col].max() - df_norm[col].min())
+    elif method == 'zscore':
+        for col in numeric_cols:
+            df_norm[col] = (df_norm[col] - df_norm[col].mean()) / df_norm[col].std()
+    
+    return df_norm
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, np.nan, 50, 60],
+        'C': ['x', 'y', 'x', 'y', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, strategy='mean', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    normalized_df = normalize_data(cleaned_df, method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized_df)
