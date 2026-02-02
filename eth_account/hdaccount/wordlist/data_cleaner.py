@@ -380,4 +380,64 @@ if __name__ == "__main__":
     sample_data = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
     print("Original data:", sample_data)
     print("Cleaned data:", remove_duplicates(sample_data))
-    print("Cleaned with threshold 4:", clean_data_with_threshold(sample_data, 4))
+    print("Cleaned with threshold 4:", clean_data_with_threshold(sample_data, 4))import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with no nulls or duplicates.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataset(df):
+    """
+    Validate dataset by checking for nulls and duplicates.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        dict: Dictionary containing validation results.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_count': df.duplicated().sum(),
+        'is_clean': df.isnull().sum().sum() == 0 and df.duplicated().sum() == 0
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 5, 5],
+        'B': [10, 20, 30, None, 50, 50],
+        'C': ['x', 'y', 'z', 'x', 'y', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nValidation Results:")
+    print(validate_dataset(df))
+    
+    cleaned_df = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nCleaned Validation Results:")
+    print(validate_dataset(cleaned_df))
