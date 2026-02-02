@@ -1,6 +1,6 @@
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 def remove_outliers_iqr(df, column):
     """
@@ -27,16 +27,16 @@ def remove_outliers_iqr(df, column):
     
     return filtered_df
 
-def calculate_basic_stats(df, column):
+def calculate_summary_statistics(df, column):
     """
-    Calculate basic statistics for a DataFrame column.
+    Calculate summary statistics for a column after outlier removal.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
     column (str): Column name to analyze
     
     Returns:
-    dict: Dictionary containing statistical measures
+    dict: Dictionary containing summary statistics
     """
     if column not in df.columns:
         raise ValueError(f"Column '{column}' not found in DataFrame")
@@ -47,53 +47,46 @@ def calculate_basic_stats(df, column):
         'std': df[column].std(),
         'min': df[column].min(),
         'max': df[column].max(),
-        'count': df[column].count(),
-        'missing': df[column].isnull().sum()
+        'count': df[column].count()
     }
     
     return stats
 
-def clean_numeric_data(df, columns=None):
+def clean_dataset(df, numeric_columns=None):
     """
-    Clean numeric data by removing NaN values and converting to appropriate types.
+    Clean dataset by removing outliers from all numeric columns.
     
     Parameters:
     df (pd.DataFrame): Input DataFrame
-    columns (list): List of column names to clean. If None, cleans all numeric columns.
+    numeric_columns (list): List of numeric column names. If None, uses all numeric columns.
     
     Returns:
     pd.DataFrame: Cleaned DataFrame
     """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
     
     cleaned_df = df.copy()
     
-    for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-            cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    for column in numeric_columns:
+        if column in df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
     
     return cleaned_df
 
 if __name__ == "__main__":
+    # Example usage
     sample_data = {
-        'A': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
-        'B': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
-        'C': [1.1, 2.2, 3.3, 4.4, 5.5, 6.6, 7.7, 8.8, 9.9, 10.0]
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print()
+    print(f"Original shape: {df.shape}")
     
-    cleaned_df = remove_outliers_iqr(df, 'A')
-    print("DataFrame after removing outliers from column 'A':")
-    print(cleaned_df)
-    print()
+    cleaned_df = clean_dataset(df, ['A', 'B'])
+    print(f"Cleaned shape: {cleaned_df.shape}")
     
-    stats = calculate_basic_stats(df, 'B')
-    print("Statistics for column 'B':")
-    for key, value in stats.items():
-        print(f"{key}: {value}")
+    stats = calculate_summary_statistics(cleaned_df, 'A')
+    print(f"Summary statistics for column A: {stats}")
