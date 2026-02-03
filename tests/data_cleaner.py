@@ -146,3 +146,46 @@ def detect_skewed_columns(df, skew_threshold=0.5):
             skewed_cols.append((col, skewness))
     
     return sorted(skewed_cols, key=lambda x: abs(x[1]), reverse=True)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def remove_outliers_zscore(self, threshold=3):
+        df_clean = self.df.copy()
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+            df_clean = df_clean[(z_scores < threshold) | df_clean[col].isna()]
+        self.df = df_clean
+        return self
+    
+    def normalize_minmax(self):
+        for col in self.numeric_columns:
+            col_min = self.df[col].min()
+            col_max = self.df[col].max()
+            if col_max > col_min:
+                self.df[col] = (self.df[col] - col_min) / (col_max - col_min)
+        return self
+    
+    def fill_missing_median(self):
+        for col in self.numeric_columns:
+            self.df[col] = self.df[col].fillna(self.df[col].median())
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+    
+    def summary(self):
+        print(f"Original shape: {self.df.shape}")
+        print(f"Numeric columns: {len(self.numeric_columns)}")
+        print(f"Missing values:")
+        print(self.df[self.numeric_columns].isnull().sum())
+
+def clean_dataset(df):
+    cleaner = DataCleaner(df)
+    cleaner.remove_outliers_zscore().fill_missing_median().normalize_minmax()
+    return cleaner.get_cleaned_data()
