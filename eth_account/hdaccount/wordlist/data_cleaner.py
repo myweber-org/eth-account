@@ -441,3 +441,146 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Validation Results:")
     print(validate_dataset(cleaned_df))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using Interquartile Range method
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            
+            if col_max != col_min:
+                df_normalized[col] = min_val + (df[col] - col_min) * (max_val - min_val) / (col_max - col_min)
+            else:
+                df_normalized[col] = min_val
+    
+    return df_normalized
+
+def standardize_zscore(df, columns=None):
+    """
+    Standardize data using Z-score normalization
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            
+            if std_val > 0:
+                df_standardized[col] = (df[col] - mean_val) / std_val
+            else:
+                df_standardized[col] = 0
+    
+    return df_standardized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else 0
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = 0
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def create_sample_data():
+    """
+    Create sample data for testing
+    """
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.uniform(0, 200, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[np.random.choice(df.index, 10), 'feature1'] = np.nan
+    df.loc[np.random.choice(df.index, 5), 'feature2'] = np.nan
+    
+    return df
+
+def main():
+    """
+    Example usage of data cleaning functions
+    """
+    df = create_sample_data()
+    print("Original data shape:", df.shape)
+    print("Missing values:\n", df.isnull().sum())
+    
+    df_filled = handle_missing_values(df, strategy='mean')
+    print("\nAfter handling missing values:")
+    print("Missing values:\n", df_filled.isnull().sum())
+    
+    df_no_outliers = remove_outliers_iqr(df_filled, columns=['feature1', 'feature2', 'feature3'])
+    print("\nAfter removing outliers:", df_no_outliers.shape)
+    
+    df_normalized = normalize_minmax(df_no_outliers, columns=['feature1', 'feature2', 'feature3'])
+    print("\nAfter normalization:")
+    print("Min values:", df_normalized[['feature1', 'feature2', 'feature3']].min().values)
+    print("Max values:", df_normalized[['feature1', 'feature2', 'feature3']].max().values)
+    
+    df_standardized = standardize_zscore(df_no_outliers, columns=['feature1', 'feature2', 'feature3'])
+    print("\nAfter standardization:")
+    print("Mean values:", df_standardized[['feature1', 'feature2', 'feature3']].mean().values.round(2))
+    print("Std values:", df_standardized[['feature1', 'feature2', 'feature3']].std().values.round(2))
+    
+    return df_normalized, df_standardized
+
+if __name__ == "__main__":
+    normalized_df, standardized_df = main()
