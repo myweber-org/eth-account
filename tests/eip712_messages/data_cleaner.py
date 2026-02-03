@@ -2,100 +2,102 @@
 import pandas as pd
 import numpy as np
 
-def remove_outliers(df, column, threshold=3):
-    mean = df[column].mean()
-    std = df[column].std()
-    z_scores = np.abs((df[column] - mean) / std)
-    return df[z_scores < threshold]
-
-def normalize_column(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_dataset(file_path, output_path):
-    df = pd.read_csv(file_path)
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
     
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
     
-    for col in numeric_columns:
-        df = remove_outliers(df, col)
-        df = normalize_column(df, col)
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to {output_path}")
-
-if __name__ == "__main__":
-    input_file = "raw_data.csv"
-    output_file = "cleaned_data.csv"
-    clean_dataset(input_file, output_file)
-import pandas as pd
-import re
-
-def clean_text_column(df, column_name):
-    """
-    Standardize text by converting to lowercase and removing extra whitespace.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    df[column_name] = df[column_name].astype(str).str.lower()
-    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x).strip())
-    return df
-
-def remove_duplicates(df, subset=None, keep='first'):
-    """
-    Remove duplicate rows from DataFrame.
-    """
-    return df.drop_duplicates(subset=subset, keep=keep)
-
-def validate_email_column(df, column_name):
-    """
-    Validate email format in a column and return a boolean mask.
-    """
-    if column_name not in df.columns:
-        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    return df[column_name].astype(str).str.match(email_pattern)
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
 
-def clean_dataset(df, text_columns=None, deduplicate=True, email_columns=None):
+def calculate_basic_stats(df, column):
     """
-    Perform comprehensive cleaning on a dataset.
+    Calculate basic statistics for a DataFrame column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+    
+    Returns:
+        dict: Dictionary containing statistical measures
     """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean dataset by removing outliers from all numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        numeric_columns (list, optional): List of numeric columns to clean.
+            If None, uses all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
     cleaned_df = df.copy()
     
-    if text_columns:
-        for col in text_columns:
-            cleaned_df = clean_text_column(cleaned_df, col)
-    
-    if deduplicate:
-        cleaned_df = remove_duplicates(cleaned_df)
-    
-    if email_columns:
-        for col in email_columns:
-            mask = validate_email_column(cleaned_df, col)
-            cleaned_df = cleaned_df[mask].reset_index(drop=True)
+    for column in numeric_columns:
+        if column in df.columns:
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            except Exception as e:
+                print(f"Warning: Could not process column '{column}': {e}")
     
     return cleaned_df
 
 if __name__ == "__main__":
     sample_data = {
-        'name': ['John Doe', 'Jane Smith', 'john doe', 'Bob Johnson  '],
-        'email': ['john@example.com', 'jane@test.org', 'invalid-email', 'bob@company.net'],
-        'age': [25, 30, 25, 35]
+        'id': range(1, 101),
+        'value': np.random.randn(100) * 10 + 50,
+        'category': np.random.choice(['A', 'B', 'C'], 100)
     }
     
     df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\nCleaned DataFrame:")
+    print("Original dataset shape:", df.shape)
     
-    cleaned = clean_dataset(
-        df,
-        text_columns=['name'],
-        deduplicate=True,
-        email_columns=['email']
-    )
-    print(cleaned)
+    cleaned_df = clean_dataset(df, ['value'])
+    print("Cleaned dataset shape:", cleaned_df.shape)
+    
+    stats = calculate_basic_stats(df, 'value')
+    print("\nOriginal statistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.4f}")
+    
+    cleaned_stats = calculate_basic_stats(cleaned_df, 'value')
+    print("\nCleaned statistics:")
+    for key, value in cleaned_stats.items():
+        print(f"{key}: {value:.4f}")
