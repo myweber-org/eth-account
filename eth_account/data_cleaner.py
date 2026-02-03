@@ -482,4 +482,62 @@ def remove_duplicates_preserve_order(iterable):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if subset is None:
+        subset = df.columns.tolist()
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by converting to numeric and filling NaN with mean.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        columns (list): List of column names to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned numeric columns.
+    """
+    df_cleaned = df.copy()
+    
+    for col in columns:
+        if col in df_cleaned.columns:
+            df_cleaned[col] = pd.to_numeric(df_cleaned[col], errors='coerce')
+            mean_value = df_cleaned[col].mean()
+            df_cleaned[col] = df_cleaned[col].fillna(mean_value)
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate that DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if all required columns are present.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
