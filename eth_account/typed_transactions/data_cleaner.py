@@ -966,3 +966,109 @@ if __name__ == "__main__":
     
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("Cleaned statistics:", calculate_basic_stats(cleaned_df, 'value'))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values with different strategies
+    """
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    elif strategy == 'drop':
+        return data.dropna()
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+
+def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize=False, standardize=False):
+    """
+    Main function to clean dataset with multiple options
+    """
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_data.columns:
+            continue
+            
+        if outlier_method == 'iqr':
+            outliers, _, _ = detect_outliers_iqr(cleaned_data, col)
+            if len(outliers) > 0:
+                cleaned_data = cleaned_data[~cleaned_data.index.isin(outliers.index)]
+        elif outlier_method == 'zscore':
+            cleaned_data = remove_outliers_zscore(cleaned_data, col)
+        
+        if normalize:
+            cleaned_data[col] = normalize_minmax(cleaned_data, col)
+        elif standardize:
+            cleaned_data[col] = standardize_data(cleaned_data, col)
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    """
+    Generate comprehensive data summary
+    """
+    summary = {
+        'rows': len(data),
+        'columns': len(data.columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'data_types': data.dtypes.to_dict(),
+        'numeric_stats': data.describe().to_dict() if data.select_dtypes(include=[np.number]).shape[1] > 0 else {}
+    }
+    return summary
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.randint(1, 100, 1000)
+    })
+    
+    cleaned = clean_dataset(sample_data, ['A', 'B', 'C'], outlier_method='iqr')
+    summary = get_data_summary(cleaned)
+    print(f"Original rows: {len(sample_data)}")
+    print(f"Cleaned rows: {len(cleaned)}")
+    print(f"Summary: {summary}")
