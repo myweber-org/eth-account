@@ -249,3 +249,36 @@ def normalize_column(df, column, method='minmax'):
         raise ValueError("Method must be 'minmax' or 'zscore'")
     
     return df_copy
+def remove_duplicates(input_list):
+    """
+    Remove duplicate items from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(string_list):
+    """
+    Clean a list of strings by converting numeric strings to integers.
+    Non-numeric strings are kept as-is.
+    """
+    cleaned = []
+    for item in string_list:
+        if isinstance(item, str) and item.isdigit():
+            cleaned.append(int(item))
+        else:
+            cleaned.append(item)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5, "5", "6", "seven"]
+    unique_data = remove_duplicates(sample_data)
+    cleaned_data = clean_numeric_strings(unique_data)
+    print(f"Original: {sample_data}")
+    print(f"Unique: {unique_data}")
+    print(f"Cleaned: {cleaned_data}")
