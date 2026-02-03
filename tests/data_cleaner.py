@@ -188,4 +188,34 @@ class DataCleaner:
 def clean_dataset(df):
     cleaner = DataCleaner(df)
     cleaner.remove_outliers_zscore().fill_missing_median().normalize_minmax()
-    return cleaner.get_cleaned_data()
+    return cleaner.get_cleaned_data()import pandas as pd
+
+def clean_data(input_file, output_file):
+    """
+    Load data from a CSV file, remove duplicate rows,
+    fill missing numeric values with the column mean,
+    and save the cleaned data to a new CSV file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        df_cleaned = df.drop_duplicates()
+        print(f"After removing duplicates: {df_cleaned.shape}")
+        
+        numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+        df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+        
+        df_cleaned.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+
+if __name__ == "__main__":
+    clean_data("raw_data.csv", "cleaned_data.csv")
