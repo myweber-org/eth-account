@@ -115,3 +115,126 @@ if __name__ == "__main__":
     cleaned_df = cleaner.get_cleaned_data()
     print("\nFirst 5 rows of cleaned data:")
     print(cleaned_df.head())
+import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Strategy for imputation ('mean', 'median', 'mode', 'drop')
+        columns (list): List of columns to process, None for all columns
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                df_clean[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_clean[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_clean[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+    
+    return df_clean
+
+def remove_outliers(df, columns=None, method='iqr', threshold=1.5):
+    """
+    Remove outliers from DataFrame using specified method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to process, None for all numeric columns
+        method (str): Method for outlier detection ('iqr' or 'zscore')
+        threshold (float): Threshold for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+        
+        elif method == 'zscore':
+            z_scores = np.abs((df_clean[col] - df_clean[col].mean()) / df_clean[col].std())
+            df_clean = df_clean[z_scores < threshold]
+    
+    return df_clean
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize data in specified columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of columns to normalize, None for all numeric columns
+        method (str): Normalization method ('minmax' or 'standard')
+    
+    Returns:
+        pd.DataFrame: Normalized DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if method == 'minmax':
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'standard':
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            if std_val != 0:
+                df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    return df_norm
+
+def validate_data(df, rules):
+    """
+    Validate DataFrame against specified rules.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        rules (dict): Dictionary of validation rules
+    
+    Returns:
+        dict: Validation results
+    """
+    results = {}
+    
+    for col, rule in rules.items():
+        if col in df.columns:
+            if 'min' in rule:
+                results[f"{col}_min"] = (df[col] >= rule['min']).all()
+            if 'max' in rule:
+                results[f"{col}_max"] = (df[col] <= rule['max']).all()
+            if 'type' in rule:
+                results[f"{col}_type"] = df[col].dtype == rule['type']
+            if 'unique' in rule:
+                results[f"{col}_unique"] = df[col].nunique() == rule['unique']
+    
+    return results
