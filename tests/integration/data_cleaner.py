@@ -196,4 +196,101 @@ def clean_dataset(file_path, columns_to_clean):
 if __name__ == "__main__":
     cleaned_data = clean_dataset('raw_data.csv', ['age', 'income', 'score'])
     cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")
+    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")import pandas as pd
+import numpy as np
+import logging
+
+def clean_csv_data(input_file, output_file, missing_strategy='mean'):
+    """
+    Clean CSV data by handling missing values and removing duplicates.
+    
+    Args:
+        input_file (str): Path to input CSV file
+        output_file (str): Path to save cleaned CSV file
+        missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'drop')
+    
+    Returns:
+        bool: True if cleaning successful, False otherwise
+    """
+    try:
+        logging.basicConfig(level=logging.INFO)
+        logger = logging.getLogger(__name__)
+        
+        logger.info(f"Loading data from {input_file}")
+        df = pd.read_csv(input_file)
+        
+        original_rows = len(df)
+        logger.info(f"Original dataset shape: {df.shape}")
+        
+        logger.info("Removing duplicate rows")
+        df.drop_duplicates(inplace=True)
+        logger.info(f"Removed {original_rows - len(df)} duplicate rows")
+        
+        logger.info("Handling missing values")
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+        if missing_strategy == 'mean':
+            for col in numeric_columns:
+                if df[col].isnull().any():
+                    mean_val = df[col].mean()
+                    df[col].fillna(mean_val, inplace=True)
+                    logger.info(f"Filled missing values in {col} with mean: {mean_val:.2f}")
+        
+        elif missing_strategy == 'median':
+            for col in numeric_columns:
+                if df[col].isnull().any():
+                    median_val = df[col].median()
+                    df[col].fillna(median_val, inplace=True)
+                    logger.info(f"Filled missing values in {col} with median: {median_val:.2f}")
+        
+        elif missing_strategy == 'drop':
+            df.dropna(subset=numeric_columns, inplace=True)
+            logger.info(f"Dropped rows with missing values in numeric columns")
+        
+        logger.info(f"Cleaned dataset shape: {df.shape}")
+        
+        df.to_csv(output_file, index=False)
+        logger.info(f"Cleaned data saved to {output_file}")
+        
+        return True
+        
+    except FileNotFoundError:
+        logger.error(f"Input file not found: {input_file}")
+        return False
+    except pd.errors.EmptyDataError:
+        logger.error("Input file is empty")
+        return False
+    except Exception as e:
+        logger.error(f"Error during data cleaning: {str(e)}")
+        return False
+
+def validate_dataframe(df):
+    """
+    Validate dataframe for common data quality issues.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+    
+    Returns:
+        dict: Dictionary containing validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    cleaned = clean_csv_data('raw_data.csv', 'cleaned_data.csv', missing_strategy='mean')
+    
+    if cleaned:
+        df_clean = pd.read_csv('cleaned_data.csv')
+        validation = validate_dataframe(df_clean)
+        print("Data validation results:")
+        for key, value in validation.items():
+            print(f"{key}: {value}")
