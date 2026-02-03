@@ -275,4 +275,11 @@ def process_data_pipeline(data, config):
             if col in result.columns:
                 result[col] = standardize_zscore(result, col)
     
-    return result.reset_index(drop=True)
+    return result.reset_index(drop=True)def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
