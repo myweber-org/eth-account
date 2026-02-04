@@ -330,3 +330,53 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    Returns a new DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame.")
+
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean a dataset by removing outliers from all numeric columns.
+    If numeric_columns is not provided, all numeric columns are used.
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+        else:
+            print(f"Warning: Column '{col}' not found, skipping.")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.randn(100),
+        'B': np.random.randn(100) * 10,
+        'C': np.random.randn(100) * 100
+    }
+    sample_df = pd.DataFrame(sample_data)
+    sample_df.loc[0, 'A'] = 100
+    sample_df.loc[1, 'B'] = 200
+
+    print("Original DataFrame shape:", sample_df.shape)
+    cleaned = clean_dataset(sample_df)
+    print("Cleaned DataFrame shape:", cleaned.shape)
