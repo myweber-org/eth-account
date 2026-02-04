@@ -90,3 +90,36 @@ if __name__ == "__main__":
     print("\nSummary Statistics:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    """
+    Load CSV data, remove outliers using z-score method,
+    and normalize numerical columns.
+    """
+    df = pd.read_csv(filepath)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        z_scores = np.abs(stats.zscore(df[col].dropna()))
+        df = df[(z_scores < 3) | df[col].isna()]
+    
+    for col in numeric_cols:
+        if df[col].std() != 0:
+            df[col] = (df[col] - df[col].mean()) / df[col].std()
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = load_and_clean_data(input_file)
+    save_cleaned_data(cleaned_df, output_file)
+    print(f"Data cleaning complete. Saved to {output_file}")
