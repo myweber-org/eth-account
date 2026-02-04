@@ -358,4 +358,65 @@ def clean_dataset(input_path, output_path, numeric_cols):
     print(f"Original shape: {df.shape}, Cleaned shape: {df_normalized.shape}")
 
 if __name__ == "__main__":
-    clean_dataset("raw_data.csv", "cleaned_data.csv", ["age", "income", "score"])
+    clean_dataset("raw_data.csv", "cleaned_data.csv", ["age", "income", "score"])import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): Columns to check for duplicates. 
+            If None, checks all columns. Defaults to None.
+        fill_missing (bool, optional): Whether to fill missing values with 
+            column mean (numeric) or mode (categorical). Defaults to True.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Remove duplicates
+    if columns_to_check is None:
+        columns_to_check = cleaned_df.columns.tolist()
+    
+    cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check, keep='first')
+    
+    # Handle missing values
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                # Fill numeric columns with mean
+                mean_value = cleaned_df[column].mean()
+                cleaned_df[column] = cleaned_df[column].fillna(mean_value)
+            else:
+                # Fill categorical columns with mode
+                mode_value = cleaned_df[column].mode()
+                if not mode_value.empty:
+                    cleaned_df[column] = cleaned_df[column].fillna(mode_value.iloc[0])
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of columns that must be present.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
