@@ -294,3 +294,76 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary to rename columns (old_name: new_name)
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for column in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[column] = cleaned_df[column].astype(str).apply(
+                lambda x: re.sub(r'\s+', ' ', x.strip().lower())
+            )
+    
+    return cleaned_df
+
+def validate_email_column(df, email_column):
+    """
+    Validate email addresses in a specified column.
+    
+    Args:
+        df: Input pandas DataFrame
+        email_column: Name of the column containing email addresses
+    
+    Returns:
+        DataFrame with validation results
+    """
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    validation_results = df.copy()
+    validation_results['email_valid'] = validation_results[email_column].str.match(email_pattern)
+    validation_results['email_domain'] = validation_results[email_column].str.extract(r'@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})$')
+    
+    return validation_results
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a numeric column using the IQR method.
+    
+    Args:
+        df: Input pandas DataFrame
+        column: Name of the numeric column
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    q1 = df[column].quantile(0.25)
+    q3 = df[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
