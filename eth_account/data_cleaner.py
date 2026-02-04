@@ -97,4 +97,51 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame:")
     print(cleaned_df)
     print("\nCleaned statistics:")
-    print(calculate_basic_stats(cleaned_df, 'value'))
+    print(calculate_basic_stats(cleaned_df, 'value'))import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    print(f"Original shape: {df.shape}")
+    
+    df_cleaned = df.copy()
+    
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        z_scores = np.abs(stats.zscore(df_cleaned[col].dropna()))
+        outliers = z_scores > 3
+        df_cleaned.loc[outliers, col] = np.nan
+        print(f"Removed {outliers.sum()} outliers from {col}")
+    
+    df_cleaned = df_cleaned.dropna(subset=numeric_cols)
+    print(f"Shape after outlier removal: {df_cleaned.shape}")
+    
+    for col in numeric_cols:
+        col_min = df_cleaned[col].min()
+        col_max = df_cleaned[col].max()
+        if col_max > col_min:
+            df_cleaned[col] = (df_cleaned[col] - col_min) / (col_max - col_min)
+        else:
+            df_cleaned[col] = 0
+    
+    print("Data normalization completed")
+    return df_cleaned
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = load_and_clean_data(input_file)
+        save_cleaned_data(cleaned_df, output_file)
+        print("Data cleaning pipeline executed successfully")
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found")
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
