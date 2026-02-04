@@ -641,4 +641,55 @@ def example_usage():
     return cleaner.df
 
 if __name__ == "__main__":
-    cleaned_df = example_usage()
+    cleaned_df = example_usage()import pandas as pd
+import argparse
+
+def remove_duplicates(input_file, output_file, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a CSV file.
+    
+    Args:
+        input_file (str): Path to input CSV file
+        output_file (str): Path to output CSV file
+        subset (list, optional): Columns to consider for duplicates
+        keep (str): Which duplicates to keep ('first', 'last', False)
+    """
+    try:
+        df = pd.read_csv(input_file)
+        initial_count = len(df)
+        
+        df_cleaned = df.drop_duplicates(subset=subset, keep=keep)
+        final_count = len(df_cleaned)
+        
+        df_cleaned.to_csv(output_file, index=False)
+        
+        print(f"Data cleaning completed:")
+        print(f"  Input file: {input_file}")
+        print(f"  Output file: {output_file}")
+        print(f"  Initial rows: {initial_count}")
+        print(f"  Final rows: {final_count}")
+        print(f"  Duplicates removed: {initial_count - final_count}")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+    except pd.errors.EmptyDataError:
+        print(f"Error: Input file '{input_file}' is empty.")
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+
+def main():
+    parser = argparse.ArgumentParser(description='Remove duplicate rows from CSV files')
+    parser.add_argument('input', help='Input CSV file path')
+    parser.add_argument('output', help='Output CSV file path')
+    parser.add_argument('--subset', nargs='+', help='Columns to consider for duplicates')
+    parser.add_argument('--keep', choices=['first', 'last', 'none'], default='first',
+                       help='Which duplicates to keep (default: first)')
+    
+    args = parser.parse_args()
+    
+    keep_value = 'first' if args.keep == 'first' else 'last' if args.keep == 'last' else False
+    
+    remove_duplicates(args.input, args.output, args.subset, keep_value)
+
+if __name__ == "__main__":
+    main()
