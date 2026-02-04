@@ -145,3 +145,66 @@ if __name__ == "__main__":
         print(f"Error: Input file '{input_file}' not found")
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame containing the data
+        column: string name of the column to clean
+    
+    Returns:
+        pandas DataFrame with outliers removed
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
+
+def calculate_basic_stats(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Args:
+        data: pandas DataFrame
+        column: string name of the column
+    
+    Returns:
+        dictionary containing mean, median, std, min, max
+    """
+    stats = {
+        'mean': np.mean(data[column]),
+        'median': np.median(data[column]),
+        'std': np.std(data[column]),
+        'min': np.min(data[column]),
+        'max': np.max(data[column])
+    }
+    
+    return stats
+
+def clean_dataset(data, numeric_columns):
+    """
+    Clean dataset by removing outliers from all specified numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of column names to clean
+    
+    Returns:
+        cleaned pandas DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+    
+    return cleaned_data
