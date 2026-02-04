@@ -548,3 +548,97 @@ if __name__ == "__main__":
     
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("Cleaned statistics:", stats)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, threshold=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in clean_df.columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - threshold * IQR
+                upper_bound = Q3 + threshold * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        
+        removed_count = len(self.df) - len(clean_df)
+        self.df = clean_df
+        return removed_count
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                col_min = self.df[col].min()
+                col_max = self.df[col].max()
+                if col_max > col_min:
+                    self.df[col] = (self.df[col] - col_min) / (col_max - col_min)
+        
+        return self.df
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+        
+        return self.df
+    
+    def get_cleaning_report(self):
+        report = {
+            'original_rows': self.original_shape[0],
+            'current_rows': len(self.df),
+            'rows_removed': self.original_shape[0] - len(self.df),
+            'columns': list(self.df.columns),
+            'dtypes': self.df.dtypes.to_dict()
+        }
+        return report
+    
+    def save_cleaned_data(self, filepath):
+        self.df.to_csv(filepath, index=False)
+        return filepath
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[10:20, 'feature_a'] = np.nan
+    df.loc[100:110, 'feature_b'] = 1000
+    
+    cleaner = DataCleaner(df)
+    print(f"Initial shape: {cleaner.original_shape}")
+    
+    outliers_removed = cleaner.remove_outliers_iqr(['feature_a', 'feature_b'])
+    print(f"Removed {outliers_removed} outliers")
+    
+    cleaner.fill_missing_median()
+    cleaner.normalize_minmax()
+    
+    report = cleaner.get_cleaning_report()
+    print(f"Final shape: {report['current_rows']} rows")
+    
+    cleaner.save_cleaned_data('cleaned_data.csv')
+    return cleaner.df
+
+if __name__ == "__main__":
+    cleaned_df = example_usage()
