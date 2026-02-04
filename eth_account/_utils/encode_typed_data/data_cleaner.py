@@ -587,4 +587,106 @@ def remove_outliers_iqr(data, column):
     
     mask = (col_data >= lower_bound) & (col_data <= upper_bound)
     
-    return data[mask]
+    return data[mask]import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): Columns to check for duplicates. 
+            If None, checks all columns.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        fill_missing (str or value): Method to fill missing values.
+            Options: 'mean', 'median', 'mode', or a specific value.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        if columns_to_check:
+            df_clean = df_clean.drop_duplicates(subset=columns_to_check)
+        else:
+            df_clean = df_clean.drop_duplicates()
+    
+    for column in df_clean.columns:
+        if df_clean[column].isnull().any():
+            if fill_missing == 'mean':
+                if pd.api.types.is_numeric_dtype(df_clean[column]):
+                    df_clean[column].fillna(df_clean[column].mean(), inplace=True)
+            elif fill_missing == 'median':
+                if pd.api.types.is_numeric_dtype(df_clean[column]):
+                    df_clean[column].fillna(df_clean[column].median(), inplace=True)
+            elif fill_missing == 'mode':
+                df_clean[column].fillna(df_clean[column].mode()[0], inplace=True)
+            else:
+                df_clean[column].fillna(fill_missing, inplace=True)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Data validation passed"
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+        method (str): Method for outlier detection ('iqr' or 'zscore').
+        threshold (float): Threshold for outlier detection.
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' is not numeric")
+    
+    df_clean = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df_clean[column].quantile(0.25)
+        Q3 = df_clean[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        df_clean = df_clean[(df_clean[column] >= lower_bound) & (df_clean[column] <= upper_bound)]
+    
+    elif method == 'zscore':
+        from scipy import stats
+        z_scores = stats.zscore(df_clean[column])
+        df_clean = df_clean[(z_scores < threshold) & (z_scores > -threshold)]
+    
+    else:
+        raise ValueError(f"Unknown method: {method}. Use 'iqr' or 'zscore'")
+    
+    return df_clean
