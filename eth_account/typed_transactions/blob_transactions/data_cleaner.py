@@ -1071,4 +1071,125 @@ if __name__ == "__main__":
     print("\nSummary statistics after cleaning:")
     for col in ['temperature', 'pressure']:
         stats = calculate_summary_statistics(cleaned_df, col)
-        print(f"{col}: {stats}")
+        print(f"{col}: {stats}")import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    strategy (str): Strategy to handle missing values ('mean', 'median', 'mode', 'drop').
+    columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    if strategy == 'drop':
+        df_clean = df_clean.dropna(subset=columns)
+    elif strategy == 'mean':
+        for col in columns:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+    elif strategy == 'median':
+        for col in columns:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    elif strategy == 'mode':
+        for col in columns:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0])
+    else:
+        raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return df_clean
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of columns to check for outliers. If None, uses all numeric columns.
+    factor (float): Multiplier for IQR to determine outlier bounds.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    return df_clean
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of columns to standardize. If None, uses all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns.
+    """
+    df_standardized = df.copy()
+    
+    if columns is None:
+        columns = df_standardized.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        mean = df_standardized[col].mean()
+        std = df_standardized[col].std()
+        if std > 0:
+            df_standardized[col] = (df_standardized[col] - mean) / std
+    
+    return df_standardized
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    np.random.seed(42)
+    data = {
+        'A': np.random.randn(100),
+        'B': np.random.randn(100) * 2 + 5,
+        'C': np.random.randn(100) * 0.5 - 2
+    }
+    
+    df = pd.DataFrame(data)
+    
+    df.loc[10:15, 'A'] = np.nan
+    df.loc[20:25, 'B'] = np.nan
+    
+    df.loc[95, 'A'] = 100
+    df.loc[96, 'B'] = -50
+    
+    print("Original DataFrame shape:", df.shape)
+    print("Missing values:\n", df.isnull().sum())
+    
+    df_clean = clean_missing_values(df, strategy='mean')
+    print("\nAfter cleaning missing values:", df_clean.shape)
+    
+    df_no_outliers = remove_outliers_iqr(df_clean)
+    print("After removing outliers:", df_no_outliers.shape)
+    
+    df_standardized = standardize_columns(df_no_outliers)
+    print("After standardization:")
+    print(df_standardized.describe())
+
+if __name__ == "__main__":
+    main()
