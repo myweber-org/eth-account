@@ -443,3 +443,40 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import hashlib
+
+def remove_duplicates_by_hash(df, column_name):
+    """
+    Remove duplicate rows based on a hash of the specified column.
+    """
+    seen_hashes = set()
+    unique_rows = []
+
+    for index, row in df.iterrows():
+        value = str(row[column_name])
+        hash_object = hashlib.md5(value.encode())
+        hash_value = hash_object.hexdigest()
+
+        if hash_value not in seen_hashes:
+            seen_hashes.add(hash_value)
+            unique_rows.append(row)
+
+    return pd.DataFrame(unique_rows)
+
+def clean_data(input_file, output_file, key_column):
+    """
+    Load data, remove duplicates, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        cleaned_df = remove_duplicates_by_hash(df, key_column)
+        cleaned_df.to_csv(output_file, index=False)
+        print(f"Data cleaned. Original rows: {len(df)}, Cleaned rows: {len(cleaned_df)}")
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+    except KeyError:
+        print(f"Error: Column '{key_column}' not found in the data.")
+
+if __name__ == "__main__":
+    clean_data('raw_data.csv', 'cleaned_data.csv', 'email')
