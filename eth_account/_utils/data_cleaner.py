@@ -480,3 +480,63 @@ def clean_data(input_file, output_file, key_column):
 
 if __name__ == "__main__":
     clean_data('raw_data.csv', 'cleaned_data.csv', 'email')
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by standardizing column names, removing duplicates,
+    and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df.rename(columns=column_mapping, inplace=True)
+    
+    if drop_duplicates:
+        cleaned_df.drop_duplicates(inplace=True)
+    
+    if fill_missing:
+        for col in cleaned_df.columns:
+            if cleaned_df[col].dtype in ['int64', 'float64']:
+                cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+            elif cleaned_df[col].dtype == 'object':
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else '', inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, unique_columns=None):
+    """
+    Validate DataFrame structure and data integrity.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if unique_columns:
+        for col in unique_columns:
+            if col in df.columns and df[col].duplicated().any():
+                raise ValueError(f"Column '{col}' contains duplicate values")
+    
+    return True
+
+def normalize_column(df, column_name, method='minmax'):
+    """
+    Normalize a column using specified method.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    if method == 'minmax':
+        col_min = df[column_name].min()
+        col_max = df[column_name].max()
+        if col_max != col_min:
+            df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
+    elif method == 'zscore':
+        col_mean = df[column_name].mean()
+        col_std = df[column_name].std()
+        if col_std != 0:
+            df[column_name] = (df[column_name] - col_mean) / col_std
+    
+    return df
