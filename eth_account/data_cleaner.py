@@ -430,3 +430,86 @@ def save_cleaned_data(df, output_path):
     """
     df.to_csv(output_path, index=False)
     print(f"Cleaned data saved to: {output_path}")
+import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Column labels to consider for duplicates
+    keep (str, optional): Which duplicates to keep - 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_column(df, column_name):
+    """
+    Clean a numeric column by converting to float and removing NaN values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column_name (str): Name of the column to clean
+    
+    Returns:
+    pd.DataFrame: DataFrame with cleaned column
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+    df = df.dropna(subset=[column_name])
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list, optional): List of required column names
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False
+    
+    return True
+
+def clean_dataset(df, cleaning_steps=None):
+    """
+    Apply multiple cleaning steps to a dataset.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    cleaning_steps (list, optional): List of cleaning functions to apply
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if not validate_dataframe(df):
+        raise ValueError("Invalid DataFrame provided")
+    
+    cleaned_df = df.copy()
+    
+    if cleaning_steps:
+        for step in cleaning_steps:
+            cleaned_df = step(cleaned_df)
+    
+    return cleaned_df
