@@ -103,4 +103,38 @@ if __name__ == "__main__":
     for column, column_stats in stats.items():
         print(f"\nStatistics for {column}:")
         for stat_name, stat_value in column_stats.items():
-            print(f"  {stat_name}: {stat_value:.2f}")
+            print(f"  {stat_name}: {stat_value:.2f}")import pandas as pd
+
+def clean_data(df):
+    """
+    Clean the input DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with the column mean
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # Fill missing categorical values with the mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    data = pd.DataFrame({
+        'A': [1, 2, 2, None, 5],
+        'B': ['x', 'y', None, 'x', 'z'],
+        'C': [10.5, None, 10.5, 12.0, 12.0]
+    })
+    
+    cleaned_data = clean_data(data)
+    print("Original Data:")
+    print(data)
+    print("\nCleaned Data:")
+    print(cleaned_data)
