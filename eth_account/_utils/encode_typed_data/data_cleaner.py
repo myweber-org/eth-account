@@ -128,3 +128,46 @@ if __name__ == "__main__":
     
     print("\nCleaned data shape:", cleaned_df.shape)
     print("Cleaned data columns:", cleaned_df.columns.tolist())
+import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+
+    return df_cleaned
+
+def load_and_clean_data(file_path):
+    """
+    Load data from a CSV file and clean it.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        cleaned_df = clean_dataframe(df)
+        return cleaned_df
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: The file is empty.")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_data = load_and_clean_data("sample_data.csv")
+    if cleaned_data is not None:
+        print("Data cleaning completed successfully.")
+        print(f"Cleaned data shape: {cleaned_data.shape}")
+        cleaned_data.to_csv("cleaned_sample_data.csv", index=False)
