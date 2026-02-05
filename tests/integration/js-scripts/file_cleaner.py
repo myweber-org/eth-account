@@ -79,3 +79,50 @@ def clean_old_files(directory, days=7):
 if __name__ == "__main__":
     target_dir = "/tmp"
     clean_old_files(target_dir)
+import os
+import re
+import sys
+
+def normalize_filename(filename):
+    """
+    Normalize a filename by removing special characters,
+    converting spaces to underscores, and making it lowercase.
+    """
+    # Remove any non-alphanumeric characters except dots, hyphens, and underscores
+    normalized = re.sub(r'[^\w\.\-]', '_', filename)
+    # Replace multiple underscores with a single one
+    normalized = re.sub(r'_+', '_', normalized)
+    # Convert to lowercase
+    normalized = normalized.lower()
+    # Remove leading/trailing underscores or dots
+    normalized = normalized.strip('_.')
+    return normalized
+
+def clean_directory(directory_path):
+    """
+    Clean all filenames in the specified directory.
+    """
+    if not os.path.isdir(directory_path):
+        print(f"Error: {directory_path} is not a valid directory.")
+        sys.exit(1)
+
+    for filename in os.listdir(directory_path):
+        old_path = os.path.join(directory_path, filename)
+        if os.path.isfile(old_path):
+            new_name = normalize_filename(filename)
+            new_path = os.path.join(directory_path, new_name)
+
+            if old_path != new_path:
+                try:
+                    os.rename(old_path, new_path)
+                    print(f"Renamed: {filename} -> {new_name}")
+                except OSError as e:
+                    print(f"Error renaming {filename}: {e}")
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        print("Usage: python file_cleaner.py <directory_path>")
+        sys.exit(1)
+
+    target_directory = sys.argv[1]
+    clean_directory(target_directory)
