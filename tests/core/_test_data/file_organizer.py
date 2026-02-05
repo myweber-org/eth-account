@@ -125,3 +125,27 @@ if __name__ == "__main__":
     # Example usage: organize files in the current directory
     target_directory = os.getcwd()
     organize_files(target_directory)
+import os
+import shutil
+
+def organize_files(directory_path):
+    if not os.path.exists(directory_path):
+        print(f"Directory {directory_path} does not exist.")
+        return
+
+    for filename in os.listdir(directory_path):
+        file_path = os.path.join(directory_path, filename)
+        
+        if os.path.isfile(file_path):
+            file_extension = filename.split('.')[-1] if '.' in filename else 'no_extension'
+            target_folder = os.path.join(directory_path, file_extension)
+            
+            if not os.path.exists(target_folder):
+                os.makedirs(target_folder)
+            
+            shutil.move(file_path, os.path.join(target_folder, filename))
+            print(f"Moved {filename} to {file_extension}/")
+
+if __name__ == "__main__":
+    target_directory = input("Enter the directory path to organize: ")
+    organize_files(target_directory)
