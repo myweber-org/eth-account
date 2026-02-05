@@ -626,4 +626,152 @@ def validate_dataframe(df, required_columns=None):
         if missing_columns:
             return False, f"Missing required columns: {missing_columns}"
     
-    return True, "DataFrame validation passed"
+    return True, "DataFrame validation passed"import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers from specified columns using IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to process. If None, process all numeric columns.
+    factor (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_norm = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col in df.columns:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            
+            if col_max != col_min:
+                df_norm[col] = min_val + (df[col] - col_min) * (max_val - min_val) / (col_max - col_min)
+            else:
+                df_norm[col] = min_val
+    
+    return df_norm
+
+def standardize_zscore(df, columns=None):
+    """
+    Standardize specified columns using z-score normalization.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): List of column names to standardize. If None, standardize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Dataframe with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_std = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            
+            if std_val > 0:
+                df_std[col] = (df[col] - mean_val) / std_val
+            else:
+                df_std[col] = 0
+    
+    return df_std
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    strategy (str): Imputation strategy - 'mean', 'median', 'mode', or 'constant'
+    columns (list): List of column names to process. If None, process all columns.
+    
+    Returns:
+    pd.DataFrame: Dataframe with missing values handled
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].isnull().any():
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                fill_value = df[col].mean()
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else None
+            elif strategy == 'constant':
+                fill_value = 0 if pd.api.types.is_numeric_dtype(df[col]) else 'missing'
+            else:
+                continue
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"Dataframe has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataframe is valid"
