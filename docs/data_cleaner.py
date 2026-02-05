@@ -73,4 +73,60 @@ def clean_dataset(data, columns_to_clean):
             stats['outliers_removed'] = removed_count
             statistics[column] = stats
     
-    return cleaned_data, statistics
+    return cleaned_data, statisticsimport pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        for column in cleaned_df.columns:
+            if cleaned_df[column].dtype in ['int64', 'float64']:
+                cleaned_df[column] = cleaned_df[column].fillna(cleaned_df[column].median())
+            elif cleaned_df[column].dtype == 'object':
+                cleaned_df[column] = cleaned_df[column].fillna('Unknown')
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Charlie'],
+        'age': [25, 30, 30, None, 35],
+        'score': [85.5, 92.0, 92.0, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'name', 'age'])
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
