@@ -1,114 +1,76 @@
-import pandas as pd
 
-def clean_dataframe(df, remove_duplicates=True):
-    """
-    Clean a pandas DataFrame by removing null values and optionally duplicates.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    remove_duplicates (bool): If True, remove duplicate rows.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    cleaned_df = df.dropna()
-    
-    if remove_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-    
-    return cleaned_df
-
-def validate_dataframe(df, required_columns=None):
-    """
-    Validate DataFrame structure and content.
-    
-    Parameters:
-    df (pd.DataFrame): DataFrame to validate.
-    required_columns (list): List of column names that must be present.
-    
-    Returns:
-    tuple: (is_valid, error_message)
-    """
-    if df.empty:
-        return False, "DataFrame is empty"
-    
-    if required_columns:
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            return False, f"Missing required columns: {missing_columns}"
-    
-    return True, "DataFrame is valid"import pandas as pd
 import numpy as np
-from typing import Optional, Dict
 
-class DataCleaner:
-    def __init__(self, df: pd.DataFrame):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def handle_missing_values(self, strategy: str = 'mean', custom_values: Optional[Dict] = None) -> 'DataCleaner':
-        if strategy == 'drop':
-            self.df = self.df.dropna()
-        elif strategy == 'mean':
-            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].mean())
-        elif strategy == 'median':
-            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
-            self.df[numeric_cols] = self.df[numeric_cols].fillna(self.df[numeric_cols].median())
-        elif strategy == 'custom' and custom_values:
-            self.df = self.df.fillna(custom_values)
-        return self
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas DataFrame column using the IQR method.
     
-    def convert_dtypes(self) -> 'DataCleaner':
-        for col in self.df.columns:
-            if self.df[col].dtype == 'object':
-                try:
-                    self.df[col] = pd.to_datetime(self.df[col])
-                except (ValueError, TypeError):
-                    try:
-                        self.df[col] = pd.to_numeric(self.df[col])
-                    except (ValueError, TypeError):
-                        continue
-        return self
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
     
-    def remove_duplicates(self, subset: Optional[list] = None) -> 'DataCleaner':
-        self.df = self.df.drop_duplicates(subset=subset, keep='first')
-        return self
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    def get_cleaned_data(self) -> pd.DataFrame:
-        return self.df
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
     
-    def get_cleaning_report(self) -> Dict:
-        report = {
-            'original_rows': self.original_shape[0],
-            'original_columns': self.original_shape[1],
-            'cleaned_rows': self.df.shape[0],
-            'cleaned_columns': self.df.shape[1],
-            'rows_removed': self.original_shape[0] - self.df.shape[0],
-            'columns_removed': self.original_shape[1] - self.df.shape[1],
-            'missing_values_remaining': self.df.isnull().sum().sum()
-        }
-        return report
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
 
-def load_and_clean_csv(filepath: str, **kwargs) -> pd.DataFrame:
-    df = pd.read_csv(filepath)
-    cleaner = DataCleaner(df)
+def calculate_summary_statistics(data, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
     
-    default_kwargs = {
-        'handle_missing_values': True,
-        'missing_strategy': 'mean',
-        'convert_dtypes': True,
-        'remove_duplicates': True
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if data.empty:
+        return {}
+    
+    stats = {
+        'mean': np.mean(data[column]),
+        'median': np.median(data[column]),
+        'std': np.std(data[column]),
+        'min': np.min(data[column]),
+        'max': np.max(data[column]),
+        'count': len(data[column])
     }
-    default_kwargs.update(kwargs)
     
-    if default_kwargs['handle_missing_values']:
-        cleaner.handle_missing_values(strategy=default_kwargs['missing_strategy'])
+    return stats
+
+def clean_dataset(data, columns_to_clean):
+    """
+    Clean multiple columns in a dataset by removing outliers.
     
-    if default_kwargs['convert_dtypes']:
-        cleaner.convert_dtypes()
+    Parameters:
+    data (pd.DataFrame): Input DataFrame
+    columns_to_clean (list): List of column names to clean
     
-    if default_kwargs['remove_duplicates']:
-        cleaner.remove_duplicates()
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    dict: Dictionary of statistics for each cleaned column
+    """
+    cleaned_data = data.copy()
+    statistics = {}
     
-    return cleaner.get_cleaned_data()
+    for column in columns_to_clean:
+        if column in cleaned_data.columns:
+            original_count = len(cleaned_data)
+            cleaned_data = remove_outliers_iqr(cleaned_data, column)
+            removed_count = original_count - len(cleaned_data)
+            
+            stats = calculate_summary_statistics(cleaned_data, column)
+            stats['outliers_removed'] = removed_count
+            statistics[column] = stats
+    
+    return cleaned_data, statistics
