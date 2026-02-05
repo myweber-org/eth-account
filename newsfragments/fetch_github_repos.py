@@ -58,4 +58,42 @@ def main():
         print(f"\nNote: More repositories available. Try page {page + 1}.")
 
 if __name__ == "__main__":
-    main()
+    main()import requests
+import sys
+
+def fetch_github_repos(username, per_page=10):
+    repos = []
+    page = 1
+    while True:
+        url = f"https://api.github.com/users/{username}/repos"
+        params = {'page': page, 'per_page': per_page}
+        response = requests.get(url, params=params)
+        if response.status_code != 200:
+            print(f"Error: Unable to fetch repositories. Status code: {response.status_code}")
+            sys.exit(1)
+        data = response.json()
+        if not data:
+            break
+        repos.extend(data)
+        page += 1
+    return repos
+
+def display_repos(repos):
+    if not repos:
+        print("No repositories found.")
+        return
+    for repo in repos:
+        print(f"Name: {repo['name']}")
+        print(f"Description: {repo['description'] or 'No description'}")
+        print(f"URL: {repo['html_url']}")
+        print(f"Stars: {repo['stargazers_count']}")
+        print(f"Forks: {repo['forks_count']}")
+        print("-" * 40)
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python fetch_github_repos.py <github_username>")
+        sys.exit(1)
+    username = sys.argv[1]
+    repos = fetch_github_repos(username)
+    display_repos(repos)
