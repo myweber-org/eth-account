@@ -150,3 +150,91 @@ if __name__ == "__main__":
     
     print(f"\nAfter outlier removal: {cleaned_df.shape}")
     print(f"After imputation: {imputed_df.isnull().sum().sum()} missing values remaining")
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: pandas DataFrame to clean
+        columns_to_check: list of column names to check for duplicates,
+                         if None, checks all columns
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove duplicates
+    if columns_to_check:
+        cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+    else:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Handle missing values - fill numeric columns with median
+    numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+    for col in numeric_cols:
+        if cleaned_df[col].isnull().any():
+            median_val = cleaned_df[col].median()
+            cleaned_df[col] = cleaned_df[col].fillna(median_val)
+    
+    # Fill categorical columns with mode
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if cleaned_df[col].isnull().any():
+            mode_val = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown'
+            cleaned_df[col] = cleaned_df[col].fillna(mode_val)
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that required columns exist in the DataFrame.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of required column names
+    
+    Returns:
+        Boolean indicating if all required columns are present
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None, 'Eve'],
+        'age': [25, 30, 30, None, 35, 40],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, columns_to_check=['id', 'name'])
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\nCleaned DataFrame info:")
+    print(cleaned_df.info())
+    
+    # Validate the cleaned data
+    required_cols = ['id', 'name', 'age', 'score']
+    is_valid = validate_data(cleaned_df, required_cols)
+    print(f"\nData validation result: {is_valid}")
