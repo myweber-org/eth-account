@@ -750,3 +750,101 @@ if __name__ == "__main__":
     input_csv = "raw_data.csv"
     output_csv = "cleaned_data.csv"
     clean_data(input_csv, output_csv)
+import pandas as pd
+import numpy as np
+import re
+
+def clean_column_names(df):
+    df.columns = [re.sub(r'\s+', '_', col.strip().lower()) for col in df.columns]
+    return df
+
+def remove_duplicates(df, subset=None):
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    if strategy == 'drop':
+        df = df.dropna()
+    elif strategy == 'fill':
+        if fill_value is not None:
+            df = df.fillna(fill_value)
+        else:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    return df
+
+def convert_data_types(df, column_types):
+    for col, dtype in column_types.items():
+        if col in df.columns:
+            try:
+                df[col] = df[col].astype(dtype)
+            except ValueError:
+                if dtype == 'datetime':
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+    return df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    if column not in df.columns:
+        return df
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return df
+
+def clean_data(file_path, output_path=None, config=None):
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File {file_path} not found")
+        return None
+    
+    if config is None:
+        config = {}
+    
+    if config.get('clean_columns', True):
+        df = clean_column_names(df)
+    
+    if config.get('remove_duplicates', True):
+        subset = config.get('duplicate_subset', None)
+        df = remove_duplicates(df, subset)
+    
+    if 'missing_strategy' in config:
+        df = handle_missing_values(df, 
+                                  strategy=config['missing_strategy'],
+                                  fill_value=config.get('fill_value'))
+    
+    if 'column_types' in config:
+        df = convert_data_types(df, config['column_types'])
+    
+    if 'outlier_columns' in config:
+        for col_info in config['outlier_columns']:
+            df = remove_outliers(df, 
+                                col_info['column'],
+                                method=col_info.get('method', 'iqr'),
+                                threshold=col_info.get('threshold', 1.5))
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    
+    return df
+
+if __name__ == "__main__":
+    config = {
+        'clean_columns': True,
+        'remove_duplicates': True,
+        'missing_strategy': 'fill',
+        'column_types': {'date': 'datetime', 'amount': 'float'},
+        'outlier_columns': [
+            {'column': 'amount', 'method': 'iqr', 'threshold': 1.5}
+        ]
+    }
+    
+    cleaned_df = clean_data('input_data.csv', 'cleaned_data.csv', config)
+    if cleaned_df is not None:
+        print(f"Data cleaning completed. Shape: {cleaned_df.shape}")
