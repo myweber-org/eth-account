@@ -622,4 +622,113 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['id', 'value'], min_rows=3)
-    print(f"\nData validation result: {is_valid}")
+    print(f"\nData validation result: {is_valid}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        filepath: Path to the CSV file.
+        fill_strategy: Method for filling missing values ('mean', 'median', 'mode', or 'zero').
+        drop_threshold: Drop columns if missing value ratio exceeds this threshold (0.0 to 1.0).
+    
+    Returns:
+        Cleaned DataFrame.
+    """
+    df = pd.read_csv(filepath)
+    
+    # Drop columns with excessive missing values
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    # Fill remaining missing values
+    for column in df.columns:
+        if df[column].dtype in ['int64', 'float64']:
+            if fill_strategy == 'mean':
+                fill_value = df[column].mean()
+            elif fill_strategy == 'median':
+                fill_value = df[column].median()
+            elif fill_strategy == 'mode':
+                fill_value = df[column].mode()[0]
+            elif fill_strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = df[column].mean()
+            
+            df[column] = df[column].fillna(fill_value)
+        else:
+            # For categorical columns, fill with most frequent value
+            most_frequent = df[column].mode()[0] if not df[column].mode().empty else 'Unknown'
+            df[column] = df[column].fillna(most_frequent)
+    
+    return df
+
+def detect_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Detect outliers using the Interquartile Range (IQR) method.
+    
+    Args:
+        df: DataFrame containing the data.
+        column: Column name to check for outliers.
+        multiplier: IQR multiplier for outlier detection.
+    
+    Returns:
+        Boolean Series indicating outliers.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a numerical column.
+    
+    Args:
+        df: DataFrame containing the data.
+        column: Column name to normalize.
+        method: Normalization method ('minmax' or 'zscore').
+    
+    Returns:
+        Series with normalized values.
+    """
+    if method == 'minmax':
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val == min_val:
+            return df[column] * 0  # Return zeros if all values are identical
+        return (df[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df[column].mean()
+        std_val = df[column].std()
+        if std_val == 0:
+            return df[column] * 0  # Return zeros if no variance
+        return (df[column] - mean_val) / std_val
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, np.nan, 40, 50],
+        'C': ['X', 'Y', 'Z', np.nan, 'X']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned = clean_csv_data('sample_data.csv', fill_strategy='mean', drop_threshold=0.3)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    outliers = detect_outliers_iqr(cleaned, 'A')
+    print(f"\nOutliers in column A: {outliers.sum()}")
+    
+    normalized = normalize_column(cleaned, 'A', method='minmax')
+    print(f"\nNormalized column A:\n{normalized}")
