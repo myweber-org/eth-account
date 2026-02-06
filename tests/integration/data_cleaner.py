@@ -172,3 +172,49 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return df[mask]
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text in a DataFrame column: lowercase, strip whitespace,
+    remove extra spaces, and drop empty strings.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str)
+    df[column_name] = df[column_name].str.lower()
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x))
+    
+    return df
+
+def remove_duplicate_rows(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def standardize_dataset(df, text_columns=None, drop_duplicates=True):
+    """
+    Apply text cleaning to specified columns and optionally remove duplicates.
+    """
+    if text_columns is None:
+        text_columns = df.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in text_columns:
+        if col in df.columns:
+            df = clean_text_column(df, col)
+    
+    if drop_duplicates:
+        df = remove_duplicate_rows(df)
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV file.
+    """
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
