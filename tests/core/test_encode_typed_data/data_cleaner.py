@@ -218,4 +218,62 @@ if __name__ == "__main__":
     stats = calculate_statistics(df, 'value')
     print("\nOriginal statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def clean_dataset(df, sort_column=None):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and optionally sorting.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        sort_column (str, optional): Column name to sort by. Defaults to None.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame with duplicates removed and sorted if specified.
+    """
+    cleaned_df = df.drop_duplicates().reset_index(drop=True)
+    
+    if sort_column and sort_column in cleaned_df.columns:
+        cleaned_df = cleaned_df.sort_values(by=sort_column).reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that the DataFrame contains all required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+    
+    Returns:
+        bool: True if all required columns are present, False otherwise.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David'],
+        'score': [85, 92, 92, 78, 95, 95]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned_df = clean_dataset(df, sort_column='score')
+    print("Cleaned DataFrame (sorted by score):")
+    print(cleaned_df)
+    print()
+    
+    required_cols = ['id', 'name', 'score']
+    is_valid = validate_data(cleaned_df, required_cols)
+    print(f"Data validation result: {is_valid}")
