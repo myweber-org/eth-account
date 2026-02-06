@@ -138,3 +138,55 @@ if __name__ == "__main__":
     print(data)
     print("\nCleaned Data:")
     print(cleaned_data)
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: List of elements (must be hashable)
+    
+    Returns:
+        List with duplicates removed
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to floats and handling invalid values.
+    
+    Args:
+        values: List of numeric values (can be strings or numbers)
+        default: Default value to use for invalid entries
+    
+    Returns:
+        List of cleaned numeric values
+    """
+    cleaned = []
+    
+    for value in values:
+        try:
+            cleaned.append(float(value))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    
+    return cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1]
+    cleaned_data = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned_data}")
+    
+    numeric_data = ["10.5", "invalid", "20.3", None, "15.7"]
+    cleaned_numeric = clean_numeric_data(numeric_data, default=0.0)
+    print(f"Numeric data: {numeric_data}")
+    print(f"Cleaned numeric: {cleaned_numeric}")
