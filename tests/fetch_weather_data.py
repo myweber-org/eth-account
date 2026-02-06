@@ -147,4 +147,78 @@ def main():
         print("Failed to fetch weather data.")
 
 if __name__ == "__main__":
+    main()import requests
+import json
+import sys
+from datetime import datetime
+
+def fetch_weather(api_key, city):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    
+    try:
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: {e}")
+        return None
+
+def display_weather(data):
+    if not data or 'main' not in data:
+        print("No weather data available.")
+        return
+    
+    main = data['main']
+    weather = data['weather'][0]
+    sys.stdout = sys.__stdout__
+    
+    print(f"Weather in {data['name']}:")
+    print(f"  Temperature: {main['temp']}°C")
+    print(f"  Feels like: {main['feels_like']}°C")
+    print(f"  Humidity: {main['humidity']}%")
+    print(f"  Pressure: {main['pressure']} hPa")
+    print(f"  Conditions: {weather['description'].title()}")
+    print(f"  Wind Speed: {data['wind']['speed']} m/s")
+    print(f"  Visibility: {data.get('visibility', 'N/A')} meters")
+    
+    if 'rain' in data:
+        print(f"  Rain (last hour): {data['rain'].get('1h', 0)} mm")
+    
+    sunrise = datetime.fromtimestamp(data['sys']['sunrise'])
+    sunset = datetime.fromtimestamp(data['sys']['sunset'])
+    print(f"  Sunrise: {sunrise.strftime('%H:%M')}")
+    print(f"  Sunset: {sunset.strftime('%H:%M')}")
+
+def main():
+    api_key = "your_api_key_here"
+    
+    if api_key == "your_api_key_here":
+        print("Please replace 'your_api_key_here' with your actual OpenWeatherMap API key.")
+        print("Get a free API key at: https://openweathermap.org/api")
+        return
+    
+    if len(sys.argv) > 1:
+        city = ' '.join(sys.argv[1:])
+    else:
+        city = input("Enter city name: ").strip()
+    
+    if not city:
+        print("No city specified.")
+        return
+    
+    print(f"Fetching weather for {city}...")
+    weather_data = fetch_weather(api_key, city)
+    
+    if weather_data:
+        if weather_data.get('cod') != 200:
+            print(f"Error: {weather_data.get('message', 'Unknown error')}")
+        else:
+            display_weather(weather_data)
+
+if __name__ == "__main__":
     main()
