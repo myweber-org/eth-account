@@ -57,4 +57,64 @@ class DataCleaner:
             'missing_values': self.df.isnull().sum().sum(),
             'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns)
         }
-        return summary
+        return summaryimport csv
+import re
+
+def remove_duplicates(input_file, output_file):
+    seen = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.reader(infile)
+        header = next(reader)
+        
+        for row in reader:
+            row_tuple = tuple(row)
+            if row_tuple not in seen:
+                seen.add(row_tuple)
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.writer(outfile)
+        writer.writerow(header)
+        writer.writerows(unique_rows)
+
+def clean_numeric_columns(input_file, output_file, columns_to_clean):
+    cleaned_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            for col in columns_to_clean:
+                if col in row:
+                    raw_value = row[col]
+                    cleaned_value = re.sub(r'[^\d.-]', '', raw_value)
+                    row[col] = cleaned_value if cleaned_value else '0'
+            cleaned_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+
+def validate_email_format(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def filter_valid_emails(input_file, output_file, email_column):
+    valid_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            if email_column in row and validate_email_format(row[email_column]):
+                valid_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(valid_rows)
