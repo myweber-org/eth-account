@@ -1269,3 +1269,111 @@ def validate_data(df, required_columns):
 #     # Validate the cleaned data
 #     is_valid = validate_data(cleaned, ['name', 'email', 'age'])
 #     print(f"Data validation passed: {is_valid}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_dataset(filepath):
+    """Load dataset from CSV file"""
+    return pd.read_csv(filepath)
+
+def remove_outliers_iqr(df, columns):
+    """Remove outliers using IQR method"""
+    df_clean = df.copy()
+    for col in columns:
+        if df_clean[col].dtype in ['int64', 'float64']:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def remove_outliers_zscore(df, columns, threshold=3):
+    """Remove outliers using Z-score method"""
+    df_clean = df.copy()
+    for col in columns:
+        if df_clean[col].dtype in ['int64', 'float64']:
+            z_scores = np.abs(stats.zscore(df_clean[col]))
+            df_clean = df_clean[z_scores < threshold]
+    return df_clean
+
+def normalize_minmax(df, columns):
+    """Normalize data using Min-Max scaling"""
+    df_normalized = df.copy()
+    for col in columns:
+        if df_normalized[col].dtype in ['int64', 'float64']:
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            if max_val > min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+    return df_normalized
+
+def normalize_zscore(df, columns):
+    """Normalize data using Z-score standardization"""
+    df_normalized = df.copy()
+    for col in columns:
+        if df_normalized[col].dtype in ['int64', 'float64']:
+            mean_val = df_normalized[col].mean()
+            std_val = df_normalized[col].std()
+            if std_val > 0:
+                df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean'):
+    """Handle missing values using specified strategy"""
+    df_clean = df.copy()
+    numeric_cols = df_clean.select_dtypes(include=['int64', 'float64']).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df_clean[col].fillna(df_clean[col].median(), inplace=True)
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+    elif strategy == 'drop':
+        df_clean.dropna(inplace=True)
+    
+    return df_clean
+
+def clean_dataset(input_file, output_file, numeric_columns=None, outlier_method='iqr', normalize_method='minmax', missing_strategy='mean'):
+    """Main function to clean dataset"""
+    df = load_dataset(input_file)
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    
+    df = handle_missing_values(df, strategy=missing_strategy)
+    
+    if outlier_method == 'iqr':
+        df = remove_outliers_iqr(df, numeric_columns)
+    elif outlier_method == 'zscore':
+        df = remove_outliers_zscore(df, numeric_columns)
+    
+    if normalize_method == 'minmax':
+        df = normalize_minmax(df, numeric_columns)
+    elif normalize_method == 'zscore':
+        df = normalize_zscore(df, numeric_columns)
+    
+    df.to_csv(output_file, index=False)
+    print(f"Cleaned dataset saved to {output_file}")
+    print(f"Original shape: {load_dataset(input_file).shape}")
+    print(f"Cleaned shape: {df.shape}")
+    
+    return df
+
+if __name__ == "__main__":
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_dataset(
+        input_file=input_csv,
+        output_file=output_csv,
+        outlier_method='iqr',
+        normalize_method='zscore',
+        missing_strategy='median'
+    )
