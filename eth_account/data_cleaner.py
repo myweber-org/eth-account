@@ -197,3 +197,146 @@ def validate_dataframe(df, required_columns=None):
 #     
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
 #     print(f"\nValidation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for detecting outliers ('iqr', 'zscore')
+    columns (list): Specific columns to clean, if None clean all numeric columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    else:
+        numeric_cols = [col for col in columns if col in df_clean.columns]
+    
+    # Handle missing values
+    for col in numeric_cols:
+        if df_clean[col].isnull().any():
+            if missing_strategy == 'mean':
+                fill_value = df_clean[col].mean()
+            elif missing_strategy == 'median':
+                fill_value = df_clean[col].median()
+            elif missing_strategy == 'mode':
+                fill_value = df_clean[col].mode()[0]
+            elif missing_strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unknown missing strategy: {missing_strategy}")
+            
+            df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    # Handle outliers
+    for col in numeric_cols:
+        if outlier_method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Cap outliers
+            df_clean[col] = df_clean[col].clip(lower=lower_bound, upper=upper_bound)
+        
+        elif outlier_method == 'zscore':
+            mean_val = df_clean[col].mean()
+            std_val = df_clean[col].std()
+            
+            # Calculate z-scores
+            z_scores = np.abs((df_clean[col] - mean_val) / std_val)
+            
+            # Identify outliers (z-score > 3)
+            outlier_mask = z_scores > 3
+            
+            # Replace outliers with median
+            if outlier_mask.any():
+                median_val = df_clean[col].median()
+                df_clean.loc[outlier_mask, col] = median_val
+        
+        else:
+            raise ValueError(f"Unknown outlier method: {outlier_method}")
+    
+    return df_clean
+
+def validate_dataset(df, min_rows=10, required_columns=None):
+    """
+    Validate dataset meets minimum requirements.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    min_rows (int): Minimum number of rows required
+    required_columns (list): List of required column names
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if len(df) < min_rows:
+        return False, f"Dataset must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Dataset is valid"
+
+def get_dataset_summary(df):
+    """
+    Generate a summary of the dataset.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Summary statistics
+    """
+    summary = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns),
+        'memory_usage': df.memory_usage(deep=True).sum() / 1024 / 1024  # MB
+    }
+    
+    return summary
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    sample_data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.randint(1, 100, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    # Add some missing values and outliers
+    sample_df = pd.DataFrame(sample_data)
+    sample_df.loc[10:15, 'feature1'] = np.nan
+    sample_df.loc[20, 'feature2'] = 1000  # Outlier
+    
+    print("Original dataset summary:")
+    print(get_dataset_summary(sample_df))
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(sample_df, missing_strategy='median', outlier_method='iqr')
+    
+    print("\nCleaned dataset summary:")
+    print(get_dataset_summary(cleaned_df))
+    
+    # Validate dataset
+    is_valid, message = validate_dataset(cleaned_df, min_rows=50, required_columns=['feature1', 'feature2'])
+    print(f"\nValidation: {message}")
