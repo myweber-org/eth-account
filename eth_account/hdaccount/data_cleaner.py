@@ -594,4 +594,55 @@ if __name__ == "__main__":
     print(cleaned)
     
     validation = validate_dataframe(cleaned, required_columns=['A', 'B'])
-    print("\nValidation results:", validation)
+    print("\nValidation results:", validation)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def standardize_zscore(df, column):
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    df[column + '_standardized'] = (df[column] - mean_val) / std_val
+    return df
+
+def handle_missing_mean(df, column):
+    mean_val = df[column].mean()
+    df[column].fillna(mean_val, inplace=True)
+    return df
+
+def process_dataframe(df, numeric_columns):
+    processed_df = df.copy()
+    for col in numeric_columns:
+        if col in processed_df.columns:
+            processed_df = remove_outliers_iqr(processed_df, col)
+            processed_df = normalize_minmax(processed_df, col)
+            processed_df = standardize_zscore(processed_df, col)
+            processed_df = handle_missing_mean(processed_df, col)
+    return processed_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 100),
+        'B': np.random.exponential(50, 100),
+        'C': np.random.uniform(0, 200, 100)
+    }
+    sample_df = pd.DataFrame(sample_data)
+    sample_df.loc[10:15, 'A'] = np.nan
+    sample_df.loc[20:25, 'B'] = np.nan
+    
+    result_df = process_dataframe(sample_df, ['A', 'B', 'C'])
+    print(f"Original shape: {sample_df.shape}")
+    print(f"Processed shape: {result_df.shape}")
+    print(result_df.head())
