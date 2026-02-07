@@ -265,3 +265,107 @@ if __name__ == "__main__":
         # Display cleaned data
         print("\nCleaned Data:")
         print(cleaned_df.head())
+import pandas as pd
+import numpy as np
+from typing import Optional
+
+def clean_csv_data(
+    input_path: str,
+    output_path: str,
+    missing_strategy: str = 'drop',
+    fill_value: Optional[float] = None
+) -> pd.DataFrame:
+    """
+    Clean CSV data by handling missing values and standardizing column names.
+    
+    Args:
+        input_path: Path to input CSV file
+        output_path: Path to save cleaned CSV file
+        missing_strategy: Strategy for handling missing values ('drop', 'fill', 'interpolate')
+        fill_value: Value to fill missing data with when using 'fill' strategy
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Handle missing values
+        if missing_strategy == 'drop':
+            df = df.dropna()
+        elif missing_strategy == 'fill':
+            if fill_value is not None:
+                df = df.fillna(fill_value)
+            else:
+                df = df.fillna(df.mean(numeric_only=True))
+        elif missing_strategy == 'interpolate':
+            df = df.interpolate(method='linear', limit_direction='forward')
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        
+        print(f"Data cleaning completed. Cleaned data saved to: {output_path}")
+        print(f"Original shape: {df.shape}, Cleaned shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+        raise
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        raise
+
+def validate_dataframe(df: pd.DataFrame) -> dict:
+    """
+    Validate DataFrame and return summary statistics.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        Dictionary with validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns),
+        'date_columns': list(df.select_dtypes(include=['datetime64']).columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_df = pd.DataFrame({
+        'ID': [1, 2, 3, 4, 5],
+        'Value': [10.5, np.nan, 15.2, 15.2, 20.1],
+        'Category': ['A', 'B', 'A', 'B', 'C']
+    })
+    
+    # Save sample data
+    sample_df.to_csv('sample_data.csv', index=False)
+    
+    # Clean the data
+    cleaned_df = clean_csv_data(
+        input_path='sample_data.csv',
+        output_path='cleaned_data.csv',
+        missing_strategy='fill',
+        fill_value=0.0
+    )
+    
+    # Validate the cleaned data
+    validation = validate_dataframe(cleaned_df)
+    print("Validation results:", validation)
