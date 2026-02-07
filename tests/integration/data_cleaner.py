@@ -833,4 +833,52 @@ if __name__ == "__main__":
     print("Original shape:", sample_data.shape)
     cleaned = clean_dataset(sample_data, ['A', 'B', 'C'])
     print("Cleaned shape:", cleaned.shape)
-    print("Outliers removed:", sample_data.shape[0] - cleaned.shape[0])
+    print("Outliers removed:", sample_data.shape[0] - cleaned.shape[0])import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Clean a CSV file by removing duplicates, handling missing values,
+    and standardizing column names.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Standardize column names: lowercase and replace spaces with underscores
+        df.columns = df.columns.str.lower().str.replace(' ', '_')
+        
+        # Handle missing values: fill numeric columns with median, categorical with mode
+        for column in df.columns:
+            if df[column].dtype in ['int64', 'float64']:
+                df[column] = df[column].fillna(df[column].median())
+            else:
+                df[column] = df[column].fillna(df[column].mode()[0] if not df[column].mode().empty else 'unknown')
+        
+        # Remove outliers using IQR method for numeric columns
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        for column in numeric_columns:
+            Q1 = df[column].quantile(0.25)
+            Q3 = df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    clean_data('raw_data.csv', 'cleaned_data.csv')
