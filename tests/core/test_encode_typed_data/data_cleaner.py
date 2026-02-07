@@ -167,3 +167,122 @@ def clean_dataset(data, numeric_columns=None, outlier_factor=1.5,
                 cleaned_data = standardize_zscore(cleaned_data, col)
     
     return cleaned_data
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (bool): Whether to fill missing values.
+    fill_value: Value to use for filling missing data.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column using IQR or z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): 'iqr' for interquartile range or 'zscore' for standard deviation.
+    threshold (float): Threshold multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data = df[column].copy()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (data >= lower_bound) & (data <= upper_bound)
+    
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        z_scores = (data - mean) / std
+        mask = abs(z_scores) <= threshold
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df[mask]
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 3, None, 5, 100],
+        'B': [10, 20, 20, 30, 40, 50, 60],
+        'C': ['x', 'y', 'y', 'z', 'z', 'x', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nShape:", df.shape)
+    
+    # Clean the data
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nShape after cleaning:", cleaned.shape)
+    
+    # Remove outliers
+    try:
+        no_outliers = remove_outliers(cleaned, 'A', method='iqr', threshold=1.5)
+        print("\nDataFrame after outlier removal:")
+        print(no_outliers)
+        print("\nShape after outlier removal:", no_outliers.shape)
+    except ValueError as e:
+        print(f"\nError removing outliers: {e}")
+    
+    # Validate data
+    is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=1)
+    print(f"\nValidation result: {is_valid}")
+    print(f"Validation message: {message}")
