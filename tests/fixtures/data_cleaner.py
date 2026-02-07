@@ -167,3 +167,142 @@ def validate_dataframe(dataframe, required_columns):
         return False
     
     return True
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers from a column using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    factor (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def normalize_minmax(data, column):
+    """
+    Normalize a column using Min-Max scaling to range [0, 1].
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize a column using Z-score normalization.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to standardize
+    
+    Returns:
+    pd.Series: Standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(data, numeric_columns=None, outlier_factor=1.5):
+    """
+    Comprehensive data cleaning function.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric columns to process
+    outlier_factor (float): IQR factor for outlier removal
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, col, outlier_factor)
+    
+    return cleaned_data
+
+def get_summary_statistics(data):
+    """
+    Generate summary statistics for numeric columns.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_data = data.select_dtypes(include=[np.number])
+    
+    if numeric_data.empty:
+        return pd.DataFrame()
+    
+    summary = numeric_data.describe().T
+    summary['missing'] = numeric_data.isnull().sum()
+    summary['missing_pct'] = (summary['missing'] / len(data)) * 100
+    
+    return summary
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    print("\nOriginal summary statistics:")
+    print(get_summary_statistics(sample_data))
+    
+    cleaned = clean_dataset(sample_data, ['A', 'B', 'C'])
+    print("\nCleaned data shape:", cleaned.shape)
+    print("\nCleaned summary statistics:")
+    print(get_summary_statistics(cleaned))
+    
+    normalized_a = normalize_minmax(cleaned, 'A')
+    standardized_b = standardize_zscore(cleaned, 'B')
+    
+    print(f"\nNormalized 'A' - Mean: {normalized_a.mean():.4f}, Std: {normalized_a.std():.4f}")
+    print(f"Standardized 'B' - Mean: {standardized_b.mean():.4f}, Std: {standardized_b.std():.4f}")
