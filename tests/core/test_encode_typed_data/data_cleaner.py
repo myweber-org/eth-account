@@ -154,3 +154,114 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
     
     return filtered_df.reset_index(drop=True)
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None):
+    """
+    Clean CSV data by handling missing values and standardizing formats.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Remove duplicate rows
+        initial_count = len(df)
+        df.drop_duplicates(inplace=True)
+        duplicates_removed = initial_count - len(df)
+        
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        
+        # Fill numeric missing values with median
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].median(), inplace=True)
+        
+        # Fill categorical missing values with mode
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Remove leading/trailing whitespace from string columns
+        for col in categorical_cols:
+            df[col] = df[col].astype(str).str.strip()
+        
+        # Generate output path if not provided
+        if output_path is None:
+            input_file = Path(input_path)
+            output_path = input_file.parent / f"cleaned_{input_file.name}"
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        
+        # Generate summary statistics
+        summary = {
+            'original_rows': initial_count,
+            'cleaned_rows': len(df),
+            'duplicates_removed': duplicates_removed,
+            'numeric_cols_filled': len([col for col in numeric_cols if df[col].isnull().any()]),
+            'categorical_cols_filled': len([col for col in categorical_cols if df[col].isnull().any()]),
+            'output_file': str(output_path)
+        }
+        
+        return df, summary
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None, None
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty")
+        return None, None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None, None
+
+def validate_dataframe(df):
+    """
+    Validate dataframe for common data quality issues.
+    """
+    if df is None or df.empty:
+        return {'valid': False, 'message': 'DataFrame is empty or None'}
+    
+    validation_results = {
+        'valid': True,
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'column_types': df.dtypes.to_dict()
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'Name': ['Alice', 'Bob', 'Charlie', None, 'Eve'],
+        'Age': [25, None, 30, 35, 40],
+        'City': ['New York', 'London', None, 'Paris', 'Tokyo'],
+        'Score': [85.5, 92.0, 78.5, None, 88.0]
+    })
+    
+    # Save sample data
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    # Clean the data
+    cleaned_df, summary = clean_csv_data('sample_data.csv')
+    
+    if cleaned_df is not None:
+        print("Data cleaning completed successfully")
+        print(f"Summary: {summary}")
+        
+        # Validate cleaned data
+        validation = validate_dataframe(cleaned_df)
+        print(f"Validation results: {validation}")
+        
+        # Display cleaned data
+        print("\nCleaned Data:")
+        print(cleaned_df.head())
