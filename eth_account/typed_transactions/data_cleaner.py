@@ -221,3 +221,34 @@ if __name__ == "__main__":
     print(f"\nCleaned shape: {cleaned_df.shape}")
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_data_with_threshold(data, threshold=None):
+    """
+    Clean data by removing duplicates and optionally filtering by threshold.
+    If threshold is provided, only items meeting the threshold are kept.
+    """
+    unique_data = remove_duplicates(data)
+    
+    if threshold is not None:
+        filtered_data = [item for item in unique_data if item >= threshold]
+        return filtered_data
+    
+    return unique_data
+
+if __name__ == "__main__":
+    sample_data = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]
+    print("Original data:", sample_data)
+    print("Cleaned data:", remove_duplicates(sample_data))
+    print("Cleaned with threshold 4:", clean_data_with_threshold(sample_data, 4))
