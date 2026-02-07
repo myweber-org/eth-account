@@ -984,4 +984,69 @@ def validate_cleaning(original_df, cleaned_df, numeric_columns):
             'cleaned_std': cleaned_df[col].std(),
             'rows_removed': len(original_df) - len(cleaned_df)
         }
-    return pd.DataFrame(report).T
+    return pd.DataFrame(report).Timport pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(file_path, output_path=None):
+    """
+    Load a dataset, clean it by removing outliers from numeric columns, and save the result.
+    
+    Args:
+        file_path (str): Path to the input CSV file
+        output_path (str, optional): Path to save the cleaned CSV file. 
+                                     If None, adds '_cleaned' suffix to input filename.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original dataset shape: {df.shape}")
+        
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_columns:
+            original_len = len(df)
+            df = remove_outliers_iqr(df, col)
+            removed_count = original_len - len(df)
+            if removed_count > 0:
+                print(f"Removed {removed_count} outliers from column '{col}'")
+        
+        print(f"Cleaned dataset shape: {df.shape}")
+        
+        if output_path is None:
+            output_path = file_path.replace('.csv', '_cleaned.csv')
+        
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned dataset saved to: {output_path}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during processing: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    input_file = "sample_data.csv"
+    cleaned_data = clean_dataset(input_file)
