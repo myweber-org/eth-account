@@ -1,154 +1,106 @@
-
 import pandas as pd
 import numpy as np
 
-def remove_outliers_iqr(df, column):
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
     """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
+    Clean a pandas DataFrame by handling duplicates and missing values.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to clean
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: Boolean indicating whether to drop duplicate rows
+        fill_missing: Strategy for filling missing values ('mean', 'median', 'mode', or 'drop')
     
     Returns:
-    pd.DataFrame: DataFrame with outliers removed
+        Cleaned pandas DataFrame
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df.reset_index(drop=True)
-
-def clean_dataset(df, numeric_columns=None):
-    """
-    Clean dataset by removing outliers from all numeric columns.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    numeric_columns (list): List of numeric column names to clean
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if numeric_columns is None:
-        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
     cleaned_df = df.copy()
     
-    for column in numeric_columns:
-        if column in cleaned_df.columns:
-            original_count = len(cleaned_df)
-            cleaned_df = remove_outliers_iqr(cleaned_df, column)
-            removed_count = original_count - len(cleaned_df)
-            print(f"Removed {removed_count} outliers from column '{column}'")
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if fill_missing == 'drop':
+        cleaned_df = cleaned_df.dropna()
+        print("Removed rows with missing values")
+    elif fill_missing in ['mean', 'median']:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if fill_missing == 'mean':
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+            else:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+        print(f"Filled missing numeric values with {fill_missing}")
+    elif fill_missing == 'mode':
+        for col in cleaned_df.columns:
+            mode_val = cleaned_df[col].mode()
+            if not mode_val.empty:
+                cleaned_df[col] = cleaned_df[col].fillna(mode_val[0])
+        print("Filled missing values with mode")
     
     return cleaned_df
 
-if __name__ == "__main__":
-    sample_data = {
-        'id': range(1, 101),
-        'value': np.concatenate([
-            np.random.normal(100, 10, 90),
-            np.random.normal(300, 50, 10)
-        ]),
-        'category': np.random.choice(['A', 'B', 'C'], 100)
-    }
-    
-    df = pd.DataFrame(sample_data)
-    print(f"Original dataset shape: {df.shape}")
-    
-    cleaned_df = clean_dataset(df, ['value'])
-    print(f"Cleaned dataset shape: {cleaned_df.shape}")
-    print(f"Outliers removed: {len(df) - len(cleaned_df)}")
-import pandas as pd
-import re
-
-def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, case_normalization='lower'):
+def validate_data(df, required_columns=None, min_rows=1):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    Validate the structure and content of a DataFrame.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame to clean.
-    columns_to_clean (list, optional): List of column names to apply string normalization.
-                                       If None, applies to all object dtype columns.
-    remove_duplicates (bool): If True, remove duplicate rows.
-    case_normalization (str): One of 'lower', 'upper', or None for case normalization.
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+        min_rows: Minimum number of rows required
     
     Returns:
-    pd.DataFrame: Cleaned DataFrame.
+        Boolean indicating whether validation passed
     """
-    df_clean = df.copy()
+    if len(df) < min_rows:
+        print(f"Validation failed: DataFrame has only {len(df)} rows, minimum required is {min_rows}")
+        return False
     
-    if remove_duplicates:
-        initial_rows = len(df_clean)
-        df_clean = df_clean.drop_duplicates()
-        removed = initial_rows - len(df_clean)
-        print(f"Removed {removed} duplicate rows.")
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing required columns: {missing_cols}")
+            return False
     
-    if columns_to_clean is None:
-        columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
-    
-    for col in columns_to_clean:
-        if col in df_clean.columns and df_clean[col].dtype == 'object':
-            df_clean[col] = df_clean[col].astype(str)
-            
-            if case_normalization == 'lower':
-                df_clean[col] = df_clean[col].str.lower()
-            elif case_normalization == 'upper':
-                df_clean[col] = df_clean[col].str.upper()
-            
-            df_clean[col] = df_clean[col].apply(lambda x: re.sub(r'\s+', ' ', x.strip()))
-    
-    return df_clean
+    print("Data validation passed")
+    return True
 
-def validate_email_column(df, email_column):
+def get_data_summary(df):
     """
-    Validate email addresses in a specified column.
+    Generate a summary of the DataFrame including statistics and missing values.
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    email_column (str): Name of the column containing email addresses.
+    Args:
+        df: pandas DataFrame to summarize
     
     Returns:
-    pd.DataFrame: DataFrame with additional 'email_valid' boolean column.
+        Dictionary containing summary statistics
     """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
-    
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-    df['email_valid'] = df[email_column].str.match(email_pattern, na=False)
-    
-    valid_count = df['email_valid'].sum()
-    total_count = len(df)
-    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
-    
-    return df
-
-if __name__ == "__main__":
-    sample_data = {
-        'name': ['John Doe', 'Jane Smith', 'John Doe', 'ALICE BROWN', '  Bob   White  '],
-        'email': ['john@example.com', 'jane@test.org', 'john@example.com', 'invalid-email', 'bob@company.co.uk'],
-        'age': [25, 30, 25, 35, 40]
+    summary = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n")
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max()
+        }
     
-    cleaned_df = clean_dataframe(df, case_normalization='lower')
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
-    print("\n")
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        summary['categorical_stats'][col] = {
+            'unique_values': df[col].nunique(),
+            'most_common': df[col].mode().iloc[0] if not df[col].mode().empty else None
+        }
     
-    validated_df = validate_email_column(cleaned_df, 'email')
-    print("DataFrame with email validation:")
-    print(validated_df)
+    return summary
