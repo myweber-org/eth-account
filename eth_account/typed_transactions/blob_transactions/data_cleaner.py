@@ -306,3 +306,90 @@ def get_data_summary(data):
         }
     
     return summary
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, deduplicate=True, handle_nulls=True, null_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling null values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        deduplicate (bool): Whether to remove duplicate rows
+        handle_nulls (bool): Whether to handle null values
+        null_strategy (str): Strategy for handling nulls ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if handle_nulls and cleaned_df.isnull().any().any():
+        if null_strategy == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print("Removed rows with null values")
+        else:
+            for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+                if cleaned_df[column].isnull().any():
+                    if null_strategy == 'mean':
+                        fill_value = cleaned_df[column].mean()
+                    elif null_strategy == 'median':
+                        fill_value = cleaned_df[column].median()
+                    elif null_strategy == 'mode':
+                        fill_value = cleaned_df[column].mode()[0]
+                    else:
+                        fill_value = 0
+                    
+                    cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+                    print(f"Filled nulls in column '{column}' with {null_strategy}: {fill_value}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'null_counts': df.isnull().sum().to_dict(),
+        'numeric_stats': df.describe().to_dict() if not df.select_dtypes(include=[np.number]).empty else {}
+    }
+    return summary
