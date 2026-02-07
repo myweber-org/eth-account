@@ -1169,3 +1169,131 @@ class DataCleaner:
             'removal_percentage': ((self.original_shape[0] - len(self.df)) / self.original_shape[0]) * 100
         }
         return stats_dict
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def load_data(file_path):
+    """Load data from CSV file."""
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Loaded data with shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return None
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    initial_count = len(df)
+    df_clean = df.drop_duplicates(subset=subset, keep='first')
+    removed_count = initial_count - len(df_clean)
+    print(f"Removed {removed_count} duplicate rows")
+    return df_clean
+
+def standardize_column(df, column_name, case='lower'):
+    """Standardize text in a column (lowercase/uppercase)."""
+    if column_name not in df.columns:
+        print(f"Column '{column_name}' not found in DataFrame")
+        return df
+    
+    if case == 'lower':
+        df[column_name] = df[column_name].astype(str).str.lower()
+    elif case == 'upper':
+        df[column_name] = df[column_name].astype(str).str.upper()
+    
+    print(f"Standardized column '{column_name}' to {case}case")
+    return df
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """Handle missing values in DataFrame."""
+    missing_count = df.isnull().sum().sum()
+    print(f"Found {missing_count} missing values")
+    
+    if strategy == 'drop':
+        df_clean = df.dropna()
+        print(f"Dropped rows with missing values")
+    elif strategy == 'fill':
+        if fill_value is not None:
+            df_clean = df.fillna(fill_value)
+            print(f"Filled missing values with: {fill_value}")
+        else:
+            df_clean = df.fillna(df.mean(numeric_only=True))
+            print("Filled missing values with column means")
+    
+    return df_clean
+
+def clean_dataframe(df, config=None):
+    """Main function to clean DataFrame based on configuration."""
+    if config is None:
+        config = {
+            'remove_duplicates': True,
+            'standardize_columns': [],
+            'missing_value_strategy': 'drop'
+        }
+    
+    df_clean = df.copy()
+    
+    if config.get('remove_duplicates', False):
+        df_clean = remove_duplicates(df_clean)
+    
+    for column_config in config.get('standardize_columns', []):
+        column_name = column_config.get('name')
+        case_type = column_config.get('case', 'lower')
+        if column_name:
+            df_clean = standardize_column(df_clean, column_name, case_type)
+    
+    missing_strategy = config.get('missing_value_strategy', 'drop')
+    fill_value = config.get('fill_value')
+    df_clean = handle_missing_values(df_clean, missing_strategy, fill_value)
+    
+    return df_clean
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned DataFrame to CSV file."""
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return False
+
+def main():
+    """Example usage of the data cleaning functions."""
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    print("Starting data cleaning process...")
+    
+    df = load_data(input_file)
+    if df is None:
+        return
+    
+    cleaning_config = {
+        'remove_duplicates': True,
+        'standardize_columns': [
+            {'name': 'category', 'case': 'lower'},
+            {'name': 'product_name', 'case': 'title'}
+        ],
+        'missing_value_strategy': 'fill',
+        'fill_value': 0
+    }
+    
+    df_clean = clean_dataframe(df, cleaning_config)
+    
+    print(f"\nOriginal data shape: {df.shape}")
+    print(f"Cleaned data shape: {df_clean.shape}")
+    
+    save_success = save_cleaned_data(df_clean, output_file)
+    
+    if save_success:
+        print("Data cleaning completed successfully!")
+    else:
+        print("Data cleaning completed with errors.")
+
+if __name__ == "__main__":
+    main()
