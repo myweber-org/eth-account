@@ -97,3 +97,20 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned summary for column 'A':")
     print(calculate_summary_statistics(cleaned_df, 'A'))
+def clean_numeric_data(data, lower_bound=None, upper_bound=None):
+    """
+    Filter a list of numeric values, removing non-numeric entries and optionally
+    clipping values to specified bounds.
+    """
+    cleaned = []
+    for item in data:
+        try:
+            num = float(item)
+            if lower_bound is not None and num < lower_bound:
+                num = lower_bound
+            if upper_bound is not None and num > upper_bound:
+                num = upper_bound
+            cleaned.append(num)
+        except (ValueError, TypeError):
+            continue
+    return cleaned
