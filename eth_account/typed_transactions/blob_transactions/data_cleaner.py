@@ -438,4 +438,11 @@ if __name__ == "__main__":
         print(f"Cleaned shape: {cleaned.shape}")
         print("Data cleaning completed successfully.")
     except ValueError as e:
-        print(f"Validation error: {e}")
+        print(f"Validation error: {e}")def deduplicate_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
