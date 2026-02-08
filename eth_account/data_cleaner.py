@@ -631,3 +631,103 @@ def clean_dataset(df, missing_strategy='remove', outlier_columns=None):
                 cleaned_df = remove_outliers(cleaned_df, col)
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_strategy='mean'):
+    """
+    Load and clean CSV data by handling missing values.
+    
+    Args:
+        file_path (str): Path to the CSV file
+        fill_strategy (str): Strategy for filling missing values.
+                             Options: 'mean', 'median', 'zero', 'drop'
+    
+    Returns:
+        pandas.DataFrame: Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        if df.empty:
+            print("Warning: Empty DataFrame loaded")
+            return df
+        
+        missing_count = df.isnull().sum().sum()
+        if missing_count > 0:
+            print(f"Found {missing_count} missing values")
+            
+            if fill_strategy == 'drop':
+                df = df.dropna()
+                print("Dropped rows with missing values")
+            elif fill_strategy == 'zero':
+                df = df.fillna(0)
+                print("Filled missing values with zero")
+            elif fill_strategy == 'mean':
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+                print("Filled numeric missing values with column mean")
+            elif fill_strategy == 'median':
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+                print("Filled numeric missing values with column median")
+            else:
+                raise ValueError(f"Unknown fill strategy: {fill_strategy}")
+        
+        df = df.reset_index(drop=True)
+        print(f"Data cleaning complete. Final shape: {df.shape}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: File is empty")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pandas.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        bool: True if validation passes, False otherwise
+    """
+    if df is None:
+        print("Validation failed: DataFrame is None")
+        return False
+    
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Validation failed: Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': [1, 2, 3, 4, 5]
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_data = clean_csv_data('sample_data.csv', fill_strategy='mean')
+    
+    if cleaned_data is not None:
+        is_valid = validate_dataframe(cleaned_data, required_columns=['A', 'B', 'C'])
+        print(f"Data validation result: {is_valid}")
+        print("\nCleaned data preview:")
+        print(cleaned_data.head())
