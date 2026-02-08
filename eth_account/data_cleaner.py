@@ -730,4 +730,162 @@ if __name__ == "__main__":
         is_valid = validate_dataframe(cleaned_data, required_columns=['A', 'B', 'C'])
         print(f"Data validation result: {is_valid}")
         print("\nCleaned data preview:")
-        print(cleaned_data.head())
+        print(cleaned_data.head())import numpy as np
+import pandas as pd
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to check for outliers
+    threshold (float): Multiplier for IQR (default 1.5)
+    
+    Returns:
+    pd.Series: Boolean mask indicating outliers
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    return (data[column] < lower_bound) | (data[column] > upper_bound)
+
+def remove_outliers(data, column, threshold=1.5):
+    """
+    Remove outliers from a dataframe column.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to process
+    threshold (float): Multiplier for IQR
+    
+    Returns:
+    pd.DataFrame: Dataframe with outliers removed
+    """
+    outlier_mask = detect_outliers_iqr(data, column, threshold)
+    return data[~outlier_mask].copy()
+
+def normalize_minmax(data, column):
+    """
+    Normalize column values to range [0, 1] using min-max scaling.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    col_data = data[column]
+    min_val = col_data.min()
+    max_val = col_data.max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(col_data), index=col_data.index)
+    
+    return (col_data - min_val) / (max_val - min_val)
+
+def normalize_zscore(data, column):
+    """
+    Normalize column values using z-score standardization.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    column (str): Column name to normalize
+    
+    Returns:
+    pd.Series: Standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    col_data = data[column]
+    mean_val = col_data.mean()
+    std_val = col_data.std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(col_data), index=col_data.index)
+    
+    return (col_data - mean_val) / std_val
+
+def clean_dataset(data, numeric_columns=None, outlier_threshold=1.5, normalization='minmax'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    data (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric columns to process
+    outlier_threshold (float): Threshold for outlier detection
+    normalization (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            # Remove outliers
+            outlier_mask = detect_outliers_iqr(cleaned_data, column, outlier_threshold)
+            cleaned_data = cleaned_data[~outlier_mask]
+            
+            # Apply normalization
+            if normalization == 'minmax':
+                cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
+            elif normalization == 'zscore':
+                cleaned_data[f'{column}_normalized'] = normalize_zscore(cleaned_data, column)
+            else:
+                raise ValueError(f"Unknown normalization method: {normalization}")
+    
+    return cleaned_data.reset_index(drop=True)
+
+def validate_data(data, required_columns=None, allow_nan=False):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    data (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    allow_nan (bool): Whether NaN values are allowed
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_result = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if not isinstance(data, pd.DataFrame):
+        validation_result['is_valid'] = False
+        validation_result['errors'].append('Input is not a pandas DataFrame')
+        return validation_result
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            validation_result['is_valid'] = False
+            validation_result['errors'].append(f'Missing required columns: {missing_columns}')
+    
+    if not allow_nan:
+        nan_columns = data.columns[data.isna().any()].tolist()
+        if nan_columns:
+            validation_result['warnings'].append(f'Columns with NaN values: {nan_columns}')
+    
+    if data.empty:
+        validation_result['warnings'].append('Dataframe is empty')
+    
+    return validation_result
