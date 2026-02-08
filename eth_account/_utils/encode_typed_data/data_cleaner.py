@@ -245,3 +245,104 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return df[mask].reset_index(drop=True)
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Column labels to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if subset is not None and not all(col in df.columns for col in subset):
+        missing = [col for col in subset if col not in df.columns]
+        raise ValueError(f"Columns not found in DataFrame: {missing}")
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, allow_nan=False):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of required column names
+        allow_nan (bool): Whether NaN values are allowed
+    
+    Returns:
+        bool: True if validation passes
+    """
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+    
+    if not allow_nan and df.isnull().any().any():
+        nan_cols = df.columns[df.isnull().any()].tolist()
+        raise ValueError(f"NaN values found in columns: {nan_cols}")
+    
+    return True
+
+def clean_column_names(df):
+    """
+    Standardize column names to lowercase with underscores.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned column names
+    """
+    df.columns = (
+        df.columns
+        .str.lower()
+        .str.replace(r'[^\w\s]', '', regex=True)
+        .str.replace(r'\s+', '_', regex=True)
+        .str.strip('_')
+    )
+    return df
+
+def main():
+    """Example usage of data cleaning functions."""
+    sample_data = {
+        'User ID': [1, 2, 2, 3, 4, 4, 4],
+        'Name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David', 'David'],
+        'Score': [85, 90, 90, 78, 92, 92, 92]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print()
+    
+    cleaned = remove_duplicates(df, subset=['User ID', 'Name'])
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print()
+    
+    cleaned = clean_column_names(cleaned)
+    print("DataFrame with cleaned column names:")
+    print(cleaned)
+    
+    try:
+        validate_data(cleaned, required_columns=['user_id', 'name'])
+        print("Data validation passed")
+    except ValueError as e:
+        print(f"Validation error: {e}")
+
+if __name__ == "__main__":
+    main()
