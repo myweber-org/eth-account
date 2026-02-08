@@ -286,3 +286,114 @@ if __name__ == "__main__":
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B', 'C'], min_rows=1)
     print(f"\nValidation result: {is_valid}")
     print(f"Validation message: {message}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_result = {
+        'is_valid': True,
+        'missing_columns': [],
+        'empty_cells': 0,
+        'total_rows': len(df),
+        'total_columns': len(df.columns)
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_result['missing_columns'] = missing
+            validation_result['is_valid'] = False
+    
+    empty_cells = df.isnull().sum().sum()
+    validation_result['empty_cells'] = int(empty_cells)
+    
+    return validation_result
+
+def save_cleaned_data(df, output_path, format='csv'):
+    """
+    Save cleaned DataFrame to file.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to save
+    output_path (str): Output file path
+    format (str): File format ('csv', 'excel', 'parquet')
+    
+    Returns:
+    bool: True if successful
+    """
+    try:
+        if format == 'csv':
+            df.to_csv(output_path, index=False)
+        elif format == 'excel':
+            df.to_excel(output_path, index=False)
+        elif format == 'parquet':
+            df.to_parquet(output_path, index=False)
+        else:
+            raise ValueError(f"Unsupported format: {format}")
+        
+        return True
+    except Exception as e:
+        print(f"Error saving data: {e}")
+        return False
