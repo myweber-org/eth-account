@@ -377,3 +377,58 @@ def clean_dataset(df, missing_strategy='remove', outlier_columns=None):
                 cleaned_df = remove_outliers(cleaned_df, col)
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, strategy='mean', outlier_method='iqr', threshold=1.5):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    strategy (str): Strategy for missing values: 'mean', 'median', 'mode', or 'drop'.
+    outlier_method (str): Method for outlier detection: 'iqr' or 'zscore'.
+    threshold (float): Threshold for outlier detection.
+
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+
+    # Handle missing values
+    if strategy == 'drop':
+        cleaned_df.dropna(inplace=True)
+    elif strategy in ['mean', 'median', 'mode']:
+        for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+            if cleaned_df[column].isnull().any():
+                if strategy == 'mean':
+                    fill_value = cleaned_df[column].mean()
+                elif strategy == 'median':
+                    fill_value = cleaned_df[column].median()
+                elif strategy == 'mode':
+                    fill_value = cleaned_df[column].mode()[0]
+                cleaned_df[column].fillna(fill_value, inplace=True)
+
+    # Handle outliers
+    numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    for column in numeric_columns:
+        if outlier_method == 'iqr':
+            Q1 = cleaned_df[column].quantile(0.25)
+            Q3 = cleaned_df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            cleaned_df[column] = np.where(
+                (cleaned_df[column] < lower_bound) | (cleaned_df[column] > upper_bound),
+                cleaned_df[column].median(),
+                cleaned_df[column]
+            )
+        elif outlier_method == 'zscore':
+            z_scores = np.abs((cleaned_df[column] - cleaned_df[column].mean()) / cleaned_df[column].std())
+            cleaned_df[column] = np.where(
+                z_scores > threshold,
+                cleaned_df[column].median(),
+                cleaned_df[column]
+            )
+
+    return cleaned_df
