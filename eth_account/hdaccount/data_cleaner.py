@@ -881,3 +881,136 @@ def validate_email_column(df, email_column):
     print(f"Email validation complete: {valid_count}/{total_count} valid emails")
     
     return df_result
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    return (data[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    return (data[column] - mean_val) / std_val
+
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5, normalization_method='standardize'):
+    """
+    Main function to clean dataset by removing outliers and normalizing numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names to process
+        outlier_multiplier: IQR multiplier for outlier detection
+        normalization_method: 'standardize' or 'normalize'
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            
+            if normalization_method == 'standardize':
+                cleaned_data[f'{column}_standardized'] = standardize_zscore(cleaned_data, column)
+            elif normalization_method == 'normalize':
+                cleaned_data[f'{column}_normalized'] = normalize_minmax(cleaned_data, column)
+            else:
+                raise ValueError("normalization_method must be 'standardize' or 'normalize'")
+    
+    return cleaned_data
+
+def get_summary_statistics(data, numeric_columns=None):
+    """
+    Get summary statistics for numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names
+    
+    Returns:
+        DataFrame with summary statistics
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    summary_stats = []
+    
+    for column in numeric_columns:
+        if column in data.columns:
+            stats_dict = {
+                'column': column,
+                'mean': data[column].mean(),
+                'median': data[column].median(),
+                'std': data[column].std(),
+                'min': data[column].min(),
+                'max': data[column].max(),
+                'count': data[column].count(),
+                'missing': data[column].isnull().sum()
+            }
+            summary_stats.append(stats_dict)
+    
+    return pd.DataFrame(summary_stats)
