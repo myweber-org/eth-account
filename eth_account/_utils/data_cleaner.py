@@ -441,4 +441,86 @@ def normalize_dates(date_series, date_format='%Y-%m-%d'):
     Normalize dates in a pandas Series to specified format.
     Attempts to parse various date formats.
     """
-    return pd.to_datetime(date_series, errors='coerce').dt.strftime(date_format)
+    return pd.to_datetime(date_series, errors='coerce').dt.strftime(date_format)import pandas as pd
+
+def clean_dataset(df, id_column=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        id_column (str, optional): Column name to use for identifying duplicates.
+                                   If None, uses all columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    cleaned_df.columns = cleaned_df.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows
+    if id_column and id_column in cleaned_df.columns:
+        cleaned_df = cleaned_df.drop_duplicates(subset=[id_column])
+    else:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of column names that must be present.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def sample_data_cleaning():
+    """Example usage of the data cleaning functions."""
+    # Create sample data
+    data = {
+        'Customer ID': [1, 2, 2, 3, 4],
+        'First Name': ['John', 'Jane', 'Jane', 'Bob', 'Alice'],
+        'Last Name': ['Doe', 'Smith', 'Smith', 'Johnson', 'Brown'],
+        'Order Value': [100.50, 200.75, 200.75, 150.00, 300.25]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean the data
+    cleaned_df = clean_dataset(df, id_column='customer_id')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    # Validate the cleaned data
+    is_valid, message = validate_dataframe(cleaned_df, required_columns=['customer_id', 'order_value'])
+    print(f"Validation result: {is_valid}")
+    print(f"Validation message: {message}")
+
+if __name__ == "__main__":
+    sample_data_cleaning()
