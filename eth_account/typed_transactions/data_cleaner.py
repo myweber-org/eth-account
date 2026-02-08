@@ -430,4 +430,108 @@ if __name__ == "__main__":
     
     # Validate the cleaned data
     is_valid = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'], min_rows=1)
-    print(f"\nData validation passed: {is_valid}")
+    print(f"\nData validation passed: {is_valid}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean a CSV file by handling missing values.
+    
+    Args:
+        filepath (str): Path to the CSV file.
+        fill_strategy (str): Strategy for filling missing values.
+            Options: 'mean', 'median', 'mode', 'zero', 'ffill'.
+        drop_threshold (float): Drop columns with missing ratio above this threshold.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
+    
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+    
+    missing_ratio = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    if len(columns_to_drop) > 0:
+        print(f"Dropped columns with >{drop_threshold*100}% missing values: {list(columns_to_drop)}")
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    categorical_cols = df.select_dtypes(exclude=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif fill_strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif fill_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    elif fill_strategy == 'ffill':
+        df = df.fillna(method='ffill')
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 0)
+    
+    for col in categorical_cols:
+        df[col] = df[col].fillna('Unknown')
+    
+    final_shape = df.shape
+    print(f"Final data shape: {final_shape}")
+    print(f"Removed {original_shape[0] - final_shape[0]} rows, {original_shape[1] - final_shape[1]} columns")
+    
+    return df
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers in a numeric column using IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column (str): Column name to check for outliers.
+    
+    Returns:
+        pd.Series: Boolean series indicating outliers.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not np.issubdtype(df[column].dtype, np.number):
+        raise ValueError(f"Column '{column}' is not numeric")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    if outliers.any():
+        print(f"Found {outliers.sum()} outliers in column '{column}'")
+        print(f"Outlier range: <{lower_bound:.2f} or >{upper_bound:.2f}")
+    
+    return outliers
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [np.nan, 2, 3, np.nan, 5, 6],
+        'C': ['X', 'Y', np.nan, 'Z', 'X', 'Y'],
+        'D': [np.nan, np.nan, np.nan, np.nan, np.nan, 1]
+    }
+    
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('test_data.csv', fill_strategy='median', drop_threshold=0.6)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    outlier_mask = detect_outliers_iqr(cleaned_df, 'A')
+    print("\nOutlier rows in column 'A':")
+    print(cleaned_df[outlier_mask])
