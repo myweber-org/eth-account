@@ -361,3 +361,100 @@ if __name__ == "__main__":
     result = example_usage()
     print("Cleaned data:")
     print(result)
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, fill_strategy='mean', column_case='lower'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    fill_strategy (str): Strategy for filling missing values. Options: 'mean', 'median', 'mode', 'zero'.
+    column_case (str): Desired case for column names. Options: 'lower', 'upper', 'title'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Standardize column names
+    if column_case == 'lower':
+        cleaned_df.columns = cleaned_df.columns.str.lower()
+    elif column_case == 'upper':
+        cleaned_df.columns = cleaned_df.columns.str.upper()
+    elif column_case == 'title':
+        cleaned_df.columns = cleaned_df.columns.str.title()
+    
+    # Handle missing values
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    categorical_cols = cleaned_df.select_dtypes(exclude=[np.number]).columns
+    
+    if fill_strategy == 'mean':
+        for col in numeric_cols:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+    elif fill_strategy == 'median':
+        for col in numeric_cols:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+    elif fill_strategy == 'zero':
+        cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(0)
+    
+    # For categorical columns, fill with most frequent value
+    for col in categorical_cols:
+        if not cleaned_df[col].mode().empty:
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0])
+        else:
+            cleaned_df[col] = cleaned_df[col].fillna('unknown')
+    
+    return cleaned_df
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a specific column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = df[column].quantile(0.25)
+    q3 = df[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (is_valid, message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
