@@ -1013,4 +1013,93 @@ def get_summary_statistics(data, numeric_columns=None):
             }
             summary_stats.append(stats_dict)
     
-    return pd.DataFrame(summary_stats)
+    return pd.DataFrame(summary_stats)import pandas as pd
+import numpy as np
+import re
+
+def clean_csv_data(input_file, output_file):
+    """
+    Clean and preprocess data from a CSV file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Standardize column names
+        df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'unknown')
+        
+        # Remove outliers using IQR method for numeric columns
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+        
+        # Clean text columns: remove extra whitespace and special characters
+        for col in categorical_cols:
+            df[col] = df[col].astype(str).apply(lambda x: re.sub(r'[^\w\s]', '', x))
+            df[col] = df[col].str.strip()
+        
+        # Reset index after cleaning
+        df = df.reset_index(drop=True)
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning complete. Cleaned data saved to {output_file}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+def validate_data(df):
+    """
+    Validate the cleaned data for common issues.
+    """
+    if df is None:
+        return False
+    
+    checks = {
+        'has_duplicates': df.duplicated().sum() == 0,
+        'has_null_values': df.isnull().sum().sum() == 0,
+        'has_infinite_values': np.isfinite(df.select_dtypes(include=[np.number])).all().all(),
+        'has_negative_values': (df.select_dtypes(include=[np.number]) >= 0).all().all()
+    }
+    
+    print("Data Validation Results:")
+    for check_name, check_result in checks.items():
+        status = "PASS" if check_result else "FAIL"
+        print(f"  {check_name}: {status}")
+    
+    return all(checks.values())
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_csv, output_csv)
+    
+    if cleaned_df is not None:
+        is_valid = validate_data(cleaned_df)
+        if is_valid:
+            print("Data validation passed successfully.")
+        else:
+            print("Data validation failed. Please review the data.")
