@@ -1073,4 +1073,75 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(input_file, output_file)
     print(f"Data cleaning complete. Cleaned dataset saved to {output_file}")
     print(f"Original shape: {pd.read_csv(input_file).shape}")
-    print(f"Cleaned shape: {cleaned_df.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to process
+    
+    Returns:
+        Cleaned DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean dataset by removing outliers from all numeric columns.
+    
+    Args:
+        df: pandas DataFrame
+        numeric_columns: List of numeric column names (optional)
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not process column {col}: {e}")
+    
+    return cleaned_df
+
+def get_cleaning_stats(original_df, cleaned_df):
+    """
+    Get statistics about the cleaning process.
+    
+    Args:
+        original_df: Original DataFrame
+        cleaned_df: Cleaned DataFrame
+    
+    Returns:
+        Dictionary with cleaning statistics
+    """
+    stats = {
+        'original_rows': len(original_df),
+        'cleaned_rows': len(cleaned_df),
+        'removed_rows': len(original_df) - len(cleaned_df),
+        'removed_percentage': ((len(original_df) - len(cleaned_df)) / len(original_df)) * 100
+    }
+    
+    return stats
