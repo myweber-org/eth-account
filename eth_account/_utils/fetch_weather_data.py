@@ -108,3 +108,111 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import json
+from datetime import datetime
+import logging
+from typing import Optional, Dict, Any
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+class WeatherFetcher:
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.session = requests.Session()
+    
+    def get_weather(self, city: str, country_code: Optional[str] = None) -> Dict[str, Any]:
+        query = city
+        if country_code:
+            query = f"{city},{country_code}"
+        
+        params = {
+            'q': query,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = self.session.get(self.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            return self._parse_weather_data(data)
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error fetching weather for {query}: {e}")
+            raise
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON response for {query}: {e}")
+            raise
+        except KeyError as e:
+            logger.error(f"Unexpected API response structure for {query}: {e}")
+            raise
+    
+    def _parse_weather_data(self, raw_data: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            'city': raw_data['name'],
+            'country': raw_data['sys']['country'],
+            'temperature': raw_data['main']['temp'],
+            'feels_like': raw_data['main']['feels_like'],
+            'humidity': raw_data['main']['humidity'],
+            'pressure': raw_data['main']['pressure'],
+            'weather': raw_data['weather'][0]['description'],
+            'wind_speed': raw_data['wind']['speed'],
+            'wind_direction': raw_data['wind'].get('deg', 0),
+            'visibility': raw_data.get('visibility', 0),
+            'cloudiness': raw_data['clouds']['all'],
+            'sunrise': datetime.fromtimestamp(raw_data['sys']['sunrise']).isoformat(),
+            'sunset': datetime.fromtimestamp(raw_data['sys']['sunset']).isoformat(),
+            'timestamp': datetime.fromtimestamp(raw_data['dt']).isoformat(),
+            'coordinates': {
+                'lon': raw_data['coord']['lon'],
+                'lat': raw_data['coord']['lat']
+            }
+        }
+    
+    def format_weather_report(self, weather_data: Dict[str, Any]) -> str:
+        report_lines = [
+            f"Weather Report for {weather_data['city']}, {weather_data['country']}",
+            f"Timestamp: {weather_data['timestamp']}",
+            f"Temperature: {weather_data['temperature']}°C (Feels like: {weather_data['feels_like']}°C)",
+            f"Weather: {weather_data['weather'].title()}",
+            f"Humidity: {weather_data['humidity']}%",
+            f"Pressure: {weather_data['pressure']} hPa",
+            f"Wind: {weather_data['wind_speed']} m/s at {weather_data['wind_direction']}°",
+            f"Visibility: {weather_data['visibility']} meters",
+            f"Cloudiness: {weather_data['cloudiness']}%",
+            f"Sunrise: {weather_data['sunrise']}",
+            f"Sunset: {weather_data['sunset']}",
+            f"Coordinates: {weather_data['coordinates']['lat']:.4f}, {weather_data['coordinates']['lon']:.4f}"
+        ]
+        return "\n".join(report_lines)
+
+def main():
+    API_KEY = "your_api_key_here"
+    
+    fetcher = WeatherFetcher(API_KEY)
+    
+    cities = [
+        ("London", "UK"),
+        ("New York", "US"),
+        ("Tokyo", "JP"),
+        ("Sydney", "AU")
+    ]
+    
+    for city, country in cities:
+        try:
+            print(f"\n{'='*50}")
+            weather_data = fetcher.get_weather(city, country)
+            report = fetcher.format_weather_report(weather_data)
+            print(report)
+            logger.info(f"Successfully fetched weather for {city}, {country}")
+        except Exception as e:
+            logger.error(f"Failed to fetch weather for {city}, {country}: {e}")
+            continue
+
+if __name__ == "__main__":
+    main()
