@@ -1,79 +1,104 @@
-
 import pandas as pd
-import re
+import numpy as np
 
-def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, normalize_text=True):
+def clean_csv_data(filepath, fill_strategy='mean'):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Load a CSV file and clean missing values.
     
     Args:
-        df (pd.DataFrame): Input DataFrame.
-        columns_to_clean (list, optional): List of column names to normalize.
-            If None, all object dtype columns are cleaned.
-        remove_duplicates (bool): Whether to remove duplicate rows.
-        normalize_text (bool): Whether to normalize text in specified columns.
+        filepath (str): Path to the CSV file.
+        fill_strategy (str): Strategy for filling missing values.
+            Options: 'mean', 'median', 'mode', 'zero', 'drop'.
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame.
+        pandas.DataFrame: Cleaned DataFrame.
     """
-    df_clean = df.copy()
+    try:
+        df = pd.read_csv(filepath)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {filepath}")
     
-    if remove_duplicates:
-        initial_rows = len(df_clean)
-        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
-        removed = initial_rows - len(df_clean)
-        print(f"Removed {removed} duplicate rows.")
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
     
-    if normalize_text and columns_to_clean is not None:
-        for col in columns_to_clean:
-            if col in df_clean.columns and df_clean[col].dtype == 'object':
-                df_clean[col] = df_clean[col].apply(_normalize_string)
-                print(f"Normalized text in column: {col}")
+    if fill_strategy == 'mean':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mean())
+    elif fill_strategy == 'median':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].median())
+    elif fill_strategy == 'mode':
+        for col in numeric_cols:
+            df[col] = df[col].fillna(df[col].mode()[0])
+    elif fill_strategy == 'zero':
+        df[numeric_cols] = df[numeric_cols].fillna(0)
+    elif fill_strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
+    else:
+        raise ValueError(f"Unknown fill strategy: {fill_strategy}")
     
-    return df_clean
+    return df
 
-def _normalize_string(text):
+def remove_outliers_iqr(df, column, multiplier=1.5):
     """
-    Normalize a string by converting to lowercase, removing extra whitespace,
-    and stripping special characters.
+    Remove outliers from a column using the IQR method.
     
     Args:
-        text (str): Input string.
+        df (pandas.DataFrame): Input DataFrame.
+        column (str): Column name to process.
+        multiplier (float): IQR multiplier for outlier detection.
     
     Returns:
-        str: Normalized string.
+        pandas.DataFrame: DataFrame with outliers removed.
     """
-    if not isinstance(text, str):
-        return text
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
-    text = text.lower().strip()
-    text = re.sub(r'\s+', ' ', text)
-    text = re.sub(r'[^\w\s]', '', text)
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    return text
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def validate_email_column(df, email_column):
+def standardize_columns(df, columns=None):
     """
-    Validate email addresses in a specified column.
+    Standardize specified columns to have zero mean and unit variance.
     
     Args:
-        df (pd.DataFrame): Input DataFrame.
-        email_column (str): Name of the column containing email addresses.
+        df (pandas.DataFrame): Input DataFrame.
+        columns (list): List of column names to standardize.
+            If None, standardize all numeric columns.
     
     Returns:
-        pd.DataFrame: DataFrame with valid emails and a validation flag.
+        pandas.DataFrame: DataFrame with standardized columns.
     """
-    if email_column not in df.columns:
-        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
     
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    for col in columns:
+        if col in df.columns and np.issubdtype(df[col].dtype, np.number):
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df[col] = (df[col] - mean) / std
     
-    df_validated = df.copy()
-    df_validated['email_valid'] = df_validated[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
-    )
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
     
-    valid_count = df_validated['email_valid'].sum()
-    print(f"Found {valid_count} valid email addresses out of {len(df_validated)} rows.")
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
     
-    return df_validated
+    cleaned = clean_csv_data('test_data.csv', fill_strategy='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    import os
+    os.remove('test_data.csv')
