@@ -710,3 +710,199 @@ if __name__ == "__main__":
     input_file = "raw_data.csv"
     output_file = "cleaned_data.csv"
     clean_dataset(input_file, output_file)
+import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Strategy to handle missing values ('mean', 'median', 'mode', 'drop')
+    columns (list): List of columns to apply cleaning to, None for all columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                df_clean[col] = df[col].fillna(df[col].mean())
+            elif strategy == 'median':
+                df_clean[col] = df[col].fillna(df[col].median())
+            elif strategy == 'mode':
+                df_clean[col] = df[col].fillna(df[col].mode()[0])
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+    
+    return df_clean
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to check for outliers
+    factor (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - factor * IQR
+            upper_bound = Q3 + factor * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize numerical data.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of columns to normalize
+    method (str): Normalization method ('minmax', 'zscore')
+    
+    Returns:
+    pd.DataFrame: Normalized DataFrame
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            if method == 'minmax':
+                min_val = df[col].min()
+                max_val = df[col].max()
+                if max_val != min_val:
+                    df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = df[col].mean()
+                std_val = df[col].std()
+                if std_val != 0:
+                    df_norm[col] = (df[col] - mean_val) / std_val
+    
+    return df_norm
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'median': df[col].median()
+        }
+    
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        summary['categorical_stats'][col] = {
+            'unique_count': df[col].nunique(),
+            'top_value': df[col].mode()[0] if not df[col].mode().empty else None,
+            'top_count': df[col].value_counts().iloc[0] if not df[col].value_counts().empty else 0
+        }
+    
+    return summary
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5, 100],
+        'B': [10, 20, 30, 40, 50, 60],
+        'C': ['a', 'b', 'a', 'b', 'a', 'b']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50)
+    
+    # Clean missing values
+    df_clean = clean_missing_values(df, strategy='mean')
+    print("\nAfter cleaning missing values:")
+    print(df_clean)
+    
+    # Remove outliers
+    df_no_outliers = remove_outliers_iqr(df_clean, columns=['A', 'B'])
+    print("\nAfter removing outliers:")
+    print(df_no_outliers)
+    
+    # Normalize data
+    df_normalized = normalize_data(df_no_outliers, method='minmax')
+    print("\nAfter normalization:")
+    print(df_normalized)
+    
+    # Validate data
+    is_valid, message = validate_data(df_normalized, required_columns=['A', 'B', 'C'])
+    print(f"\nData validation: {is_valid} - {message}")
+    
+    # Get summary
+    summary = get_data_summary(df_normalized)
+    print("\nData summary:")
+    print(f"Shape: {summary['shape']}")
+    print(f"Missing values: {summary['missing_values']}")
