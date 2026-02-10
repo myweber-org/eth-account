@@ -250,3 +250,130 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+        
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_clean = self.df.copy()
+        
+        for col in columns:
+            if col not in self.numeric_columns:
+                continue
+                
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            mask = (df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)
+            df_clean = df_clean[mask]
+            
+        return df_clean
+    
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_clean = self.df.copy()
+        
+        for col in columns:
+            if col not in self.numeric_columns:
+                continue
+                
+            z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+            mask = z_scores < threshold
+            
+            valid_indices = df_clean[col].dropna().index[mask]
+            df_clean = df_clean.loc[valid_indices.union(df_clean[col].isna().index)]
+            
+        return df_clean
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_normalized = self.df.copy()
+        
+        for col in columns:
+            if col not in self.numeric_columns:
+                continue
+                
+            min_val = df_normalized[col].min()
+            max_val = df_normalized[col].max()
+            
+            if max_val != min_val:
+                df_normalized[col] = (df_normalized[col] - min_val) / (max_val - min_val)
+            else:
+                df_normalized[col] = 0
+                
+        return df_normalized
+    
+    def normalize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_normalized = self.df.copy()
+        
+        for col in columns:
+            if col not in self.numeric_columns:
+                continue
+                
+            mean_val = df_normalized[col].mean()
+            std_val = df_normalized[col].std()
+            
+            if std_val != 0:
+                df_normalized[col] = (df_normalized[col] - mean_val) / std_val
+            else:
+                df_normalized[col] = 0
+                
+        return df_normalized
+    
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_filled = self.df.copy()
+        
+        for col in columns:
+            if col not in self.numeric_columns:
+                continue
+                
+            mean_val = df_filled[col].mean()
+            df_filled[col] = df_filled[col].fillna(mean_val)
+            
+        return df_filled
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        df_filled = self.df.copy()
+        
+        for col in columns:
+            if col not in self.numeric_columns:
+                continue
+                
+            median_val = df_filled[col].median()
+            df_filled[col] = df_filled[col].fillna(median_val)
+            
+        return df_filled
+    
+    def get_summary(self):
+        summary = {
+            'original_shape': self.df.shape,
+            'numeric_columns': self.numeric_columns,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
