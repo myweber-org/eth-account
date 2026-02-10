@@ -172,3 +172,145 @@ if __name__ == "__main__":
     import os
     if os.path.exists('sample_data.csv'):
         os.remove('sample_data.csv')
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(
+    data: pd.DataFrame,
+    subset: Optional[List[str]] = None,
+    keep: str = 'first',
+    inplace: bool = False
+) -> pd.DataFrame:
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        Input DataFrame containing potential duplicates
+    subset : list, optional
+        Column names to consider for identifying duplicates
+    keep : {'first', 'last', False}
+        Determines which duplicates to keep
+    inplace : bool
+        If True, modifies the DataFrame in place
+    
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with duplicates removed
+    """
+    if not inplace:
+        data = data.copy()
+    
+    if subset is None:
+        subset = data.columns.tolist()
+    
+    # Remove duplicates
+    cleaned_data = data.drop_duplicates(subset=subset, keep=keep, inplace=False)
+    
+    # Log removal statistics
+    original_count = len(data)
+    cleaned_count = len(cleaned_data)
+    duplicates_removed = original_count - cleaned_count
+    
+    print(f"Original records: {original_count}")
+    print(f"Cleaned records: {cleaned_count}")
+    print(f"Duplicates removed: {duplicates_removed}")
+    
+    return cleaned_data
+
+def validate_dataframe(data: pd.DataFrame) -> bool:
+    """
+    Validate basic DataFrame structure and content.
+    
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        DataFrame to validate
+    
+    Returns:
+    --------
+    bool
+        True if DataFrame passes validation checks
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if data.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if data.isnull().all().any():
+        print("Warning: Some columns contain only null values")
+    
+    return True
+
+def clean_numeric_columns(
+    data: pd.DataFrame,
+    columns: List[str],
+    fill_method: str = 'mean'
+) -> pd.DataFrame:
+    """
+    Clean numeric columns by handling missing values.
+    
+    Parameters:
+    -----------
+    data : pd.DataFrame
+        Input DataFrame
+    columns : list
+        List of numeric column names to clean
+    fill_method : {'mean', 'median', 'zero'}
+        Method for filling missing values
+    
+    Returns:
+    --------
+    pd.DataFrame
+        DataFrame with cleaned numeric columns
+    """
+    cleaned_data = data.copy()
+    
+    for col in columns:
+        if col not in cleaned_data.columns:
+            print(f"Warning: Column '{col}' not found in DataFrame")
+            continue
+        
+        if not pd.api.types.is_numeric_dtype(cleaned_data[col]):
+            print(f"Warning: Column '{col}' is not numeric")
+            continue
+        
+        # Count missing values
+        missing_count = cleaned_data[col].isnull().sum()
+        if missing_count > 0:
+            print(f"Column '{col}': {missing_count} missing values")
+            
+            # Fill missing values based on specified method
+            if fill_method == 'mean':
+                fill_value = cleaned_data[col].mean()
+            elif fill_method == 'median':
+                fill_value = cleaned_data[col].median()
+            elif fill_method == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown fill_method: {fill_method}")
+            
+            cleaned_data[col] = cleaned_data[col].fillna(fill_value)
+            print(f"  Filled with {fill_method}: {fill_value}")
+    
+    return cleaned_data
+
+# Example usage (commented out for production)
+# if __name__ == "__main__":
+#     # Create sample data
+#     sample_data = pd.DataFrame({
+#         'id': [1, 2, 2, 3, 4, 4, 5],
+#         'value': [10, 20, 20, 30, np.nan, 40, 50],
+#         'category': ['A', 'B', 'B', 'C', 'D', 'D', 'E']
+#     })
+#     
+#     # Clean the data
+#     cleaned = remove_duplicates(sample_data, subset=['id'])
+#     cleaned = clean_numeric_columns(cleaned, columns=['value'])
+#     print("\nCleaned DataFrame:")
+#     print(cleaned)
