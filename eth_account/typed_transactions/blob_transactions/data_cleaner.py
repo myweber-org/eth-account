@@ -211,4 +211,84 @@ if __name__ == "__main__":
     stats = calculate_statistics(cleaned, column=1)
     print("\nStatistics for cleaned data:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing null values and duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataset(df, required_columns=None):
+    """
+    Validate the dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+def process_data_file(file_path, required_columns=None):
+    """
+    Load, validate, and clean a dataset from a file.
+    
+    Args:
+        file_path (str): Path to the data file.
+        required_columns (list): List of required column names.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame or None if processing fails.
+    """
+    try:
+        # Read the data file (supports CSV and Excel)
+        if file_path.endswith('.csv'):
+            df = pd.read_csv(file_path)
+        elif file_path.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file_path)
+        else:
+            print(f"Unsupported file format: {file_path}")
+            return None
+        
+        # Validate the dataset
+        if not validate_dataset(df, required_columns):
+            return None
+        
+        # Clean the dataset
+        df_cleaned = clean_dataset(df)
+        
+        print(f"Data cleaning completed. Original: {len(df)} rows, Cleaned: {len(df_cleaned)} rows")
+        
+        return df_cleaned
+        
+    except Exception as e:
+        print(f"Error processing file {file_path}: {str(e)}")
+        return None
