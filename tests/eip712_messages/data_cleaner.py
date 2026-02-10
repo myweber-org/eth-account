@@ -344,3 +344,84 @@ def clean_dataset(dataframe, numeric_columns, outlier_method='iqr', normalize_me
     
     cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None):
+    """
+    Remove outliers from specified columns using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if len(numeric_cols) == 0:
+        return pd.DataFrame()
+    
+    stats = df[numeric_cols].agg(['mean', 'median', 'std', 'min', 'max']).T
+    stats['range'] = stats['max'] - stats['min']
+    
+    return stats
+
+def main():
+    # Example usage
+    np.random.seed(42)
+    data = {
+        'A': np.random.normal(100, 15, 100),
+        'B': np.random.exponential(50, 100),
+        'C': np.random.uniform(0, 200, 100),
+        'category': np.random.choice(['X', 'Y', 'Z'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[10, 'A'] = 500  # Add outlier
+    df.loc[20, 'B'] = 1000  # Add outlier
+    
+    print("Original DataFrame shape:", df.shape)
+    print("\nOriginal summary statistics:")
+    print(calculate_summary_statistics(df))
+    
+    df_clean = remove_outliers_iqr(df, ['A', 'B', 'C'])
+    
+    print("\nCleaned DataFrame shape:", df_clean.shape)
+    print("\nCleaned summary statistics:")
+    print(calculate_summary_statistics(df_clean))
+
+if __name__ == "__main__":
+    main()
