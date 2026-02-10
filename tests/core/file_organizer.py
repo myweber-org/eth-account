@@ -188,3 +188,61 @@ if __name__ == "__main__":
         target_dir = os.getcwd()
     
     organize_files(target_dir)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files(directory="."):
+    """
+    Organizes files in the specified directory by moving them into
+    subdirectories based on their file extensions.
+    """
+    base_path = Path(directory).resolve()
+    
+    if not base_path.is_dir():
+        print(f"Error: '{directory}' is not a valid directory.")
+        return
+
+    extension_categories = {
+        'Images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
+        'Documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
+        'Archives': ['.zip', '.tar', '.gz', '.rar', '.7z'],
+        'Code': ['.py', '.js', '.html', '.css', '.json', '.xml'],
+        'Audio': ['.mp3', '.wav', '.flac', '.aac'],
+        'Video': ['.mp4', '.avi', '.mov', '.mkv']
+    }
+
+    other_dir = base_path / 'Other'
+    other_dir.mkdir(exist_ok=True)
+
+    for item in base_path.iterdir():
+        if item.is_file():
+            file_ext = item.suffix.lower()
+            moved = False
+
+            for category, extensions in extension_categories.items():
+                if file_ext in extensions:
+                    category_dir = base_path / category
+                    category_dir.mkdir(exist_ok=True)
+                    try:
+                        shutil.move(str(item), str(category_dir / item.name))
+                        print(f"Moved: {item.name} -> {category}/")
+                        moved = True
+                        break
+                    except Exception as e:
+                        print(f"Failed to move {item.name}: {e}")
+
+            if not moved:
+                try:
+                    shutil.move(str(item), str(other_dir / item.name))
+                    print(f"Moved: {item.name} -> Other/")
+                except Exception as e:
+                    print(f"Failed to move {item.name}: {e}")
+
+    print("\nFile organization completed.")
+
+if __name__ == "__main__":
+    target_directory = input("Enter directory path to organize (or press Enter for current): ").strip()
+    if not target_directory:
+        target_directory = "."
+    organize_files(target_directory)
