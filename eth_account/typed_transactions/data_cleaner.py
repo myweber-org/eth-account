@@ -1,50 +1,76 @@
-import pandas as pd
 
-def clean_dataset(df):
-    """
-    Clean a pandas DataFrame by removing duplicate rows and
-    filling missing values with column means for numeric columns.
-    """
-    # Remove duplicate rows
-    df_clean = df.drop_duplicates()
-    
-    # Fill missing values for numeric columns with column mean
-    numeric_cols = df_clean.select_dtypes(include=['number']).columns
-    df_clean[numeric_cols] = df_clean[numeric_cols].fillna(df_clean[numeric_cols].mean())
-    
-    # For non-numeric columns, fill with mode (most frequent value)
-    non_numeric_cols = df_clean.select_dtypes(exclude=['number']).columns
-    for col in non_numeric_cols:
-        if df_clean[col].isnull().any():
-            mode_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else ''
-            df_clean[col] = df_clean[col].fillna(mode_value)
-    
-    return df_clean
+import numpy as np
 
-def validate_data(df, required_columns=None):
+def remove_outliers_iqr(data, column):
     """
-    Validate that the DataFrame meets basic requirements.
+    Remove outliers from a specified column using the IQR method.
+    
+    Args:
+        data (pd.DataFrame): Input dataframe
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: Dataframe with outliers removed
     """
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
     
-    if df.empty:
-        raise ValueError("DataFrame is empty")
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
     
-    return True
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    
+    return filtered_data
 
-# Example usage (commented out for production)
-# if __name__ == "__main__":
-#     sample_data = pd.DataFrame({
-#         'A': [1, 2, 2, None, 5],
-#         'B': [None, 2, 3, 4, 5],
-#         'C': ['a', 'b', 'b', None, 'e']
-#     })
-#     
-#     cleaned = clean_dataset(sample_data)
-#     print("Original data:")
-#     print(sample_data)
-#     print("\nCleaned data:")
-#     print(cleaned)
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Args:
+        data (pd.DataFrame): Input dataframe
+        column (str): Column name to analyze
+    
+    Returns:
+        dict: Dictionary containing statistics
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    stats = {
+        'mean': data[column].mean(),
+        'median': data[column].median(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max(),
+        'count': data[column].count()
+    }
+    
+    return stats
+
+def normalize_column(data, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        data (pd.DataFrame): Input dataframe
+        column (str): Column name to normalize
+    
+    Returns:
+        pd.DataFrame: Dataframe with normalized column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        data[f'{column}_normalized'] = 0.5
+    else:
+        data[f'{column}_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    
+    return data
