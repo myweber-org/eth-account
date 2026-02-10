@@ -1,113 +1,57 @@
 
 import pandas as pd
-import numpy as np
+import re
 
-def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+def clean_dataframe(df, text_columns=None, drop_duplicates=True):
     """
-    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    Clean a pandas DataFrame by removing duplicates and standardizing text columns.
     
     Args:
-        df (pd.DataFrame): Input DataFrame to clean
-        drop_duplicates (bool): Whether to remove duplicate rows
-        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+        df: pandas DataFrame to clean
+        text_columns: list of column names to standardize (lowercase, strip whitespace)
+        drop_duplicates: whether to remove duplicate rows
     
     Returns:
-        pd.DataFrame: Cleaned DataFrame
+        Cleaned pandas DataFrame
     """
-    original_shape = df.shape
+    df_clean = df.copy()
     
-    # Create a copy to avoid modifying the original
-    cleaned_df = df.copy()
-    
-    # Remove duplicates if requested
     if drop_duplicates:
-        cleaned_df = cleaned_df.drop_duplicates()
-        duplicates_removed = original_shape[0] - cleaned_df.shape[0]
-        print(f"Removed {duplicates_removed} duplicate rows")
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows")
     
-    # Handle missing values
-    missing_before = cleaned_df.isnull().sum().sum()
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.lower().str.strip()
+                print(f"Standardized text in column: {col}")
     
-    if fill_missing == 'drop':
-        cleaned_df = cleaned_df.dropna()
-    elif fill_missing in ['mean', 'median']:
-        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
-        for col in numeric_cols:
-            if fill_missing == 'mean':
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
-            else:
-                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
-    elif fill_missing == 'mode':
-        for col in cleaned_df.columns:
-            mode_value = cleaned_df[col].mode()
-            if not mode_value.empty:
-                cleaned_df[col] = cleaned_df[col].fillna(mode_value[0])
-    
-    missing_after = cleaned_df.isnull().sum().sum()
-    print(f"Handled {missing_before - missing_after} missing values")
-    
-    # Report cleaning statistics
-    print(f"Original shape: {original_shape}")
-    print(f"Cleaned shape: {cleaned_df.shape}")
-    print(f"Rows removed: {original_shape[0] - cleaned_df.shape[0]}")
-    print(f"Columns: {original_shape[1]} (unchanged)")
-    
-    return cleaned_df
+    return df_clean
 
-def validate_data(df, required_columns=None, min_rows=1):
+def validate_email(email):
     """
-    Validate that the DataFrame meets basic requirements.
+    Validate email format using regex pattern.
     
     Args:
-        df (pd.DataFrame): DataFrame to validate
-        required_columns (list): List of column names that must be present
-        min_rows (int): Minimum number of rows required
+        email: string email address to validate
     
     Returns:
-        bool: True if validation passes, False otherwise
+        Boolean indicating if email is valid
     """
-    if df.empty:
-        print("Validation failed: DataFrame is empty")
-        return False
-    
-    if len(df) < min_rows:
-        print(f"Validation failed: DataFrame has fewer than {min_rows} rows")
-        return False
-    
-    if required_columns:
-        missing_cols = [col for col in required_columns if col not in df.columns]
-        if missing_cols:
-            print(f"Validation failed: Missing required columns: {missing_cols}")
-            return False
-    
-    print("Data validation passed")
-    return True
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
 
-# Example usage
-if __name__ == "__main__":
-    # Create sample data with duplicates and missing values
-    sample_data = {
-        'id': [1, 2, 2, 3, 4, 5],
-        'value': [10.5, 20.3, 20.3, np.nan, 40.1, 50.0],
-        'category': ['A', 'B', 'B', 'A', np.nan, 'C']
-    }
+def extract_numeric(text):
+    """
+    Extract numeric values from text string.
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print("\n" + "="*50 + "\n")
+    Args:
+        text: string containing numeric values
     
-    # Clean the data
-    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
-    
-    print("\n" + "="*50 + "\n")
-    print("Cleaned DataFrame:")
-    print(cleaned_df)
-    
-    # Validate the cleaned data
-    validation_passed = validate_data(cleaned_df, required_columns=['id', 'value'], min_rows=1)
-    
-    if validation_passed:
-        print("\nData cleaning completed successfully")
-    else:
-        print("\nData cleaning completed with validation warnings")
+    Returns:
+        List of numeric values found in text
+    """
+    numbers = re.findall(r'\d+\.?\d*', str(text))
+    return [float(num) if '.' in num else int(num) for num in numbers]
