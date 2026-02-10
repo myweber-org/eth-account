@@ -553,4 +553,66 @@ def handle_missing_values(df, columns=None, strategy='mean'):
         elif strategy == 'drop':
             df_processed = df_processed.dropna(subset=[col])
     
-    return df_processed.reset_index(drop=True)
+    return df_processed.reset_index(drop=True)import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def validate_dataframe(df):
+    """
+    Basic validation of DataFrame structure.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        bool: True if valid, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if df.shape[0] == 0:
+        return False
+    
+    return True
+
+def clean_dataset(file_path, output_path=None):
+    """
+    Load, clean, and optionally save a dataset.
+    
+    Args:
+        file_path (str): Path to input CSV file.
+        output_path (str, optional): Path to save cleaned data.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File not found: {file_path}")
+    
+    if not validate_dataframe(df):
+        raise ValueError("Invalid DataFrame structure")
+    
+    cleaned_df = remove_duplicates(df)
+    
+    if output_path:
+        cleaned_df.to_csv(output_path, index=False)
+    
+    return cleaned_df
