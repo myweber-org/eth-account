@@ -217,3 +217,107 @@ def filter_by_threshold(df, column_name, threshold, keep='above'):
         raise ValueError("keep parameter must be 'above' or 'below'")
     
     return filtered_df
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                
+                mask = (clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)
+                clean_df = clean_df[mask]
+                
+        return clean_df.reset_index(drop=True)
+    
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                z_scores = np.abs(stats.zscore(clean_df[col]))
+                mask = z_scores < threshold
+                clean_df = clean_df[mask]
+                
+        return clean_df.reset_index(drop=True)
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        normalized_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                min_val = normalized_df[col].min()
+                max_val = normalized_df[col].max()
+                if max_val > min_val:
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+                    
+        return normalized_df
+    
+    def normalize_zscore(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        normalized_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                mean_val = normalized_df[col].mean()
+                std_val = normalized_df[col].std()
+                if std_val > 0:
+                    normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+                    
+        return normalized_df
+    
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                mean_val = filled_df[col].mean()
+                filled_df[col] = filled_df[col].fillna(mean_val)
+                
+        return filled_df
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+            
+        filled_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                median_val = filled_df[col].median()
+                filled_df[col] = filled_df[col].fillna(median_val)
+                
+        return filled_df
+    
+    def get_summary(self):
+        summary = {}
+        for col in self.numeric_columns:
+            summary[col] = {
+                'mean': self.df[col].mean(),
+                'median': self.df[col].median(),
+                'std': self.df[col].std(),
+                'min': self.df[col].min(),
+                'max': self.df[col].max(),
+                'missing': self.df[col].isna().sum()
+            }
+        return pd.DataFrame(summary).T
