@@ -190,3 +190,11 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned.shape)
     print("\nCleaned summary statistics:")
     print(get_summary_statistics(cleaned, ['feature_a', 'feature_b', 'feature_c']))
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
