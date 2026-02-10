@@ -590,3 +590,68 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned_data.shape)
     print("\nSummary statistics:")
     print(summary_stats)
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers from DataFrame using Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to process. If None, process all numeric columns.
+    factor (float): Multiplier for IQR. Default is 1.5.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    summary = df[numeric_cols].describe()
+    return summary
+
+def detect_missing_values(df):
+    """
+    Detect missing values in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Missing value statistics
+    """
+    missing_stats = pd.DataFrame({
+        'missing_count': df.isnull().sum(),
+        'missing_percentage': (df.isnull().sum() / len(df)) * 100
+    })
+    return missing_stats[missing_stats['missing_count'] > 0]
