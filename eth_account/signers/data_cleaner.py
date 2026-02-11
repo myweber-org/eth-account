@@ -1174,3 +1174,40 @@ def clean_dataset(dataframe, outlier_columns=None, normalize_method='zscore',
             cleaned_df = log_transform_skewed(cleaned_df, list(skewed_cols.keys()))
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(filepath):
+    try:
+        df = pd.read_csv(filepath)
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
+        
+        output_path = filepath.replace('.csv', '_cleaned.csv')
+        df.to_csv(output_path, index=False)
+        return output_path
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return None
+
+if __name__ == "__main__":
+    cleaned_file = clean_dataset('sample_data.csv')
+    if cleaned_file:
+        print(f"Cleaned data saved to: {cleaned_file}")
