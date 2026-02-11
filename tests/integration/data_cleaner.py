@@ -183,3 +183,47 @@ if __name__ == "__main__":
     print("\nStatistics for column 0 (original):")
     for key, value in stats.items():
         print(f"{key}: {value:.4f}")
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Normalize text by converting to lowercase and removing extra whitespace.
+    """
+    if column_name in df.columns:
+        df[column_name] = df[column_name].astype(str).str.lower()
+        df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x).strip())
+    return df
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from the DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def process_dataframe(input_file, output_file):
+    """
+    Main function to load, clean, and save the DataFrame.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Loaded data from {input_file}")
+        
+        df = remove_duplicates(df)
+        print("Removed duplicate rows")
+        
+        text_columns = [col for col in df.columns if df[col].dtype == 'object']
+        for col in text_columns:
+            df = clean_text_column(df, col)
+        print(f"Cleaned text columns: {text_columns}")
+        
+        df.to_csv(output_file, index=False)
+        print(f"Saved cleaned data to {output_file}")
+        
+    except FileNotFoundError:
+        print(f"Error: File {input_file} not found.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    process_dataframe('raw_data.csv', 'cleaned_data.csv')
