@@ -692,3 +692,121 @@ if __name__ == "__main__":
     print("Cleaned shape:", cleaned_df.shape)
     print("Missing values after:", cleaned_df.isnull().sum().sum())
     print("Stats:", stats)
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        column_mapping (dict): Optional dictionary to rename columns
+        drop_duplicates (bool): Whether to remove duplicate rows
+        normalize_text (bool): Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+        print(f"Normalized {len(text_columns)} text columns")
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None, numeric_ranges=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of columns that must be present
+        numeric_ranges (dict): Dictionary mapping columns to (min, max) ranges
+    
+    Returns:
+        dict: Validation results with issues found
+    """
+    validation_results = {
+        'missing_columns': [],
+        'out_of_range': [],
+        'null_values': {}
+    }
+    
+    if required_columns:
+        for col in required_columns:
+            if col not in df.columns:
+                validation_results['missing_columns'].append(col)
+    
+    if numeric_ranges:
+        for col, (min_val, max_val) in numeric_ranges.items():
+            if col in df.columns:
+                out_of_range = df[(df[col] < min_val) | (df[col] > max_val)]
+                if len(out_of_range) > 0:
+                    validation_results['out_of_range'].append({
+                        'column': col,
+                        'count': len(out_of_range),
+                        'range': (min_val, max_val)
+                    })
+    
+    for col in df.columns:
+        null_count = df[col].isnull().sum()
+        if null_count > 0:
+            validation_results['null_values'][col] = null_count
+    
+    return validation_results
+
+def sample_data(df, n_samples=5, random_state=42):
+    """
+    Return a random sample from the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        n_samples (int): Number of samples to return
+        random_state (int): Random seed for reproducibility
+    
+    Returns:
+        pd.DataFrame: Sampled data
+    """
+    if len(df) <= n_samples:
+        return df
+    
+    return df.sample(n=n_samples, random_state=random_state)
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown'],
+        'age': [25, 30, 25, 35, 28],
+        'email': ['JOHN@example.com', 'jane@test.com', 'JOHN@example.com', 'bob@test.com', 'alice@example.com'],
+        'score': [85, 92, 85, 78, 95]
+    })
+    
+    cleaned = clean_dataframe(sample_data, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    validation = validate_data(
+        cleaned,
+        required_columns=['name', 'age', 'email'],
+        numeric_ranges={'age': (18, 100), 'score': (0, 100)}
+    )
+    print("\nValidation Results:")
+    print(validation)
+    
+    sample = sample_data(cleaned, n_samples=2)
+    print("\nRandom Sample:")
+    print(sample)
