@@ -250,3 +250,121 @@ def get_data_summary(df):
             })
     
     return pd.DataFrame(summary_data)
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Columns to consider for duplicates
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): 'mean', 'median', 'mode', or 'drop'
+        columns (list): Columns to apply strategy to
+    
+    Returns:
+        pd.DataFrame: DataFrame with handled missing values
+    """
+    df_copy = df.copy()
+    
+    if columns is None:
+        columns = df_copy.columns
+    
+    for col in columns:
+        if df_copy[col].isnull().any():
+            if strategy == 'mean':
+                df_copy[col].fillna(df_copy[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_copy[col].fillna(df_copy[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_copy[col].fillna(df_copy[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_copy = df_copy.dropna(subset=[col])
+    
+    return df_copy
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column in DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column to normalize
+        method (str): 'minmax' or 'zscore'
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column
+    """
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        df_copy[column] = (df_copy[column] - mean_val) / std_val
+    
+    return df_copy
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): Columns that must be present
+        min_rows (int): Minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
+
+def clean_data_pipeline(df, steps=None):
+    """
+    Execute a series of data cleaning steps.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        steps (list): List of cleaning step functions
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if steps is None:
+        steps = [
+            lambda x: remove_duplicates(x),
+            lambda x: handle_missing_values(x, strategy='mean')
+        ]
+    
+    cleaned_df = df.copy()
+    for step in steps:
+        cleaned_df = step(cleaned_df)
+    
+    return cleaned_df
