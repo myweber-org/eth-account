@@ -611,3 +611,117 @@ def get_statistics(data, column):
         'count': data[column].count(),
         'missing': data[column].isnull().sum()
     }
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in specified columns
+    """
+    if columns is None:
+        columns = data.columns
+    
+    data_copy = data.copy()
+    
+    for column in columns:
+        if column not in data_copy.columns:
+            continue
+            
+        if data_copy[column].isnull().any():
+            if strategy == 'mean':
+                fill_value = data_copy[column].mean()
+            elif strategy == 'median':
+                fill_value = data_copy[column].median()
+            elif strategy == 'mode':
+                fill_value = data_copy[column].mode()[0]
+            elif strategy == 'drop':
+                data_copy = data_copy.dropna(subset=[column])
+                continue
+            else:
+                raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+            
+            data_copy[column] = data_copy[column].fillna(fill_value)
+    
+    return data_copy
+
+def validate_dataframe(data, required_columns=None, check_types=True):
+    """
+    Validate DataFrame structure and content
+    """
+    if not isinstance(data, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if check_types:
+        for column in data.columns:
+            if data[column].dtype == 'object':
+                unique_count = data[column].nunique()
+                if unique_count / len(data) > 0.5:
+                    print(f"Warning: Column '{column}' has high cardinality ({unique_count} unique values)")
+    
+    return True
