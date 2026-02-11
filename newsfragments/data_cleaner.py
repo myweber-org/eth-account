@@ -594,4 +594,101 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        filtered_df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        removed_count = len(self.df) - len(filtered_df)
+        self.df = filtered_df
+        return removed_count
+    
+    def zscore_normalize(self, column):
+        mean_val = self.df[column].mean()
+        std_val = self.df[column].std()
+        if std_val > 0:
+            self.df[f'{column}_normalized'] = (self.df[column] - mean_val) / std_val
+            return True
+        return False
+    
+    def minmax_normalize(self, column, feature_range=(0, 1)):
+        min_val = self.df[column].min()
+        max_val = self.df[column].max()
+        if max_val > min_val:
+            a, b = feature_range
+            self.df[f'{column}_scaled'] = a + (self.df[column] - min_val) * (b - a) / (max_val - min_val)
+            return True
+        return False
+    
+    def handle_missing(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_value = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_value = self.df[col].mode()[0]
+                else:
+                    fill_value = 0
+                self.df[col].fillna(fill_value, inplace=True)
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_removal_stats(self):
+        current_shape = self.df.shape
+        rows_removed = self.original_shape[0] - current_shape[0]
+        cols_added = current_shape[1] - self.original_shape[1]
+        return {
+            'original_rows': self.original_shape[0],
+            'current_rows': current_shape[0],
+            'rows_removed': rows_removed,
+            'columns_added': cols_added
+        }
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 200, 1000)
+    }
+    df = pd.DataFrame(data)
+    df.iloc[10:15, 0] = np.nan
+    df.iloc[50:55, 1] = np.nan
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    print("Original shape:", cleaner.original_shape)
+    print("Missing values before:", sample_df.isnull().sum().sum())
+    
+    cleaner.handle_missing(strategy='mean')
+    removed = cleaner.remove_outliers_iqr('feature_a')
+    cleaner.zscore_normalize('feature_b')
+    cleaner.minmax_normalize('feature_c')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    stats = cleaner.get_removal_stats()
+    
+    print("Rows removed by IQR:", removed)
+    print("Cleaned shape:", cleaned_df.shape)
+    print("Missing values after:", cleaned_df.isnull().sum().sum())
+    print("Stats:", stats)
