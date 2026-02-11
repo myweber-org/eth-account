@@ -138,3 +138,170 @@ if __name__ == "__main__":
     
     standardized_data = cleaner.standardize_numeric()
     print("After standardization - mean of column A:", standardized_data['A'].mean())
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None, keep: str = 'first') -> pd.DataFrame:
+        """
+        Remove duplicate rows from the DataFrame.
+        
+        Args:
+            subset: Column labels to consider for identifying duplicates.
+            keep: Determines which duplicates to keep.
+        
+        Returns:
+            Cleaned DataFrame with duplicates removed.
+        """
+        cleaned_df = self.df.drop_duplicates(subset=subset, keep=keep)
+        removed_count = len(self.df) - len(cleaned_df)
+        
+        if removed_count > 0:
+            print(f"Removed {removed_count} duplicate rows.")
+            print(f"Original shape: {self.original_shape}")
+            print(f"New shape: {cleaned_df.shape}")
+        
+        return cleaned_df
+    
+    def fill_missing_values(self, column: str, method: str = 'mean') -> pd.DataFrame:
+        """
+        Fill missing values in a specified column.
+        
+        Args:
+            column: Name of the column to fill.
+            method: Method to use for filling ('mean', 'median', 'mode', or 'constant').
+        
+        Returns:
+            DataFrame with filled missing values.
+        """
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame.")
+        
+        if method == 'mean':
+            fill_value = self.df[column].mean()
+        elif method == 'median':
+            fill_value = self.df[column].median()
+        elif method == 'mode':
+            fill_value = self.df[column].mode()[0]
+        elif method == 'constant':
+            fill_value = 0
+        else:
+            raise ValueError("Method must be 'mean', 'median', 'mode', or 'constant'.")
+        
+        missing_count = self.df[column].isnull().sum()
+        self.df[column] = self.df[column].fillna(fill_value)
+        
+        if missing_count > 0:
+            print(f"Filled {missing_count} missing values in column '{column}' using {method} method.")
+        
+        return self.df
+    
+    def remove_outliers(self, column: str, method: str = 'iqr', threshold: float = 1.5) -> pd.DataFrame:
+        """
+        Remove outliers from a specified column.
+        
+        Args:
+            column: Name of the column to process.
+            method: Method to detect outliers ('iqr' or 'zscore').
+            threshold: Threshold for outlier detection.
+        
+        Returns:
+            DataFrame with outliers removed.
+        """
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame.")
+        
+        original_len = len(self.df)
+        
+        if method == 'iqr':
+            Q1 = self.df[column].quantile(0.25)
+            Q3 = self.df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            mask = (self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)
+        
+        elif method == 'zscore':
+            mean = self.df[column].mean()
+            std = self.df[column].std()
+            z_scores = np.abs((self.df[column] - mean) / std)
+            mask = z_scores <= threshold
+        
+        else:
+            raise ValueError("Method must be 'iqr' or 'zscore'.")
+        
+        self.df = self.df[mask]
+        removed_count = original_len - len(self.df)
+        
+        if removed_count > 0:
+            print(f"Removed {removed_count} outliers from column '{column}' using {method} method.")
+        
+        return self.df
+    
+    def get_summary(self) -> dict:
+        """
+        Get summary statistics of the current DataFrame.
+        
+        Returns:
+            Dictionary containing summary statistics.
+        """
+        summary = {
+            'original_shape': self.original_shape,
+            'current_shape': self.df.shape,
+            'columns': list(self.df.columns),
+            'dtypes': self.df.dtypes.to_dict(),
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'memory_usage': self.df.memory_usage(deep=True).sum()
+        }
+        return summary
+
+def clean_dataset(file_path: str, output_path: Optional[str] = None) -> pd.DataFrame:
+    """
+    Convenience function to clean a dataset from a file.
+    
+    Args:
+        file_path: Path to the input data file.
+        output_path: Optional path to save cleaned data.
+    
+    Returns:
+        Cleaned DataFrame.
+    """
+    df = pd.read_csv(file_path)
+    cleaner = DataCleaner(df)
+    
+    cleaner.remove_duplicates()
+    
+    for column in df.columns:
+        if df[column].dtype in ['float64', 'int64']:
+            cleaner.fill_missing_values(column, 'mean')
+    
+    summary = cleaner.get_summary()
+    print("Data cleaning completed.")
+    print(f"Original records: {summary['original_shape'][0]}")
+    print(f"Final records: {summary['current_shape'][0]}")
+    
+    if output_path:
+        cleaner.df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return cleaner.df
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'id': [1, 2, 2, 3, 4, 5, 5, 6],
+        'value': [10.5, 20.3, 20.3, np.nan, 50.1, 1000.0, 1000.0, 15.7],
+        'category': ['A', 'B', 'B', 'C', 'D', 'E', 'E', 'F']
+    })
+    
+    cleaner = DataCleaner(sample_data)
+    cleaned = cleaner.remove_duplicates()
+    cleaned = cleaner.fill_missing_values('value', 'mean')
+    cleaned = cleaner.remove_outliers('value', 'iqr')
+    
+    print("\nFinal DataFrame:")
+    print(cleaned)
