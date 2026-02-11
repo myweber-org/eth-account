@@ -227,3 +227,11 @@ def process_dataframe(input_file, output_file):
 
 if __name__ == "__main__":
     process_dataframe('raw_data.csv', 'cleaned_data.csv')
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
