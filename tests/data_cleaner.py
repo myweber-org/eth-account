@@ -283,3 +283,108 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned_data.shape}")
     print(f"Validation: {message}")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_data(input_path, output_path=None):
+    """
+    Clean and preprocess CSV data by handling missing values,
+    removing duplicates, and standardizing formats.
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Remove duplicate rows
+        initial_count = len(df)
+        df.drop_duplicates(inplace=True)
+        duplicates_removed = initial_count - len(df)
+        
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        
+        # Fill numeric missing values with median
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].median(), inplace=True)
+        
+        # Fill categorical missing values with mode
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].mode()[0], inplace=True)
+        
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Remove leading/trailing whitespace from string columns
+        for col in categorical_cols:
+            df[col] = df[col].astype(str).str.strip()
+        
+        # Generate output path if not provided
+        if output_path is None:
+            input_file = Path(input_path)
+            output_path = input_file.parent / f"cleaned_{input_file.name}"
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        
+        # Print cleaning summary
+        print(f"Data cleaning completed:")
+        print(f"  - Rows processed: {initial_count}")
+        print(f"  - Duplicates removed: {duplicates_removed}")
+        print(f"  - Missing values filled: {df.isnull().sum().sum()}")
+        print(f"  - Cleaned data saved to: {output_path}")
+        
+        return df, output_path
+        
+    except FileNotFoundError:
+        print(f"Error: Input file not found at {input_path}")
+        return None, None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None, None
+
+def validate_dataframe(df):
+    """
+    Validate dataframe structure and content.
+    """
+    if df is None or df.empty:
+        return False, "DataFrame is empty or None"
+    
+    # Check for required columns
+    required_columns = ['id', 'timestamp']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        return False, f"Missing required columns: {missing_columns}"
+    
+    # Check data types
+    if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
+        try:
+            df['timestamp'] = pd.to_datetime(df['timestamp'])
+        except:
+            return False, "Timestamp column cannot be converted to datetime"
+    
+    return True, "DataFrame validation passed"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4],
+        'Name': ['Alice', 'Bob', 'Bob', None, 'Charlie'],
+        'Age': [25, 30, 30, 35, None],
+        'Score': [85.5, 92.0, 92.0, 78.5, 88.0],
+        'Timestamp': ['2023-01-01', '2023-01-02', '2023-01-02', None, '2023-01-03']
+    }
+    
+    # Create sample CSV
+    pd.DataFrame(sample_data).to_csv('sample_data.csv', index=False)
+    
+    # Clean the data
+    cleaned_df, output_file = clean_data('sample_data.csv')
+    
+    if cleaned_df is not None:
+        # Validate cleaned data
+        is_valid, message = validate_dataframe(cleaned_df)
+        print(f"Validation: {is_valid} - {message}")
