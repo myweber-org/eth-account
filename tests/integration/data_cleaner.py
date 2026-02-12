@@ -1,28 +1,70 @@
 
-import pandas as pd
 import numpy as np
-from scipy import stats
+import pandas as pd
 
-def load_data(filepath):
-    return pd.read_csv(filepath)
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
 
-def remove_outliers(df, column, threshold=3):
-    z_scores = np.abs(stats.zscore(df[column]))
-    return df[z_scores < threshold]
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a column after outlier removal.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to analyze
+    
+    Returns:
+        dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count()
+    }
+    
+    return stats
 
-def normalize_column(df, column):
-    df[column] = (df[column] - df[column].min()) / (df[column].max() - df[column].min())
-    return df
-
-def clean_data(df, numeric_columns):
-    for col in numeric_columns:
-        df = remove_outliers(df, col)
-        df = normalize_column(df, col)
-    return df.dropna()
-
-if __name__ == "__main__":
-    data = load_data("raw_data.csv")
-    numeric_cols = data.select_dtypes(include=[np.number]).columns.tolist()
-    cleaned_data = clean_data(data, numeric_cols)
-    cleaned_data.to_csv("cleaned_data.csv", index=False)
-    print(f"Data cleaned. Original: {len(data)} rows, Cleaned: {len(cleaned_data)} rows")
+def process_dataframe(df, column):
+    """
+    Complete data processing pipeline: remove outliers and return statistics.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        tuple: (cleaned_df, original_stats, cleaned_stats)
+    """
+    original_stats = calculate_summary_statistics(df, column)
+    cleaned_df = remove_outliers_iqr(df, column)
+    cleaned_stats = calculate_summary_statistics(cleaned_df, column)
+    
+    return cleaned_df, original_stats, cleaned_stats
