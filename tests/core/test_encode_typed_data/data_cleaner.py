@@ -144,3 +144,100 @@ def get_categorical_columns(df):
     """
     categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
     return categorical_cols
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    """
+    Normalize a column using min-max scaling to range [0, 1].
+    """
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        return df[column].apply(lambda x: 0.5)
+    
+    return (df[column] - min_val) / (max_val - min_val)
+
+def standardize_zscore(df, column):
+    """
+    Standardize a column using z-score normalization.
+    """
+    mean_val = df[column].mean()
+    std_val = df[column].std()
+    
+    if std_val == 0:
+        return df[column].apply(lambda x: 0)
+    
+    return (df[column] - mean_val) / std_val
+
+def clean_dataset(df, numeric_columns, outlier_multiplier=1.5, normalization_method='minmax'):
+    """
+    Clean dataset by removing outliers and normalizing numeric columns.
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_multiplier)
+            
+            if normalization_method == 'minmax':
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            elif normalization_method == 'zscore':
+                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns):
+    """
+    Validate that DataFrame contains all required columns and no null values.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    null_counts = df[required_columns].isnull().sum()
+    columns_with_nulls = null_counts[null_counts > 0].index.tolist()
+    
+    if columns_with_nulls:
+        print(f"Warning: Columns with null values: {columns_with_nulls}")
+    
+    return True
+
+def sample_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    sample_data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print(f"Original shape: {df.shape}")
+    
+    numeric_cols = ['feature1', 'feature2']
+    cleaned_df = clean_dataset(df, numeric_cols, normalization_method='zscore')
+    
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    print(f"Cleaned statistics:\n{cleaned_df[numeric_cols].describe()}")
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    cleaned_data = sample_usage()
