@@ -58,3 +58,47 @@ def main():
 
 if __name__ == "__main__":
     main()
+import os
+import re
+import sys
+
+def rename_files(directory, pattern, replacement):
+    try:
+        if not os.path.isdir(directory):
+            print(f"Error: {directory} is not a valid directory.")
+            return False
+
+        files = os.listdir(directory)
+        renamed_count = 0
+
+        for filename in files:
+            file_path = os.path.join(directory, filename)
+            if os.path.isfile(file_path):
+                new_filename = re.sub(pattern, replacement, filename)
+                if new_filename != filename:
+                    new_file_path = os.path.join(directory, new_filename)
+                    try:
+                        os.rename(file_path, new_file_path)
+                        print(f"Renamed: {filename} -> {new_filename}")
+                        renamed_count += 1
+                    except OSError as e:
+                        print(f"Error renaming {filename}: {e}")
+
+        print(f"Renaming complete. {renamed_count} files renamed.")
+        return True
+
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    if len(sys.argv) != 4:
+        print("Usage: python file_renamer.py <directory> <pattern> <replacement>")
+        sys.exit(1)
+
+    dir_path = sys.argv[1]
+    regex_pattern = sys.argv[2]
+    replace_with = sys.argv[3]
+
+    success = rename_files(dir_path, regex_pattern, replace_with)
+    sys.exit(0 if success else 1)
