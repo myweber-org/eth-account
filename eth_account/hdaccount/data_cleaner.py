@@ -267,3 +267,102 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values using specified strategy
+    """
+    if strategy not in ['mean', 'median', 'mode', 'drop']:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    data_clean = data.copy()
+    
+    for column in data_clean.columns:
+        if data_clean[column].isnull().any():
+            if strategy == 'drop':
+                data_clean = data_clean.dropna(subset=[column])
+            elif strategy == 'mean':
+                data_clean[column].fillna(data_clean[column].mean(), inplace=True)
+            elif strategy == 'median':
+                data_clean[column].fillna(data_clean[column].median(), inplace=True)
+            elif strategy == 'mode':
+                data_clean[column].fillna(data_clean[column].mode()[0], inplace=True)
+    
+    return data_clean
+
+def validate_data_types(data, expected_types):
+    """
+    Validate data types match expected types
+    """
+    validation_results = {}
+    
+    for column, expected_type in expected_types.items():
+        if column not in data.columns:
+            validation_results[column] = {'valid': False, 'message': 'Column not found'}
+            continue
+        
+        actual_type = str(data[column].dtype)
+        is_valid = actual_type == expected_type
+        
+        validation_results[column] = {
+            'valid': is_valid,
+            'expected': expected_type,
+            'actual': actual_type,
+            'message': 'Type matches' if is_valid else f'Type mismatch: expected {expected_type}, got {actual_type}'
+        }
+    
+    return validation_results
