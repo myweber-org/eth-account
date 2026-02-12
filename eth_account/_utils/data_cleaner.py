@@ -602,3 +602,94 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or array): Input data
+    column (int or str): Column index or name if using pandas DataFrame
+    
+    Returns:
+    tuple: (cleaned_data, outlier_indices)
+    """
+    if isinstance(data, list):
+        data_array = np.array(data)
+    else:
+        data_array = data
+    
+    q1 = np.percentile(data_array, 25)
+    q3 = np.percentile(data_array, 75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - 1.5 * iqr
+    upper_bound = q3 + 1.5 * iqr
+    
+    outlier_mask = (data_array < lower_bound) | (data_array > upper_bound)
+    cleaned_data = data_array[~outlier_mask]
+    outlier_indices = np.where(outlier_mask)[0]
+    
+    return cleaned_data.tolist(), outlier_indices.tolist()
+
+def calculate_basic_stats(data):
+    """
+    Calculate basic statistics for the data.
+    
+    Parameters:
+    data (list or array): Input data
+    
+    Returns:
+    dict: Dictionary containing mean, median, std, min, max
+    """
+    if isinstance(data, list):
+        data_array = np.array(data)
+    else:
+        data_array = data
+    
+    stats = {
+        'mean': np.mean(data_array),
+        'median': np.median(data_array),
+        'std': np.std(data_array),
+        'min': np.min(data_array),
+        'max': np.max(data_array),
+        'count': len(data_array)
+    }
+    
+    return stats
+
+def clean_dataset(data, columns=None):
+    """
+    Clean dataset by removing outliers from specified columns.
+    
+    Parameters:
+    data (dict or DataFrame): Input dataset
+    columns (list): List of columns to clean
+    
+    Returns:
+    dict: Cleaned dataset with statistics
+    """
+    result = {
+        'cleaned_data': {},
+        'outliers_removed': {},
+        'statistics': {}
+    }
+    
+    if columns is None:
+        if isinstance(data, dict):
+            columns = list(data.keys())
+        else:
+            raise ValueError("Columns must be specified for non-dictionary data")
+    
+    for col in columns:
+        if col in data:
+            col_data = data[col]
+            cleaned, outliers = remove_outliers_iqr(col_data, col)
+            stats = calculate_basic_stats(cleaned)
+            
+            result['cleaned_data'][col] = cleaned
+            result['outliers_removed'][col] = outliers
+            result['statistics'][col] = stats
+    
+    return result
