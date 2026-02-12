@@ -194,3 +194,192 @@ def remove_duplicates_preserve_order(seq):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+from typing import Union, List, Optional
+
+def remove_outliers_iqr(
+    df: pd.DataFrame,
+    columns: Union[str, List[str]],
+    multiplier: float = 1.5
+) -> pd.DataFrame:
+    """
+    Remove outliers from specified columns using the Interquartile Range method.
+    
+    Parameters:
+    df: Input DataFrame
+    columns: Column name or list of column names to process
+    multiplier: IQR multiplier for outlier detection (default 1.5)
+    
+    Returns:
+    DataFrame with outliers removed
+    """
+    if isinstance(columns, str):
+        columns = [columns]
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def fill_missing_values(
+    df: pd.DataFrame,
+    strategy: str = 'mean',
+    columns: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Fill missing values in DataFrame columns using specified strategy.
+    
+    Parameters:
+    df: Input DataFrame
+    strategy: Filling strategy - 'mean', 'median', 'mode', or 'constant'
+    columns: List of columns to process (None processes all numeric columns)
+    
+    Returns:
+    DataFrame with missing values filled
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df[col].mean()
+        elif strategy == 'median':
+            fill_value = df[col].median()
+        elif strategy == 'mode':
+            fill_value = df[col].mode()[0] if not df[col].mode().empty else np.nan
+        elif strategy == 'constant':
+            fill_value = 0
+        else:
+            raise ValueError(f"Unsupported strategy: {strategy}")
+        
+        df_filled[col] = df_filled[col].fillna(fill_value)
+    
+    return df_filled
+
+def normalize_columns(
+    df: pd.DataFrame,
+    columns: Union[str, List[str]],
+    method: str = 'minmax'
+) -> pd.DataFrame:
+    """
+    Normalize specified columns using different scaling methods.
+    
+    Parameters:
+    df: Input DataFrame
+    columns: Column name or list of column names to normalize
+    method: Normalization method - 'minmax' or 'zscore'
+    
+    Returns:
+    DataFrame with normalized columns
+    """
+    if isinstance(columns, str):
+        columns = [columns]
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        if method == 'minmax':
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+        
+        elif method == 'zscore':
+            mean_val = df[col].mean()
+            std_val = df[col].std()
+            if std_val != 0:
+                df_norm[col] = (df[col] - mean_val) / std_val
+        
+        else:
+            raise ValueError(f"Unsupported normalization method: {method}")
+    
+    return df_norm
+
+def validate_dataframe(
+    df: pd.DataFrame,
+    required_columns: List[str],
+    min_rows: int = 1
+) -> bool:
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df: DataFrame to validate
+    required_columns: List of column names that must be present
+    min_rows: Minimum number of rows required
+    
+    Returns:
+    Boolean indicating if DataFrame passes validation
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if len(df) < min_rows:
+        return False
+    
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        return False
+    
+    return True
+
+def create_data_summary(df: pd.DataFrame) -> dict:
+    """
+    Create a comprehensive summary of the DataFrame.
+    
+    Parameters:
+    df: Input DataFrame
+    
+    Returns:
+    Dictionary containing data summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': df.columns.tolist(),
+        'dtypes': df.dtypes.to_dict(),
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': {},
+        'categorical_stats': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'median': df[col].median()
+        }
+    
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns
+    for col in categorical_cols:
+        summary['categorical_stats'][col] = {
+            'unique_count': df[col].nunique(),
+            'top_value': df[col].mode()[0] if not df[col].mode().empty else None,
+            'top_count': df[col].value_counts().iloc[0] if not df[col].empty else 0
+        }
+    
+    return summary
