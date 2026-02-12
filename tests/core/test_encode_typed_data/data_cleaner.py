@@ -97,3 +97,50 @@ if __name__ == "__main__":
     
     validation = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print("\nValidation results:", validation)
+import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing rows with null values
+    and standardizing column names to lowercase with underscores.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Standardize column names
+    df_cleaned.columns = (
+        df_cleaned.columns
+        .str.lower()
+        .str.replace(' ', '_')
+        .str.replace('-', '_')
+    )
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic requirements.
+    """
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_columns = set(required_columns) - set(df.columns)
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+def get_numeric_columns(df):
+    """
+    Return list of numeric columns in the DataFrame.
+    """
+    numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns.tolist()
+    return numeric_cols
+
+def get_categorical_columns(df):
+    """
+    Return list of categorical columns in the DataFrame.
+    """
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    return categorical_cols
