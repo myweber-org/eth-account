@@ -200,3 +200,121 @@ def clean_dataset(df, numeric_columns):
         if col in cleaned_df.columns:
             cleaned_df = remove_outliers_iqr(cleaned_df, col)
     return cleaned_df.reset_index(drop=True)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers from a column using the IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize specified columns using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        columns: list of column names to normalize (default: all numeric columns)
+    
+    Returns:
+        DataFrame with normalized columns
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    normalized_data = data.copy()
+    
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            col_min = normalized_data[col].min()
+            col_max = normalized_data[col].max()
+            
+            if col_max != col_min:
+                normalized_data[col] = (normalized_data[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_data[col] = 0
+    
+    return normalized_data
+
+def handle_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in the dataset.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', or 'drop')
+        columns: list of columns to process (default: all columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = data.columns.tolist()
+    
+    processed_data = data.copy()
+    
+    for col in columns:
+        if col not in processed_data.columns:
+            continue
+            
+        if processed_data[col].isnull().any():
+            if strategy == 'drop':
+                processed_data = processed_data.dropna(subset=[col])
+            elif strategy == 'mean' and np.issubdtype(processed_data[col].dtype, np.number):
+                processed_data[col].fillna(processed_data[col].mean(), inplace=True)
+            elif strategy == 'median' and np.issubdtype(processed_data[col].dtype, np.number):
+                processed_data[col].fillna(processed_data[col].median(), inplace=True)
+            elif strategy == 'mode':
+                processed_data[col].fillna(processed_data[col].mode()[0], inplace=True)
+    
+    return processed_data
+
+def clean_dataset(data, config):
+    """
+    Main function to clean dataset based on configuration.
+    
+    Args:
+        data: pandas DataFrame
+        config: dictionary with cleaning configuration
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    if 'missing_values' in config:
+        strategy = config['missing_values'].get('strategy', 'mean')
+        columns = config['missing_values'].get('columns')
+        cleaned_data = handle_missing_values(cleaned_data, strategy, columns)
+    
+    if 'outliers' in config:
+        for col_config in config['outliers']:
+            column = col_config.get('column')
+            multiplier = col_config.get('multiplier', 1.5)
+            if column:
+                cleaned_data = remove_outliers_iqr(cleaned_data, column, multiplier)
+    
+    if 'normalize' in config:
+        columns = config['normalize'].get('columns')
+        cleaned_data = normalize_minmax(cleaned_data, columns)
+    
+    return cleaned_data
