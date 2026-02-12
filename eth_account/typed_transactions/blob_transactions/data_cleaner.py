@@ -311,3 +311,11 @@ class DataCleaner:
             print("\nNumeric columns statistics:")
             for col in numeric_cols[:5]:
                 print(f"  {col}: mean={self.df[col].mean():.2f}, std={self.df[col].std():.2f}")
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
