@@ -180,4 +180,96 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
     if len(df) < min_rows:
         return False, f"DataFrame has fewer than {min_rows} rows"
     
-    return True, "DataFrame validation passed"
+    return True, "DataFrame validation passed"import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        subset (list, optional): Column labels to consider for duplicates.
+        keep (str, optional): Which duplicates to keep.
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed.
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    return cleaned_df
+
+def clean_numeric_column(df, column_name):
+    """
+    Clean a numeric column by removing non-numeric characters.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        column_name (str): Name of column to clean.
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned column.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = pd.to_numeric(df[column_name], errors='coerce')
+    return df
+
+def validate_email_format(df, email_column):
+    """
+    Validate email addresses in a column.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        email_column (str): Name of email column.
+    
+    Returns:
+        pd.DataFrame: DataFrame with email validation results.
+    """
+    import re
+    
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame")
+    
+    df['email_valid'] = df[email_column].apply(
+        lambda x: bool(re.match(pattern, str(x))) if pd.notnull(x) else False
+    )
+    
+    return df
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'name': ['Alice', 'Bob', 'Alice', 'Charlie', 'David', 'David'],
+        'email': ['alice@example.com', 'bob@test', 'alice@example.com', 'charlie@domain.org', 'david@mail.com', 'david@mail.com'],
+        'age': ['25', '30', '25', '35', '40', '40']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = remove_duplicates(df, subset=['email'], keep='first')
+    print("After removing duplicate emails:")
+    print(cleaned_df)
+    print("\n")
+    
+    cleaned_df = clean_numeric_column(cleaned_df, 'age')
+    print("After cleaning age column:")
+    print(cleaned_df)
+    print("\n")
+    
+    cleaned_df = validate_email_format(cleaned_df, 'email')
+    print("After email validation:")
+    print(cleaned_df)
+
+if __name__ == "__main__":
+    main()
