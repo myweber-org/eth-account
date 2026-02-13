@@ -545,4 +545,121 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid, message = validate_dataframe(df_cleaned, required_columns=['A', 'B', 'C'])
     print(f"Validation result: {is_valid}")
-    print(f"Validation message: {message}")
+    print(f"Validation message: {message}")import numpy as np
+import pandas as pd
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to check for missing values
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_with_mean(df, columns=None):
+    """
+    Fill missing values with column mean.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list, optional): Specific columns to fill
+    
+    Returns:
+        pd.DataFrame: DataFrame with filled values
+    """
+    df_filled = df.copy()
+    
+    if columns is None:
+        columns = df.columns
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            mean_val = df[col].mean()
+            df_filled[col] = df[col].fillna(mean_val)
+    
+    return df_filled
+
+def remove_outliers_iqr(df, columns, multiplier=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): Columns to check for outliers
+        multiplier (float): IQR multiplier
+    
+    Returns:
+        pd.DataFrame: DataFrame without outliers
+    """
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns):
+    """
+    Standardize specified columns to have zero mean and unit variance.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): Columns to standardize
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized columns
+    """
+    df_std = df.copy()
+    
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            mean = df[col].mean()
+            std = df[col].std()
+            if std > 0:
+                df_std[col] = (df[col] - mean) / std
+    
+    return df_std
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_stats': {}
+    }
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        summary['numeric_stats'][col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'median': df[col].median()
+        }
+    
+    return summary
