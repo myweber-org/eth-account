@@ -45,3 +45,49 @@ def main():
 
 if __name__ == "__main__":
     main()
+import os
+import re
+import unicodedata
+
+def clean_filename(filename):
+    """
+    Normalize and clean a filename by removing or replacing invalid characters,
+    converting to lowercase, and stripping extra spaces.
+    """
+    # Normalize unicode characters
+    filename = unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
+    
+    # Replace spaces and invalid characters with underscores
+    filename = re.sub(r'[^\w\s.-]', '', filename)
+    filename = re.sub(r'[\s]+', '_', filename)
+    
+    # Convert to lowercase and strip leading/trailing underscores/dots
+    filename = filename.lower().strip('_.')
+    
+    return filename
+
+def clean_filenames_in_directory(directory_path):
+    """
+    Iterate through files in a directory and rename them with cleaned filenames.
+    """
+    if not os.path.isdir(directory_path):
+        print(f"Error: {directory_path} is not a valid directory.")
+        return
+    
+    for filename in os.listdir(directory_path):
+        old_path = os.path.join(directory_path, filename)
+        
+        if os.path.isfile(old_path):
+            new_filename = clean_filename(filename)
+            new_path = os.path.join(directory_path, new_filename)
+            
+            if old_path != new_path:
+                try:
+                    os.rename(old_path, new_path)
+                    print(f"Renamed: {filename} -> {new_filename}")
+                except OSError as e:
+                    print(f"Error renaming {filename}: {e}")
+
+if __name__ == "__main__":
+    target_directory = input("Enter directory path to clean filenames: ").strip()
+    clean_filenames_in_directory(target_directory)
