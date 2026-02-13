@@ -475,3 +475,113 @@ def clean_dataset(data, outlier_method='iqr', normalize_method='minmax', missing
                 cleaned_data[f'{col}_normalized'] = normalize_zscore(cleaned_data, col)
     
     return cleaned_data
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        drop_duplicates (bool): Whether to remove duplicate rows
+        fill_missing (str): Method to fill missing values ('mean', 'median', 'mode', or 'drop')
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        
+        if fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print("Dropped rows with missing values")
+        else:
+            for column in cleaned_df.select_dtypes(include=[np.number]).columns:
+                if cleaned_df[column].isnull().any():
+                    if fill_missing == 'mean':
+                        fill_value = cleaned_df[column].mean()
+                    elif fill_missing == 'median':
+                        fill_value = cleaned_df[column].median()
+                    elif fill_missing == 'mode':
+                        fill_value = cleaned_df[column].mode()[0]
+                    else:
+                        raise ValueError("fill_missing must be 'mean', 'median', 'mode', or 'drop'")
+                    
+                    cleaned_df[column] = cleaned_df[column].fillna(fill_value)
+                    print(f"Filled missing values in '{column}' with {fill_missing}: {fill_value}")
+    
+    print(f"Cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list): List of required column names
+    
+    Returns:
+        dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'issues': [],
+        'summary': {}
+    }
+    
+    if not isinstance(df, pd.DataFrame):
+        validation_results['is_valid'] = False
+        validation_results['issues'].append('Input is not a pandas DataFrame')
+        return validation_results
+    
+    validation_results['summary']['shape'] = df.shape
+    validation_results['summary']['columns'] = list(df.columns)
+    validation_results['summary']['dtypes'] = df.dtypes.to_dict()
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['issues'].append(f'Missing required columns: {missing_columns}')
+    
+    null_counts = df.isnull().sum()
+    if null_counts.any():
+        validation_results['issues'].append(f'Found {null_counts.sum()} missing values')
+        validation_results['summary']['null_counts'] = null_counts[null_counts > 0].to_dict()
+    
+    duplicate_count = df.duplicated().sum()
+    if duplicate_count > 0:
+        validation_results['issues'].append(f'Found {duplicate_count} duplicate rows')
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5, 6],
+        'value': [10.5, 20.3, None, 40.1, 50.0, 50.0, None],
+        'category': ['A', 'B', 'A', 'B', 'A', 'A', 'C']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    validation = validate_dataframe(df, required_columns=['id', 'value'])
+    print("Validation Results:")
+    print(validation)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
