@@ -98,3 +98,86 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics:")
     print(calculate_statistics(cleaned_df, 'value'))
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary mapping old column names to new ones
+        drop_duplicates: Boolean flag to remove duplicate rows
+        normalize_text: Boolean flag to normalize text columns
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Rename columns if mapping provided
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    # Remove duplicate rows
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text columns
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
+    
+    return cleaned_df
+
+def _normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    
+    Args:
+        text: Input string
+    
+    Returns:
+        Normalized string
+    """
+    if pd.isna(text):
+        return text
+    
+    # Convert to string if not already
+    text = str(text)
+    
+    # Convert to lowercase
+    text = text.lower()
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Remove special characters (keep alphanumeric and spaces)
+    text = re.sub(r'[^a-z0-9\s]', '', text)
+    
+    return text
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate a DataFrame for required columns and minimum row count.
+    
+    Args:
+        df: Input pandas DataFrame
+        required_columns: List of required column names
+        min_rows: Minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    return True, "DataFrame validation passed"
