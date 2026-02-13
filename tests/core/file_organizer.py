@@ -246,3 +246,56 @@ if __name__ == "__main__":
     if not target_directory:
         target_directory = "."
     organize_files(target_directory)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files(directory):
+    if not os.path.exists(directory):
+        print(f"Directory '{directory}' does not exist.")
+        return
+    
+    categories = {
+        'Images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
+        'Documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
+        'Audio': ['.mp3', '.wav', '.flac', '.aac'],
+        'Video': ['.mp4', '.avi', '.mov', '.mkv'],
+        'Archives': ['.zip', '.rar', '.tar', '.gz'],
+        'Code': ['.py', '.js', '.html', '.css', '.java', '.cpp']
+    }
+    
+    for category in categories:
+        category_path = os.path.join(directory, category)
+        if not os.path.exists(category_path):
+            os.makedirs(category_path)
+    
+    for item in os.listdir(directory):
+        item_path = os.path.join(directory, item)
+        
+        if os.path.isdir(item_path):
+            continue
+        
+        file_extension = Path(item).suffix.lower()
+        moved = False
+        
+        for category, extensions in categories.items():
+            if file_extension in extensions:
+                dest_path = os.path.join(directory, category, item)
+                shutil.move(item_path, dest_path)
+                print(f"Moved '{item}' to '{category}' folder.")
+                moved = True
+                break
+        
+        if not moved:
+            other_path = os.path.join(directory, 'Other')
+            if not os.path.exists(other_path):
+                os.makedirs(other_path)
+            dest_path = os.path.join(other_path, item)
+            shutil.move(item_path, dest_path)
+            print(f"Moved '{item}' to 'Other' folder.")
+    
+    print("File organization completed.")
+
+if __name__ == "__main__":
+    target_directory = input("Enter the directory path to organize: ").strip()
+    organize_files(target_directory)
