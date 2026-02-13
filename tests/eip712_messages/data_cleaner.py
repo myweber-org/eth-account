@@ -698,4 +698,103 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(cleaned_df, 'values')
     print("\nSummary Statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+        print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns cleaned Series and outlier indices.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outlier_mask = (data[column] < lower_bound) | (data[column] > upper_bound)
+    cleaned_data = data[~outlier_mask].copy()
+    
+    return cleaned_data, data[outlier_mask].index.tolist()
+
+def normalize_minmax(data, column):
+    """
+    Apply min-max normalization to a column.
+    Returns Series with values scaled between 0 and 1.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def z_score_normalize(data, column):
+    """
+    Apply z-score normalization to a column.
+    Returns Series with mean=0 and std=1.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    normalized = (data[column] - mean_val) / std_val
+    return normalized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    Supports 'mean', 'median', 'mode' strategies.
+    """
+    data_filled = data.copy()
+    
+    for col in data.select_dtypes(include=[np.number]).columns:
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            data_filled[col] = data[col].fillna(fill_value)
+    
+    return data_filled
+
+def clean_dataset(data, numeric_columns=None):
+    """
+    Comprehensive data cleaning pipeline.
+    Removes outliers, handles missing values, and normalizes numeric columns.
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    # Handle missing values
+    cleaned_data = handle_missing_values(cleaned_data, strategy='median')
+    
+    # Remove outliers from each numeric column
+    outlier_indices = []
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            temp_data, outliers = remove_outliers_iqr(cleaned_data, col)
+            outlier_indices.extend(outliers)
+    
+    # Remove rows with outliers in any column
+    outlier_indices = list(set(outlier_indices))
+    cleaned_data = cleaned_data.drop(index=outlier_indices)
+    
+    # Normalize numeric columns
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            cleaned_data[f'{col}_normalized'] = z_score_normalize(cleaned_data, col)
+    
+    return cleaned_data, outlier_indices
