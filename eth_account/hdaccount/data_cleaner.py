@@ -584,4 +584,72 @@ if __name__ == "__main__":
     
     cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
     print("\nCleaned DataFrame:")
-    print(cleaned)
+    print(cleaned)import pandas as pd
+import numpy as np
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        
+        self.df = clean_df
+        return self
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        for col in columns:
+            if col in self.numeric_columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        return self
+    
+    def fill_missing_mean(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        for col in columns:
+            if col in self.numeric_columns:
+                mean_val = self.df[col].mean()
+                self.df[col].fillna(mean_val, inplace=True)
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def summary(self):
+        print(f"Data shape: {self.df.shape}")
+        print(f"Numeric columns: {self.numeric_columns}")
+        print("\nMissing values:")
+        print(self.df.isnull().sum())
+        print("\nBasic statistics:")
+        print(self.df.describe())
+
+def load_and_clean_data(filepath):
+    try:
+        df = pd.read_csv(filepath)
+        cleaner = DataCleaner(df)
+        cleaner.fill_missing_mean().remove_outliers_iqr().normalize_minmax()
+        return cleaner.get_cleaned_data()
+    except Exception as e:
+        print(f"Error loading or cleaning data: {e}")
+        return None
