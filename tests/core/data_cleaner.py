@@ -335,3 +335,89 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        mask = pd.Series(True, index=self.df.index)
+        for col in columns:
+            if col in self.df.columns:
+                z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+                col_mask = z_scores < threshold
+                mask = mask & self.df.index.isin(self.df[col].dropna().index[col_mask])
+        
+        self.df = self.df[mask]
+        removed_count = self.original_shape[0] - self.df.shape[0]
+        print(f"Removed {removed_count} outliers using Z-score method")
+        return self
+
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        
+        print("Applied Min-Max normalization to selected columns")
+        return self
+
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns and self.df[col].isnull().any():
+                median_val = self.df[col].median()
+                self.df[col].fillna(median_val, inplace=True)
+        
+        print("Filled missing values with column medians")
+        return self
+
+    def get_cleaned_data(self):
+        return self.df
+
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': self.df.shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+        return summary
+
+def process_dataset(filepath, output_path=None):
+    try:
+        df = pd.read_csv(filepath)
+        cleaner = DataCleaner(df)
+        
+        cleaner.fill_missing_median() \
+               .remove_outliers_zscore() \
+               .normalize_minmax()
+        
+        summary = cleaner.get_summary()
+        cleaned_df = cleaner.get_cleaned_data()
+        
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to {output_path}")
+        
+        return cleaned_df, summary
+        
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None, None
