@@ -1,58 +1,46 @@
-
 import pandas as pd
 import numpy as np
+import sys
 
-def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to process.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
-    """
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
-
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a DataFrame column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to analyze.
-    
-    Returns:
-    dict: Dictionary containing mean, median, std, min, and max.
-    """
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max()
-    }
-    return stats
+def clean_csv(input_file, output_file):
+    try:
+        df = pd.read_csv(input_file)
+        
+        print(f"Original shape: {df.shape}")
+        print(f"Missing values per column:")
+        print(df.isnull().sum())
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].median(), inplace=True)
+        
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown', inplace=True)
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Final shape: {df.shape}")
+        
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+        return False
 
 if __name__ == "__main__":
-    sample_data = {'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 13, 12, 10, 9, 8, 150]}
-    df = pd.DataFrame(sample_data)
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file.csv> <output_file.csv>")
+        sys.exit(1)
     
-    print("Original DataFrame:")
-    print(df)
-    print("\nSummary Statistics:")
-    print(calculate_summary_statistics(df, 'values'))
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame (outliers removed):")
-    print(cleaned_df)
-    print("\nSummary Statistics after cleaning:")
-    print(calculate_summary_statistics(cleaned_df, 'values'))
+    success = clean_csv(input_file, output_file)
+    sys.exit(0 if success else 1)
