@@ -728,3 +728,129 @@ if __name__ == "__main__":
     for col in cleaned_df.columns:
         stats = calculate_statistics(cleaned_df, col)
         print(f"{col}: {stats}")
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: 'first', 'last', or False to drop all duplicates
+    
+    Returns:
+        Cleaned DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'mean', 'median', 'mode', or 'drop'
+        columns: list of columns to apply strategy to
+    
+    Returns:
+        DataFrame with missing values handled
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        columns = df_clean.columns
+    
+    for col in columns:
+        if df_clean[col].isnull().any():
+            if strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+            elif strategy == 'mean':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+            elif strategy == 'median':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+            elif strategy == 'mode':
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0])
+    
+    return df_clean
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        column: column name to normalize
+        method: 'minmax' or 'zscore'
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    df_norm = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_norm[column].min()
+        max_val = df_norm[column].max()
+        if max_val > min_val:
+            df_norm[column] = (df_norm[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_norm[column].mean()
+        std_val = df_norm[column].std()
+        if std_val > 0:
+            df_norm[column] = (df_norm[column] - mean_val) / std_val
+    
+    return df_norm
+
+def clean_dataframe(df, duplicate_params=None, missing_params=None, normalize_params=None):
+    """
+    Apply multiple cleaning operations to DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        duplicate_params: dict of parameters for remove_duplicates
+        missing_params: dict of parameters for handle_missing_values
+        normalize_params: dict of parameters for normalize_column
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if duplicate_params:
+        df_clean = remove_duplicates(df_clean, **duplicate_params)
+    
+    if missing_params:
+        df_clean = handle_missing_values(df_clean, **missing_params)
+    
+    if normalize_params:
+        for col, method in normalize_params.items():
+            df_clean = normalize_column(df_clean, col, method)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
