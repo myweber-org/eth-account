@@ -147,4 +147,11 @@ if __name__ == "__main__":
     stats = calculate_basic_stats(cleaned_df, 'values')
     print("\nBasic Statistics for cleaned data:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}" if isinstance(value, (int, float)) else f"{key}: {value}")
+        print(f"{key}: {value:.2f}" if isinstance(value, (int, float)) else f"{key}: {value}")def remove_duplicates(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
