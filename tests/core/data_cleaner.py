@@ -108,4 +108,11 @@ if __name__ == "__main__":
     
     normalized_df = normalize_column(cleaned_df, 'values', method='minmax')
     print("\nData after normalization:")
-    print(normalized_df)
+    print(normalized_df)def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
