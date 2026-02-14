@@ -3,149 +3,83 @@ import os
 import shutil
 from pathlib import Path
 
-def organize_files(directory):
+def organize_files_by_extension(directory_path):
     """
-    Organize files in the given directory by moving them into
-    subfolders based on their file extensions.
+    Organizes files in the specified directory into subfolders based on their file extensions.
     """
-    if not os.path.isdir(directory):
-        print(f"Error: {directory} is not a valid directory.")
-        return
+    # Convert the input path to a Path object for easier handling
+    base_path = Path(directory_path)
 
-    for item in os.listdir(directory):
-        item_path = os.path.join(directory, item)
-
-        if os.path.isfile(item_path):
-            file_extension = Path(item).suffix.lower()
-
-            if not file_extension:
-                folder_name = "NoExtension"
-            else:
-                folder_name = file_extension[1:].capitalize() + "Files"
-
-            target_folder = os.path.join(directory, folder_name)
-            os.makedirs(target_folder, exist_ok=True)
-
-            try:
-                shutil.move(item_path, os.path.join(target_folder, item))
-                print(f"Moved: {item} -> {folder_name}/")
-            except Exception as e:
-                print(f"Failed to move {item}: {e}")
-
-if __name__ == "__main__":
-    target_dir = input("Enter the directory path to organize: ").strip()
-    organize_files(target_dir)
-    print("File organization complete.")
-import os
-import shutil
-from pathlib import Path
-
-def organize_files(directory):
-    """
-    Organizes files in the given directory by moving them into subfolders
-    based on their file extensions.
-    """
-    # Define file type categories and their associated extensions
-    file_categories = {
-        'Images': ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.svg'],
-        'Documents': ['.pdf', '.docx', '.txt', '.xlsx', '.pptx', '.md'],
-        'Audio': ['.mp3', '.wav', '.flac', '.aac'],
-        'Video': ['.mp4', '.avi', '.mov', '.mkv'],
-        'Archives': ['.zip', '.tar', '.gz', '.rar', '.7z'],
-        'Code': ['.py', '.js', '.html', '.css', '.java', '.cpp', '.c']
-    }
-
-    # Convert directory to Path object for easier handling
-    base_path = Path(directory)
-
-    # Ensure the directory exists
+    # Check if the provided path exists and is a directory
     if not base_path.exists() or not base_path.is_dir():
-        print(f"Error: Directory '{directory}' does not exist or is not a directory.")
+        print(f"Error: The path '{directory_path}' does not exist or is not a directory.")
         return
 
-    # Create category folders if they don't exist
-    for category in file_categories.keys():
-        category_path = base_path / category
-        category_path.mkdir(exist_ok=True)
-
-    # Track moved files and errors
-    moved_files = []
-    error_files = []
+    # Dictionary mapping file extensions to folder names
+    extension_categories = {
+        '.txt': 'TextFiles',
+        '.pdf': 'PDFs',
+        '.jpg': 'Images',
+        '.jpeg': 'Images',
+        '.png': 'Images',
+        '.gif': 'Images',
+        '.mp3': 'Audio',
+        '.wav': 'Audio',
+        '.mp4': 'Videos',
+        '.avi': 'Videos',
+        '.mov': 'Videos',
+        '.zip': 'Archives',
+        '.tar': 'Archives',
+        '.gz': 'Archives',
+        '.py': 'PythonScripts',
+        '.js': 'Scripts',
+        '.html': 'WebFiles',
+        '.css': 'WebFiles',
+        '.json': 'Data',
+        '.csv': 'Data',
+        '.xlsx': 'Spreadsheets',
+        '.docx': 'Documents',
+        '.pptx': 'Presentations',
+    }
 
     # Iterate over all items in the directory
     for item in base_path.iterdir():
-        # Skip directories
+        # Skip if it's a directory
         if item.is_dir():
             continue
 
-        # Get file extension
+        # Get the file extension (lowercase for consistency)
         file_extension = item.suffix.lower()
 
-        # Find the appropriate category for the file
-        target_category = None
-        for category, extensions in file_categories.items():
-            if file_extension in extensions:
-                target_category = category
-                break
+        # Determine the target folder name
+        if file_extension in extension_categories:
+            target_folder_name = extension_categories[file_extension]
+        else:
+            target_folder_name = 'Other'
 
-        # If no category found, skip the file
-        if not target_category:
-            continue
+        # Create the full path for the target folder
+        target_folder_path = base_path / target_folder_name
 
-        # Define target path
-        target_path = base_path / target_category / item.name
+        # Create the target folder if it doesn't exist
+        target_folder_path.mkdir(exist_ok=True)
 
-        # Check if file already exists in target location
-        if target_path.exists():
-            error_files.append((item.name, "File already exists in target folder"))
-            continue
+        # Construct the new file path
+        new_file_path = target_folder_path / item.name
 
+        # Move the file to the target folder
         try:
-            # Move the file
-            shutil.move(str(item), str(target_path))
-            moved_files.append((item.name, target_category))
+            shutil.move(str(item), str(new_file_path))
+            print(f"Moved: {item.name} -> {target_folder_name}/")
         except Exception as e:
-            error_files.append((item.name, str(e)))
+            print(f"Failed to move {item.name}: {e}")
 
-    # Print summary
-    print(f"Organization complete for: {directory}")
-    print(f"Files moved: {len(moved_files)}")
-    
-    if moved_files:
-        print("\nMoved files:")
-        for filename, category in moved_files:
-            print(f"  {filename} -> {category}/")
-    
-    if error_files:
-        print(f"\nErrors: {len(error_files)}")
-        for filename, error in error_files:
-            print(f"  {filename}: {error}")
+    print("File organization complete.")
 
 if __name__ == "__main__":
     # Example usage: organize files in the current directory
-    target_directory = os.getcwd()
-    organize_files(target_directory)
-import os
-import shutil
-
-def organize_files(directory_path):
-    if not os.path.exists(directory_path):
-        print(f"Directory {directory_path} does not exist.")
-        return
-
-    for filename in os.listdir(directory_path):
-        file_path = os.path.join(directory_path, filename)
-        
-        if os.path.isfile(file_path):
-            file_extension = filename.split('.')[-1] if '.' in filename else 'no_extension'
-            target_folder = os.path.join(directory_path, file_extension)
-            
-            if not os.path.exists(target_folder):
-                os.makedirs(target_folder)
-            
-            shutil.move(file_path, os.path.join(target_folder, filename))
-            print(f"Moved {filename} to {file_extension}/")
-
-if __name__ == "__main__":
-    target_directory = input("Enter the directory path to organize: ")
-    organize_files(target_directory)
+    target_directory = input("Enter the directory path to organize (or press Enter for current directory): ").strip()
+    
+    if not target_directory:
+        target_directory = os.getcwd()
+    
+    organize_files_by_extension(target_directory)
