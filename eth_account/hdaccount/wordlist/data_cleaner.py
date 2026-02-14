@@ -182,3 +182,11 @@ def remove_outliers_iqr(df, column, multiplier=1.5):
     upper_bound = q3 + multiplier * iqr
     
     return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
