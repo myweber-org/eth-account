@@ -251,3 +251,59 @@ def validate_dataframe(df):
     if df.empty:
         raise ValueError("DataFrame is empty")
     return True
+import pandas as pd
+
+def clean_dataframe(df, column_name):
+    """
+    Clean a specific column in a pandas DataFrame.
+    Removes duplicates, strips whitespace, and converts to lowercase.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame.")
+
+    # Remove duplicates
+    df = df.drop_duplicates(subset=[column_name])
+
+    # Normalize strings: strip whitespace and convert to lowercase
+    df[column_name] = df[column_name].astype(str).str.strip().str.lower()
+
+    # Drop rows where the column is empty after cleaning
+    df = df[df[column_name] != '']
+
+    return df.reset_index(drop=True)
+
+def validate_email_column(df, email_column='email'):
+    """
+    Basic validation for email format in a specified column.
+    """
+    if email_column not in df.columns:
+        raise ValueError(f"Column '{email_column}' not found in DataFrame.")
+
+    # Simple regex pattern for email validation
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    email_mask = df[email_column].astype(str).str.match(pattern)
+
+    valid_emails = df[email_mask]
+    invalid_emails = df[~email_mask]
+
+    return valid_emails, invalid_emails
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', 'Charlie', '  dave  ', 'Eve', ''],
+        'email': ['alice@example.com', 'bob@example', 'alice@example.com', 'charlie@test.org', 'dave@domain.co.uk', 'invalid-email', 'missing@']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+
+    cleaned_df = clean_dataframe(df, 'name')
+    print("\nDataFrame after cleaning 'name' column:")
+    print(cleaned_df)
+
+    valid, invalid = validate_email_column(cleaned_df, 'email')
+    print("\nValid emails:")
+    print(valid)
+    print("\nInvalid emails:")
+    print(invalid)
