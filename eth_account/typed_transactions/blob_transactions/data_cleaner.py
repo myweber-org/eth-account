@@ -853,4 +853,61 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "DataFrame is valid"
+    return True, "DataFrame is valid"import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+    
+    def remove_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        return self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        return self.df[z_scores < threshold]
+    
+    def normalize_minmax(self, column):
+        min_val = self.df[column].min()
+        max_val = self.df[column].max()
+        self.df[column + '_normalized'] = (self.df[column] - min_val) / (max_val - min_val)
+        return self.df
+    
+    def standardize_column(self, column):
+        mean_val = self.df[column].mean()
+        std_val = self.df[column].std()
+        self.df[column + '_standardized'] = (self.df[column] - mean_val) / std_val
+        return self.df
+    
+    def fill_missing_mean(self, column):
+        self.df[column].fillna(self.df[column].mean(), inplace=True)
+        return self.df
+    
+    def fill_missing_median(self, column):
+        self.df[column].fillna(self.df[column].median(), inplace=True)
+        return self.df
+    
+    def drop_duplicates(self):
+        self.df.drop_duplicates(inplace=True)
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'original_columns': len(self.original_columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'duplicate_rows': self.df.duplicated().sum(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+    
+    def save_cleaned_data(self, filename='cleaned_data.csv'):
+        self.df.to_csv(filename, index=False)
+        return f"Data saved to {filename}"
