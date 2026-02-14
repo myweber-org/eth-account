@@ -366,4 +366,64 @@ def validate_cleaning(df_before, df_after, column):
         'min': df_after[column].min(),
         'max': df_after[column].max()
     }
-    return {'before': stats_before, 'after': stats_after}
+    return {'before': stats_before, 'after': stats_after}import pandas as pd
+import numpy as np
+
+def clean_dataset(df, id_column='id'):
+    """
+    Clean a pandas DataFrame by removing duplicates and standardizing column names.
+    """
+    # Standardize column names: lowercase and replace spaces with underscores
+    df.columns = df.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows based on the specified ID column
+    if id_column in df.columns:
+        df = df.drop_duplicates(subset=[id_column], keep='first')
+    else:
+        df = df.drop_duplicates()
+    
+    # Replace any NaN values with None for consistency
+    df = df.replace({np.nan: None})
+    
+    # Reset index after cleaning
+    df = df.reset_index(drop=True)
+    
+    return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate the structure of a DataFrame.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'ID': [1, 2, 2, 3, 4],
+        'First Name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David'],
+        'Last Name': ['Smith', 'Johnson', 'Johnson', 'Brown', 'Wilson'],
+        'Age': [25, 30, 30, 35, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(df, id_column='ID')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_dataframe(cleaned_df, required_columns=['id', 'first_name'])
+        print("Data validation passed.")
+    except ValueError as e:
+        print(f"Data validation failed: {e}")
