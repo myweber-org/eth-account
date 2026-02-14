@@ -103,3 +103,114 @@ if __name__ == "__main__":
     # Validate the cleaned data
     is_valid, message = validate_dataframe(cleaned_df, ['A', 'B', 'C'])
     print(f"Validation: {is_valid} - {message}")
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df, column_types):
+    """
+    Convert specified columns to given data types.
+    
+    Args:
+        df: pandas DataFrame
+        column_types: dict mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_converted = df.copy()
+    for column, dtype in column_types.items():
+        if column in df_converted.columns:
+            df_converted[column] = df_converted[column].astype(dtype)
+    return df_converted
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: value to use when filling (defaults to column mean for numeric)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        df_filled = df.copy()
+        for column in df_filled.columns:
+            if df_filled[column].dtype in [np.float64, np.int64]:
+                fill_val = fill_value if fill_value is not None else df_filled[column].mean()
+                df_filled[column].fillna(fill_val, inplace=True)
+            else:
+                fill_val = fill_value if fill_value is not None else ''
+                df_filled[column].fillna(fill_val, inplace=True)
+        return df_filled
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def clean_dataframe(df, deduplicate=True, type_conversions=None, missing_strategy='drop'):
+    """
+    Main function to clean DataFrame with multiple operations.
+    
+    Args:
+        df: pandas DataFrame
+        deduplicate: whether to remove duplicates
+        type_conversions: dict for column type conversions
+        missing_strategy: strategy for handling missing values
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None],
+        'age': [25, 30, 30, None, 35],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    cleaned = clean_dataframe(
+        df,
+        deduplicate=True,
+        type_conversions={'id': 'int32', 'age': 'float64'},
+        missing_strategy='fill'
+    )
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    print("\nCleaned DataFrame info:")
+    print(cleaned.info())
