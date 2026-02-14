@@ -307,3 +307,41 @@ if __name__ == "__main__":
     print(valid)
     print("\nInvalid emails:")
     print(invalid)
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Cleans a pandas DataFrame by removing duplicate rows and
+    handling missing values in numeric columns.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+
+    # For numeric columns, fill missing values with the column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+
+    # For non-numeric columns, fill missing values with 'Unknown'
+    non_numeric_cols = df_cleaned.select_dtypes(exclude=[np.number]).columns
+    df_cleaned[non_numeric_cols] = df_cleaned[non_numeric_cols].fillna('Unknown')
+
+    return df_cleaned
+
+def main():
+    # Example usage
+    data = {
+        'A': [1, 2, 2, 4, np.nan],
+        'B': [5, np.nan, 7, 8, 9],
+        'C': ['x', 'y', 'y', np.nan, 'z']
+    }
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+
+if __name__ == "__main__":
+    main()
