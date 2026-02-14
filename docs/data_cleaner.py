@@ -206,3 +206,135 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset('raw_data.csv', ['age', 'salary', 'score'])
     cleaned_data.to_csv('cleaned_data.csv', index=False)
     print(f"Data cleaned. Original shape: {pd.read_csv('raw_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, handle_nulls='drop', null_threshold=0.5):
+    """
+    Clean a pandas DataFrame by handling duplicates and null values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    drop_duplicates (bool): Whether to drop duplicate rows
+    handle_nulls (str): Strategy for null handling - 'drop', 'fill', or 'threshold'
+    null_threshold (float): Threshold for column null percentage when handle_nulls='threshold'
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    
+    df_clean = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates()
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows")
+    
+    if handle_nulls == 'drop':
+        df_clean = df_clean.dropna()
+        print("Dropped rows with any null values")
+    
+    elif handle_nulls == 'fill':
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        categorical_cols = df_clean.select_dtypes(exclude=[np.number]).columns
+        
+        for col in numeric_cols:
+            if df_clean[col].isnull().any():
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+        
+        for col in categorical_cols:
+            if df_clean[col].isnull().any():
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 'Unknown')
+        
+        print("Filled null values with median (numeric) or mode (categorical)")
+    
+    elif handle_nulls == 'threshold':
+        null_percentages = df_clean.isnull().sum() / len(df_clean)
+        cols_to_drop = null_percentages[null_percentages > null_threshold].index
+        df_clean = df_clean.drop(columns=cols_to_drop)
+        
+        if len(cols_to_drop) > 0:
+            print(f"Dropped columns with >{null_threshold*100}% nulls: {list(cols_to_drop)}")
+        else:
+            print("No columns exceeded null threshold")
+    
+    print(f"Original shape: {df.shape}, Cleaned shape: {df_clean.shape}")
+    return df_clean
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, False otherwise
+    """
+    
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Error: DataFrame has fewer than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Summary statistics
+    """
+    
+    summary = {
+        'shape': df.shape,
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'numeric_columns': len(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': len(df.select_dtypes(exclude=[np.number]).columns),
+        'total_nulls': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'memory_usage_mb': df.memory_usage(deep=True).sum() / 1024 / 1024
+    }
+    
+    return summary
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, None, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', None, 'A'],
+        'score': [100, 200, 200, 300, 400, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Sample DataFrame:")
+    print(df)
+    print()
+    
+    summary = get_data_summary(df)
+    print("Data Summary:")
+    for key, value in summary.items():
+        print(f"{key}: {value}")
+    print()
+    
+    cleaned_df = clean_dataset(df, handle_nulls='fill')
+    print()
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
