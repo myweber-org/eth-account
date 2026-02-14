@@ -611,3 +611,107 @@ if __name__ == "__main__":
     
     is_valid = validate_dataframe(cleaned, ['product_name', 'price', 'quantity_in_stock'])
     print(f"\nDataFrame validation: {is_valid}")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class CSVDataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        self.cleaning_report = {}
+        
+    def load_data(self):
+        try:
+            self.df = pd.read_csv(self.file_path)
+            self.cleaning_report['original_rows'] = len(self.df)
+            self.cleaning_report['original_columns'] = len(self.df.columns)
+            return True
+        except Exception as e:
+            print(f"Error loading file: {e}")
+            return False
+    
+    def remove_duplicates(self):
+        if self.df is not None:
+            before = len(self.df)
+            self.df.drop_duplicates(inplace=True)
+            self.cleaning_report['duplicates_removed'] = before - len(self.df)
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        if self.df is not None:
+            numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+            
+            if strategy == 'mean':
+                for col in numeric_cols:
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                for col in numeric_cols:
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                for col in numeric_cols:
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+            elif strategy == 'custom' and fill_value is not None:
+                self.df.fillna(fill_value, inplace=True)
+            
+            self.cleaning_report['missing_strategy'] = strategy
+    
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if self.df is not None:
+            if columns is None:
+                columns = self.df.select_dtypes(include=[np.number]).columns
+            
+            outliers_count = 0
+            for col in columns:
+                if col in self.df.columns:
+                    Q1 = self.df[col].quantile(0.25)
+                    Q3 = self.df[col].quantile(0.75)
+                    IQR = Q3 - Q1
+                    lower_bound = Q1 - multiplier * IQR
+                    upper_bound = Q3 + multiplier * IQR
+                    
+                    before = len(self.df)
+                    self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+                    outliers_count += (before - len(self.df))
+            
+            self.cleaning_report['outliers_removed'] = outliers_count
+    
+    def standardize_columns(self):
+        if self.df is not None:
+            self.df.columns = self.df.columns.str.strip().str.lower().str.replace(' ', '_')
+            self.cleaning_report['columns_standardized'] = True
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is not None:
+            if output_path is None:
+                output_path = self.file_path.parent / f"cleaned_{self.file_path.name}"
+            
+            self.df.to_csv(output_path, index=False)
+            self.cleaning_report['cleaned_rows'] = len(self.df)
+            self.cleaning_report['cleaned_columns'] = len(self.df.columns)
+            self.cleaning_report['output_path'] = str(output_path)
+            return output_path
+    
+    def get_report(self):
+        return self.cleaning_report
+    
+    def full_clean_pipeline(self, output_path=None):
+        self.load_data()
+        self.standardize_columns()
+        self.remove_duplicates()
+        self.handle_missing_values(strategy='median')
+        self.remove_outliers_iqr()
+        return self.save_cleaned_data(output_path)
+
+def clean_csv_file(input_file, output_file=None):
+    cleaner = CSVDataCleaner(input_file)
+    result_path = cleaner.full_clean_pipeline(output_file)
+    report = cleaner.get_report()
+    
+    print(f"Data cleaning completed:")
+    print(f"Original data: {report.get('original_rows', 0)} rows, {report.get('original_columns', 0)} columns")
+    print(f"Cleaned data: {report.get('cleaned_rows', 0)} rows, {report.get('cleaned_columns', 0)} columns")
+    print(f"Duplicates removed: {report.get('duplicates_removed', 0)}")
+    print(f"Outliers removed: {report.get('outliers_removed', 0)}")
+    print(f"Saved to: {report.get('output_path', 'Not saved')}")
+    
+    return result_path, report
