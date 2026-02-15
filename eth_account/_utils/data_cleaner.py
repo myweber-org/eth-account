@@ -312,3 +312,107 @@ def validate_data(data, require_columns=None, allow_nan_ratio=0.1):
     validation_result['summary']['data_types'] = data.dtypes.astype(str).to_dict()
     
     return validation_result
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: Optional dictionary to rename columns
+        drop_duplicates: Whether to remove duplicate rows
+        normalize_text: Whether to normalize text columns (strip, lower case)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+            cleaned_df[col] = cleaned_df[col].replace(r'\s+', ' ', regex=True)
+            cleaned_df[col] = cleaned_df[col].replace('nan', pd.NA)
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+def validate_email(email_series):
+    """
+    Validate email addresses in a pandas Series.
+    
+    Args:
+        email_series: pandas Series containing email addresses
+    
+    Returns:
+        Boolean Series indicating valid emails
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return email_series.str.match(pattern, na=False)
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to check for outliers
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    q1 = df[column].quantile(0.25)
+    q3 = df[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    removed = len(df) - len(filtered_df)
+    print(f"Removed {removed} outliers from column '{column}'")
+    
+    return filtered_df
+
+def example_usage():
+    """Example usage of the data cleaning functions."""
+    data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'Alice Brown'],
+        'email': ['john@example.com', 'jane@example.com', 'invalid-email', 'bob@example.com', 'alice@example.com'],
+        'age': [25, 30, 25, 150, 28],
+        'salary': [50000, 60000, 50000, 70000, 55000]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataframe(df, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n" + "="*50 + "\n")
+    
+    valid_emails = validate_email(cleaned['email'])
+    print("Valid emails:")
+    print(valid_emails)
+    print("\n" + "="*50 + "\n")
+    
+    no_outliers = remove_outliers_iqr(cleaned, 'age')
+    print("DataFrame without age outliers:")
+    print(no_outliers)
+
+if __name__ == "__main__":
+    example_usage()
