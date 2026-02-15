@@ -358,3 +358,66 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    """
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    for col in df_clean.columns:
+        if df_clean[col].dtype in [np.float64, np.int64]:
+            if fill_missing == 'mean':
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif fill_missing == 'median':
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif fill_missing == 'zero':
+                df_clean[col].fillna(0, inplace=True)
+        elif df_clean[col].dtype == 'object':
+            df_clean[col].fillna('Unknown', inplace=True)
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate the cleaned dataset for basic integrity.
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if len(df) < min_rows:
+        raise ValueError(f"Dataset has fewer than {min_rows} rows")
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 5],
+        'value': [10.5, 20.3, 20.3, np.nan, 40.1, 50.0],
+        'category': ['A', 'B', 'B', 'C', None, 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    try:
+        validate_data(cleaned_df, required_columns=['id', 'value'], min_rows=3)
+        print("\nData validation passed.")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
