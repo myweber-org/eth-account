@@ -421,3 +421,11 @@ if __name__ == "__main__":
         print("\nData validation passed.")
     except ValueError as e:
         print(f"\nData validation failed: {e}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
