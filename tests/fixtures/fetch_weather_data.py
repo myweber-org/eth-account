@@ -186,4 +186,127 @@ def main():
     display_weather(weather_data)
 
 if __name__ == "__main__":
+    main()import requests
+import json
+from datetime import datetime
+import sys
+
+class WeatherFetcher:
+    def __init__(self, api_key, base_url="http://api.openweathermap.org/data/2.5"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+        
+    def get_current_weather(self, city_name, country_code=None):
+        """Fetch current weather data for a given city."""
+        query = city_name
+        if country_code:
+            query += f",{country_code}"
+            
+        params = {
+            'q': query,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = self.session.get(
+                f"{self.base_url}/weather",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching weather data: {e}")
+            return None
+    
+    def get_weather_forecast(self, city_name, days=5):
+        """Fetch weather forecast for multiple days."""
+        params = {
+            'q': city_name,
+            'appid': self.api_key,
+            'units': 'metric',
+            'cnt': days * 8  # 8 forecasts per day (3-hour intervals)
+        }
+        
+        try:
+            response = self.session.get(
+                f"{self.base_url}/forecast",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error fetching forecast: {e}")
+            return None
+    
+    def format_weather_data(self, weather_data):
+        """Format weather data for display."""
+        if not weather_data:
+            return "No weather data available"
+        
+        main = weather_data.get('main', {})
+        weather = weather_data.get('weather', [{}])[0]
+        wind = weather_data.get('wind', {})
+        
+        formatted = f"""
+Weather Report:
+---------------
+Location: {weather_data.get('name', 'Unknown')}
+Temperature: {main.get('temp', 'N/A')}°C
+Feels Like: {main.get('feels_like', 'N/A')}°C
+Humidity: {main.get('humidity', 'N/A')}%
+Pressure: {main.get('pressure', 'N/A')} hPa
+Conditions: {weather.get('description', 'N/A').title()}
+Wind Speed: {wind.get('speed', 'N/A')} m/s
+Wind Direction: {wind.get('deg', 'N/A')}°
+Visibility: {weather_data.get('visibility', 'N/A')} meters
+"""
+        return formatted
+    
+    def save_to_file(self, data, filename=None):
+        """Save weather data to a JSON file."""
+        if not filename:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"weather_data_{timestamp}.json"
+        
+        try:
+            with open(filename, 'w') as f:
+                json.dump(data, f, indent=2)
+            print(f"Weather data saved to {filename}")
+            return True
+        except IOError as e:
+            print(f"Error saving to file: {e}")
+            return False
+
+def main():
+    # Replace with your actual API key
+    API_KEY = "your_api_key_here"
+    
+    if API_KEY == "your_api_key_here":
+        print("Please set your API key in the script")
+        sys.exit(1)
+    
+    fetcher = WeatherFetcher(API_KEY)
+    
+    # Example usage
+    city = "London"
+    
+    print(f"Fetching current weather for {city}...")
+    current_weather = fetcher.get_current_weather(city)
+    
+    if current_weather:
+        print(fetcher.format_weather_data(current_weather))
+        fetcher.save_to_file(current_weather)
+    
+    print(f"\nFetching 5-day forecast for {city}...")
+    forecast = fetcher.get_weather_forecast(city, days=5)
+    
+    if forecast:
+        fetcher.save_to_file(forecast, "weather_forecast.json")
+        print(f"Forecast data saved successfully")
+
+if __name__ == "__main__":
     main()
