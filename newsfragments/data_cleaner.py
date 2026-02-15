@@ -410,4 +410,83 @@ if __name__ == "__main__":
     normalized_df = cleaner.normalize_data(method='zscore')
     
     print("\nCleaning complete.")
-    print(f"Final shape: {normalized_df.shape}")
+    print(f"Final shape: {normalized_df.shape}")import numpy as np
+import pandas as pd
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    Returns a boolean mask where True indicates an outlier.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    return (data[column] < lower_bound) | (data[column] > upper_bound)
+
+def remove_outliers(df, columns, threshold=1.5):
+    """
+    Remove outliers from specified columns using IQR method.
+    Returns a cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df_clean.columns:
+            outliers = detect_outliers_iqr(df_clean, col, threshold)
+            df_clean = df_clean[~outliers]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    """
+    Apply min-max normalization to specified columns.
+    Returns DataFrame with normalized columns.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df_norm.columns and df_norm[col].dtype in [np.float64, np.int64]:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    return df_norm
+
+def clean_dataset(df, numeric_columns, outlier_threshold=1.5, normalize=True):
+    """
+    Main cleaning pipeline: remove outliers and optionally normalize.
+    Returns cleaned DataFrame.
+    """
+    print(f"Original shape: {df.shape}")
+    
+    # Remove outliers
+    df_clean = remove_outliers(df, numeric_columns, outlier_threshold)
+    print(f"After outlier removal: {df_clean.shape}")
+    
+    # Normalize if requested
+    if normalize:
+        df_clean = normalize_minmax(df_clean, numeric_columns)
+        print("Applied min-max normalization")
+    
+    return df_clean
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 200),
+        'feature_b': np.random.exponential(50, 200),
+        'category': np.random.choice(['A', 'B', 'C'], 200)
+    }
+    # Introduce some outliers
+    data['feature_a'][10] = 500
+    data['feature_b'][20] = 1000
+    
+    df = pd.DataFrame(data)
+    
+    # Clean the dataset
+    numeric_cols = ['feature_a', 'feature_b']
+    cleaned_df = clean_dataset(df, numeric_cols, outlier_threshold=1.5, normalize=True)
+    
+    print(f"\nCleaned DataFrame head:")
+    print(cleaned_df.head())
