@@ -448,3 +448,11 @@ def clean_dataset(file_path, numeric_columns):
 if __name__ == "__main__":
     cleaned = clean_dataset('sample_data.csv', ['age', 'salary', 'score'])
     print(f"Cleaned data saved to: {cleaned}")
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
