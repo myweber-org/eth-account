@@ -545,3 +545,11 @@ def clean_csv_file(input_path: str, output_path: str, cleaning_steps: Dict) -> N
     except Exception as e:
         print(f"Error during data cleaning: {e}")
         raise
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
