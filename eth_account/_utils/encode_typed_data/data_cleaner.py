@@ -144,3 +144,68 @@ def main():
 
 if __name__ == "__main__":
     main()
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list (list): Input list that may contain duplicates.
+    
+    Returns:
+        list: List with duplicates removed.
+    
+    Example:
+        >>> remove_duplicates([1, 2, 2, 3, 1, 4])
+        [1, 2, 3, 4]
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to numbers and handling invalid values.
+    
+    Args:
+        values (list): List of values that should be numeric.
+        default: Default value to use for invalid entries.
+    
+    Returns:
+        list: Cleaned list of numeric values.
+    """
+    cleaned = []
+    
+    for value in values:
+        try:
+            if isinstance(value, str):
+                # Try to convert string to float, then to int if possible
+                num = float(value)
+                if num.is_integer():
+                    cleaned.append(int(num))
+                else:
+                    cleaned.append(num)
+            else:
+                cleaned.append(float(value))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    
+    return cleaned
+
+
+if __name__ == "__main__":
+    # Test the functions
+    test_data = [1, 2, 2, 3, 1, 4, "5", "6.2", "invalid", 7.5]
+    
+    print("Original data:", test_data)
+    print("Without duplicates:", remove_duplicates(test_data))
+    
+    numeric_test = ["1", "2.5", "3", "abc", "4.7", 5, None]
+    print("\nNumeric data:", numeric_test)
+    print("Cleaned numeric:", clean_numeric_data(numeric_test))
