@@ -645,3 +645,107 @@ if __name__ == "__main__":
     input_path = "raw_data.csv"
     output_path = "cleaned_data.csv"
     cleaned_df = clean_dataset(input_path, output_path)
+import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame using specified strategy.
+    
+    Args:
+        df: pandas DataFrame containing data with potential missing values
+        strategy: Method for imputation ('mean', 'median', 'mode', 'drop')
+        columns: List of columns to apply cleaning to (None for all columns)
+    
+    Returns:
+        Cleaned DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df_clean[col].isnull().any():
+            if strategy == 'mean':
+                df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_clean[col].fillna(df_clean[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of columns that must be present
+    
+    Returns:
+        Boolean indicating if DataFrame is valid
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+def load_and_clean_csv(filepath, strategy='mean', required_columns=None):
+    """
+    Load CSV file and clean missing values.
+    
+    Args:
+        filepath: Path to CSV file
+        strategy: Imputation strategy for missing values
+        required_columns: Columns that must be present in the data
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    try:
+        df = pd.read_csv(filepath)
+        
+        if not validate_dataframe(df, required_columns):
+            raise ValueError("DataFrame validation failed")
+        
+        df_clean = clean_missing_values(df, strategy=strategy)
+        
+        print(f"Data cleaning completed. Original shape: {df.shape}, Cleaned shape: {df_clean.shape}")
+        print(f"Missing values handled using '{strategy}' strategy")
+        
+        return df_clean
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, np.nan, 5],
+        'C': [1, 2, 3, 4, 5]
+    }
+    
+    df_sample = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df_sample)
+    
+    df_cleaned = clean_missing_values(df_sample, strategy='mean')
+    print("\nCleaned DataFrame (mean imputation):")
+    print(df_cleaned)
