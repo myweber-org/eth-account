@@ -518,3 +518,92 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, fill_missing='mean')
     print("\nCleaned DataFrame:")
     print(cleaned)
+import pandas as pd
+import numpy as np
+from datetime import datetime
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates,
+    standardizing column names, and handling missing values.
+    """
+    # Create a copy to avoid modifying the original
+    df_clean = df.copy()
+    
+    # Standardize column names: lowercase and replace spaces with underscores
+    df_clean.columns = df_clean.columns.str.lower().str.replace(' ', '_')
+    
+    # Remove duplicate rows
+    df_clean = df_clean.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    
+    # Fill missing categorical values with 'unknown'
+    categorical_cols = df_clean.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_clean[col] = df_clean[col].fillna('unknown')
+    
+    # Convert date columns to datetime format
+    for col in df_clean.columns:
+        if 'date' in col.lower():
+            try:
+                df_clean[col] = pd.to_datetime(df_clean[col], errors='coerce')
+            except:
+                pass
+    
+    return df_clean
+
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic quality criteria.
+    """
+    if required_columns:
+        missing_cols = set(required_columns) - set(df.columns)
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    # Check for empty DataFrame
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    # Check for high percentage of missing values
+    missing_percentage = df.isnull().sum().sum() / (df.shape[0] * df.shape[1])
+    if missing_percentage > 0.5:
+        print(f"Warning: High percentage of missing values: {missing_percentage:.2%}")
+    
+    return True
+
+def process_file(input_path, output_path=None):
+    """
+    Main function to process a CSV file through the cleaning pipeline.
+    """
+    # Read input file
+    df = pd.read_csv(input_path)
+    
+    # Validate data
+    validate_data(df)
+    
+    # Clean data
+    df_clean = clean_dataframe(df)
+    
+    # Save cleaned data
+    if output_path:
+        df_clean.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    
+    return df_clean
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    try:
+        cleaned_df = process_file(input_file, output_file)
+        print(f"Data cleaning completed. Shape: {cleaned_df.shape}")
+        print(f"Columns: {list(cleaned_df.columns)}")
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
