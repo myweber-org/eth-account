@@ -288,3 +288,81 @@ def validate_data(df, required_columns=None, numeric_columns=None):
         validation_results['non_numeric_columns'] = non_numeric
     
     return validation_results
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: pandas DataFrame to clean
+        column_mapping: dictionary mapping old column names to new ones
+        drop_duplicates: whether to remove duplicate rows
+        normalize_text: whether to normalize text in string columns
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    df_clean = df.copy()
+    
+    if column_mapping:
+        df_clean = df_clean.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if normalize_text:
+        for col in df_clean.select_dtypes(include=['object']).columns:
+            df_clean[col] = df_clean[col].apply(_normalize_string)
+    
+    return df_clean
+
+def _normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    """
+    if pd.isna(text):
+        return text
+    
+    text = str(text)
+    text = text.lower()
+    text = re.sub(r'\s+', ' ', text)
+    text = text.strip()
+    text = re.sub(r'[^\w\s-]', '', text)
+    
+    return text
+
+def validate_email(email):
+    """
+    Validate email format using regex pattern.
+    
+    Args:
+        email: string email address to validate
+    
+    Returns:
+        Boolean indicating if email is valid
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email))) if pd.notna(email) else False
+
+def remove_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    q1 = df[column].quantile(0.25)
+    q3 = df[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
