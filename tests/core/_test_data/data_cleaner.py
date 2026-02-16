@@ -210,3 +210,36 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def clean_numeric_strings(string_list):
+    """
+    Clean a list of numeric strings by converting to integers,
+    removing invalid entries, and returning sorted unique values.
+    """
+    cleaned = []
+    for s in string_list:
+        try:
+            num = int(s.strip())
+            cleaned.append(num)
+        except ValueError:
+            continue
+    unique_nums = remove_duplicates(cleaned)
+    return sorted(unique_nums)
+
+if __name__ == "__main__":
+    sample_data = ["5", "3", "8", "3", "abc", "12", "5", "8", "invalid"]
+    cleaned = clean_numeric_strings(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
