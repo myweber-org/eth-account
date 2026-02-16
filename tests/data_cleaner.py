@@ -570,3 +570,35 @@ if __name__ == "__main__":
     print("Cleaned data shape:", cleaned_data.shape)
     print("\nStatistical summary:")
     print(statistics)
+import re
+
+def clean_string(text):
+    """
+    Cleans a string by removing extra whitespace, normalizing to lowercase,
+    and stripping non-alphanumeric characters (except basic punctuation).
+    """
+    if not isinstance(text, str):
+        return text
+
+    # Convert to lowercase
+    text = text.lower()
+
+    # Replace multiple spaces/newlines/tabs with a single space
+    text = re.sub(r'\s+', ' ', text)
+
+    # Remove leading/trailing whitespace
+    text = text.strip()
+
+    # Optional: Remove special characters except letters, numbers, and basic punctuation
+    # This regex keeps letters, numbers, spaces, and .,!?;:-
+    text = re.sub(r'[^a-z0-9\s.,!?;:-]', '', text)
+
+    return text
+
+def normalize_whitespace(text):
+    """
+    Normalizes whitespace in a string, collapsing multiple spaces into one.
+    """
+    if not isinstance(text, str):
+        return text
+    return ' '.join(text.split())
