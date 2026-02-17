@@ -61,3 +61,11 @@ class DataCleaner:
     def save_cleaned_data(self, filepath):
         self.df.to_csv(filepath, index=False)
         return f"Data saved to {filepath}"
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
