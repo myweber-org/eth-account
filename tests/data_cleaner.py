@@ -949,4 +949,41 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned_df)
     print("\nValidation Results:")
     for key, value in validation.items():
-        print(f"{key}: {value}")
+        print(f"{key}: {value}")import pandas as pd
+import re
+
+def clean_string_column(series):
+    """Standardize string column: lowercase, strip whitespace, remove extra spaces."""
+    if series.dtype == 'object':
+        series = series.astype(str)
+        series = series.str.lower()
+        series = series.str.strip()
+        series = series.apply(lambda x: re.sub(r'\s+', ' ', x))
+    return series
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """Remove duplicate rows from DataFrame."""
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def clean_dataframe(df, string_columns='auto', deduplicate=True, subset=None):
+    """Clean DataFrame by standardizing strings and removing duplicates."""
+    df_clean = df.copy()
+    
+    if string_columns == 'auto':
+        string_cols = df_clean.select_dtypes(include=['object']).columns
+    else:
+        string_cols = string_columns
+    
+    for col in string_cols:
+        if col in df_clean.columns:
+            df_clean[col] = clean_string_column(df_clean[col])
+    
+    if deduplicate:
+        df_clean = remove_duplicates(df_clean, subset=subset)
+    
+    return df_clean
+
+def validate_email(email):
+    """Validate email format using regex."""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email)))
