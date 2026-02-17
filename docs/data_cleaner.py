@@ -60,3 +60,134 @@ def clean_dataset(file_path: str, output_path: str) -> None:
     
     print(f"Data cleaning complete. Results saved to {output_path}")
     print(f"Summary: {summary}")
+import pandas as pd
+import numpy as np
+from typing import Optional, List, Dict, Union
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset)
+        return self
+        
+    def handle_missing_values(self, 
+                             strategy: str = 'mean',
+                             columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+            
+        for col in columns:
+            if col not in self.df.columns:
+                continue
+                
+            if strategy == 'mean':
+                fill_value = self.df[col].mean()
+            elif strategy == 'median':
+                fill_value = self.df[col].median()
+            elif strategy == 'mode':
+                fill_value = self.df[col].mode()[0] if not self.df[col].mode().empty else 0
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+                
+            self.df[col] = self.df[col].fillna(fill_value)
+            
+        return self
+        
+    def remove_outliers_iqr(self, 
+                           columns: Optional[List[str]] = None,
+                           multiplier: float = 1.5) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+            
+        for col in columns:
+            if col not in self.df.columns:
+                continue
+                
+            Q1 = self.df[col].quantile(0.25)
+            Q3 = self.df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+            
+        return self
+        
+    def normalize_columns(self, 
+                         columns: Optional[List[str]] = None,
+                         method: str = 'minmax') -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+            
+        for col in columns:
+            if col not in self.df.columns:
+                continue
+                
+            if method == 'minmax':
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val != min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+                    
+            elif method == 'zscore':
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val != 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+                    
+        return self
+        
+    def encode_categorical(self, 
+                          columns: Optional[List[str]] = None,
+                          method: str = 'onehot') -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=['object', 'category']).columns.tolist()
+            
+        for col in columns:
+            if col not in self.df.columns:
+                continue
+                
+            if method == 'onehot':
+                dummies = pd.get_dummies(self.df[col], prefix=col, drop_first=True)
+                self.df = pd.concat([self.df.drop(columns=[col]), dummies], axis=1)
+                
+            elif method == 'label':
+                self.df[col] = self.df[col].astype('category').cat.codes
+                
+        return self
+        
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df.copy()
+        
+    def get_summary(self) -> Dict[str, Union[int, float]]:
+        cleaned_shape = self.df.shape
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': cleaned_shape[0],
+            'cleaned_columns': cleaned_shape[1],
+            'rows_removed': self.original_shape[0] - cleaned_shape[0],
+            'columns_changed': abs(self.original_shape[1] - cleaned_shape[1])
+        }
+
+def load_and_clean_csv(filepath: str, 
+                      cleaning_steps: Optional[List[Dict]] = None) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    if cleaning_steps:
+        for step in cleaning_steps:
+            method_name = step.get('method')
+            params = step.get('params', {})
+            
+            if hasattr(cleaner, method_name):
+                method = getattr(cleaner, method_name)
+                method(**params)
+    
+    return cleaner.get_cleaned_data()
