@@ -226,3 +226,147 @@ if __name__ == "__main__":
     print(f"\nCleaned data shape: {cleaned_df.shape}")
     print("\nFirst few rows of cleaned data:")
     print(cleaned_df.head())
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def zscore_normalize(data, column):
+    """
+    Normalize data using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean = data[column].mean()
+    std = data[column].std()
+    
+    if std == 0:
+        return data[column] - mean
+    
+    return (data[column] - mean) / std
+
+def minmax_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+        feature_range: desired range of transformed data
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        return data[column] * 0 + feature_range[0]
+    
+    scaled = (data[column] - min_val) / (max_val - min_val)
+    return scaled * (feature_range[1] - feature_range[0]) + feature_range[0]
+
+def detect_missing_patterns(data, threshold=0.3):
+    """
+    Detect columns with high percentage of missing values.
+    
+    Args:
+        data: pandas DataFrame
+        threshold: percentage threshold for flagging columns
+    
+    Returns:
+        List of column names exceeding missing value threshold
+    """
+    missing_percent = data.isnull().sum() / len(data)
+    return missing_percent[missing_percent > threshold].index.tolist()
+
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric columns to process
+        outlier_multiplier: IQR multiplier for outlier removal
+        normalize_method: 'zscore' or 'minmax' normalization
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            
+            if normalize_method == 'zscore':
+                cleaned_data[f'{column}_normalized'] = zscore_normalize(cleaned_data, column)
+            elif normalize_method == 'minmax':
+                cleaned_data[f'{column}_normalized'] = minmax_normalize(cleaned_data, column)
+    
+    high_missing_cols = detect_missing_patterns(cleaned_data)
+    if high_missing_cols:
+        print(f"Warning: Columns with >30% missing values: {high_missing_cols}")
+    
+    return cleaned_data
+
+def validate_data(data, required_columns=None, min_rows=10):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        data: pandas DataFrame
+        required_columns: list of required column names
+        min_rows: minimum number of rows required
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if len(data) < min_rows:
+        return False, f"Dataset has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in data.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if data.isnull().all().any():
+        return False, "Some columns contain only null values"
+    
+    return True, "Data validation passed"
