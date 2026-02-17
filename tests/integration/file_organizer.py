@@ -177,3 +177,28 @@ def organize_files_by_extension(directory_path):
 if __name__ == "__main__":
     target_directory = input("Enter the directory path to organize: ").strip()
     organize_files_by_extension(target_directory)
+import os
+import shutil
+
+def organize_files(directory):
+    if not os.path.exists(directory):
+        print(f"Directory {directory} does not exist.")
+        return
+
+    for filename in os.listdir(directory):
+        file_path = os.path.join(directory, filename)
+
+        if os.path.isfile(file_path):
+            file_extension = filename.split('.')[-1] if '.' in filename else 'no_extension'
+            target_folder = os.path.join(directory, file_extension.upper() + "_FILES")
+
+            if not os.path.exists(target_folder):
+                os.makedirs(target_folder)
+
+            target_path = os.path.join(target_folder, filename)
+            shutil.move(file_path, target_path)
+            print(f"Moved {filename} to {target_folder}")
+
+if __name__ == "__main__":
+    target_directory = input("Enter the directory path to organize: ").strip()
+    organize_files(target_directory)
