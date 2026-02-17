@@ -1,97 +1,94 @@
 
-import numpy as np
 import pandas as pd
+import numpy as np
+from pathlib import Path
 
-def remove_outliers_iqr(df, column):
+def clean_csv_data(input_path, output_path=None):
     """
-    Remove outliers from a DataFrame column using the IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to process
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed
+    Load a CSV file, clean missing values, and save cleaned data.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    
-    return filtered_df
+    try:
+        df = pd.read_csv(input_path)
+        print(f"Original data shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].mode()[0])
+        
+        # Remove rows where all values are missing
+        df = df.dropna(how='all')
+        
+        # Generate output path if not provided
+        if output_path is None:
+            input_file = Path(input_path)
+            output_path = input_file.parent / f"cleaned_{input_file.name}"
+        
+        # Save cleaned data
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        print(f"Final data shape: {df.shape}")
+        
+        return df, output_path
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {input_path}")
+        return None, None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None, None
 
-def calculate_statistics(df, column):
+def validate_dataframe(df):
     """
-    Calculate basic statistics for a column.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    column (str): Column name to analyze
-    
-    Returns:
-    dict: Dictionary containing statistics
+    Perform basic validation on dataframe.
     """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+    if df is None:
+        return False
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
+    validation_results = {
+        'has_data': len(df) > 0,
+        'has_columns': len(df.columns) > 0,
+        'missing_values': df.isnull().sum().sum(),
+        'duplicates': df.duplicated().sum()
     }
     
-    return stats
-
-def clean_numeric_data(df, columns=None):
-    """
-    Clean numeric data by removing NaN values and converting to appropriate types.
+    print("Data Validation Results:")
+    for key, value in validation_results.items():
+        print(f"  {key}: {value}")
     
-    Parameters:
-    df (pd.DataFrame): Input DataFrame
-    columns (list): List of columns to clean. If None, clean all numeric columns.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame
-    """
-    if columns is None:
-        columns = df.select_dtypes(include=[np.number]).columns.tolist()
-    
-    cleaned_df = df.copy()
-    
-    for col in columns:
-        if col in cleaned_df.columns:
-            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
-            cleaned_df = cleaned_df.dropna(subset=[col])
-    
-    return cleaned_df
+    return all([validation_results['has_data'], validation_results['has_columns']])
 
 if __name__ == "__main__":
     # Example usage
     sample_data = {
-        'values': [10, 12, 12, 13, 12, 14, 15, 100, 12, 14, 13, 12, 11, 10, 9, 8, 200]
+        'id': [1, 2, 3, 4, 5, 6],
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Eve', 'Alice'],
+        'age': [25, 30, None, 40, 35, 25],
+        'score': [85.5, 92.0, 78.5, None, 88.0, 85.5]
     }
     
-    df = pd.DataFrame(sample_data)
-    print("Original data:")
-    print(df)
-    print(f"Original shape: {df.shape}")
+    # Create temporary CSV for demonstration
+    temp_df = pd.DataFrame(sample_data)
+    temp_df.to_csv('sample_data.csv', index=False)
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned data (outliers removed):")
-    print(cleaned_df)
-    print(f"Cleaned shape: {cleaned_df.shape}")
+    # Clean the data
+    cleaned_df, output_file = clean_csv_data('sample_data.csv')
     
-    stats = calculate_statistics(cleaned_df, 'values')
-    print("\nStatistics for cleaned data:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+    if cleaned_df is not None:
+        validate_dataframe(cleaned_df)
+    
+    # Clean up temporary file
+    import os
+    if os.path.exists('sample_data.csv'):
+        os.remove('sample_data.csv')
