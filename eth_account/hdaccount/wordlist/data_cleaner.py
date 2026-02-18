@@ -235,4 +235,79 @@ if __name__ == "__main__":
     print(validate_dataframe(df))
     
     cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    """
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return data[(data >= lower_bound) & (data <= upper_bound)]
+
+def normalize_minmax(data):
+    """
+    Normalize data using min-max scaling to range [0, 1].
+    """
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
+    
+    min_val = data.min()
+    max_val = data.max()
+    
+    if max_val == min_val:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data - min_val) / (max_val - min_val)
+    return normalized
+
+def clean_dataframe(df, numeric_columns=None):
+    """
+    Clean a DataFrame by removing outliers and normalizing numeric columns.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            # Remove outliers
+            cleaned_series = remove_outliers_iqr(cleaned_df[col].dropna(), col)
+            cleaned_df = cleaned_df.loc[cleaned_series.index]
+            
+            # Normalize the column
+            cleaned_df[col] = normalize_minmax(cleaned_df[col])
+    
+    return cleaned_df
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns in a DataFrame.
+    """
+    numeric_df = df.select_dtypes(include=[np.number])
+    
+    if numeric_df.empty:
+        return pd.DataFrame()
+    
+    stats = {
+        'mean': numeric_df.mean(),
+        'median': numeric_df.median(),
+        'std': numeric_df.std(),
+        'min': numeric_df.min(),
+        'max': numeric_df.max(),
+        'count': numeric_df.count()
+    }
+    
+    return pd.DataFrame(stats)
