@@ -263,3 +263,11 @@ if __name__ == "__main__":
     print(f"Cleaned data shape: {result_df.shape}")
     print(f"Missing values: {result_df.isnull().sum().sum()}")
     print(f"Data summary:\n{stats}")
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
