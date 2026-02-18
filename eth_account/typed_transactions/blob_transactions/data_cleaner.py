@@ -270,4 +270,57 @@ def remove_duplicates_preserve_order(input_list):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and
+    handling missing values in numeric columns.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+
+    # Identify numeric columns
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+
+    # Fill missing values in numeric columns with column median
+    for col in numeric_cols:
+        if df_cleaned[col].isnull().any():
+            median_value = df_cleaned[col].median()
+            df_cleaned[col].fillna(median_value, inplace=True)
+
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate that the DataFrame contains no missing values
+    in numeric columns after cleaning.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    missing_counts = df[numeric_cols].isnull().sum()
+
+    if missing_counts.sum() == 0:
+        return True, "All numeric columns have no missing values."
+    else:
+        return False, f"Missing values found: {missing_counts.to_dict()}"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 4, None],
+        'B': [5, None, 7, 8, 9],
+        'C': ['x', 'y', 'y', 'z', 'z']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    is_valid, message = validate_dataframe(cleaned_df)
+    print(f"\nValidation: {is_valid}")
+    print(f"Message: {message}")
