@@ -355,4 +355,95 @@ def remove_outliers_iqr(data, column):
     
     mask = (col_data >= lower_bound) & (col_data <= upper_bound)
     
-    return data[mask]
+    return data[mask]import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    def remove_outliers_iqr(self, columns=None, multiplier=1.5):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - multiplier * IQR
+                upper_bound = Q3 + multiplier * IQR
+                clean_df = clean_df[(clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)]
+        return clean_df
+    
+    def fill_missing_values(self, strategy='mean', fill_value=None):
+        df_filled = self.df.copy()
+        
+        for col in self.numeric_columns:
+            if df_filled[col].isnull().any():
+                if strategy == 'mean':
+                    df_filled[col].fillna(df_filled[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    df_filled[col].fillna(df_filled[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    df_filled[col].fillna(df_filled[col].mode()[0], inplace=True)
+                elif strategy == 'constant' and fill_value is not None:
+                    df_filled[col].fillna(fill_value, inplace=True)
+        
+        return df_filled
+    
+    def standardize_data(self, columns=None):
+        if columns is None:
+            columns = self.numeric_columns
+        
+        df_standardized = self.df.copy()
+        for col in columns:
+            if col in self.numeric_columns:
+                mean = df_standardized[col].mean()
+                std = df_standardized[col].std()
+                if std > 0:
+                    df_standardized[col] = (df_standardized[col] - mean) / std
+        return df_standardized
+    
+    def detect_skewed_columns(self, threshold=0.5):
+        skewed_cols = []
+        for col in self.numeric_columns:
+            skewness = stats.skew(self.df[col].dropna())
+            if abs(skewness) > threshold:
+                skewed_cols.append((col, skewness))
+        return skewed_cols
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.randint(1, 100, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'feature1'] = np.nan
+    df.loc[5, 'feature2'] = 1000
+    
+    cleaner = DataCleaner(df)
+    print("Original shape:", df.shape)
+    
+    cleaned_df = cleaner.remove_outliers_iqr(['feature2'])
+    print("After outlier removal:", cleaned_df.shape)
+    
+    filled_df = cleaner.fill_missing_values(strategy='median')
+    print("Missing values filled")
+    
+    standardized_df = cleaner.standardize_data()
+    print("Data standardized")
+    
+    skewed = cleaner.detect_skewed_columns()
+    print("Skewed columns:", skewed)
+    
+    return cleaned_df, filled_df, standardized_df
+
+if __name__ == "__main__":
+    example_usage()
