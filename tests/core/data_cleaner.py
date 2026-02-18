@@ -203,3 +203,149 @@ def process_dataset(data, config):
         processed_data = clean_missing_values(processed_data, strategy, columns)
     
     return processed_data
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df, column_types):
+    """
+    Convert specified columns to given data types.
+    
+    Args:
+        df: pandas DataFrame
+        column_types: dict mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    df_converted = df.copy()
+    for column, dtype in column_types.items():
+        if column in df_converted.columns:
+            df_converted[column] = df_converted[column].astype(dtype)
+    return df_converted
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill with value
+        fill_value: value to use when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        return df.fillna(fill_value)
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def clean_dataframe(df, deduplicate=True, type_conversions=None, missing_strategy='drop'):
+    """
+    Comprehensive data cleaning function.
+    
+    Args:
+        df: pandas DataFrame
+        deduplicate: whether to remove duplicates
+        type_conversions: dict of column type conversions
+        missing_strategy: strategy for handling missing values
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
+    
+    cleaned_df = handle_missing_values(cleaned_df, strategy=missing_strategy)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, unique_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of columns that must be present
+        unique_columns: list of columns that should have unique values
+    
+    Returns:
+        dict with validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'duplicate_values': {},
+        'row_count': len(df),
+        'column_count': len(df.columns)
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    if unique_columns:
+        for column in unique_columns:
+            if column in df.columns:
+                duplicates = df[column].duplicated().sum()
+                if duplicates > 0:
+                    validation_results['duplicate_values'][column] = duplicates
+                    validation_results['is_valid'] = False
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', None],
+        'age': ['25', '30', '30', '35', '40'],
+        'score': [85.5, 92.0, 92.0, 78.5, 88.0]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nDataFrame info:")
+    print(df.info())
+    
+    cleaned = clean_dataframe(
+        df,
+        deduplicate=True,
+        type_conversions={'age': 'int32', 'score': 'float32'},
+        missing_strategy='fill'
+    )
+    
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    validation = validate_dataframe(
+        cleaned,
+        required_columns=['id', 'name', 'age', 'score'],
+        unique_columns=['id']
+    )
+    
+    print("\nValidation results:")
+    for key, value in validation.items():
+        print(f"{key}: {value}")
