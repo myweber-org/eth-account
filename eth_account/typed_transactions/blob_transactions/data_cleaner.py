@@ -324,3 +324,100 @@ if __name__ == "__main__":
     is_valid, message = validate_dataframe(cleaned_df)
     print(f"\nValidation: {is_valid}")
     print(f"Message: {message}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to process.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    strategy (str): 'drop' to remove rows, 'fill' to fill values.
+    fill_value: Value to use when strategy is 'fill'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    if strategy == 'drop':
+        cleaned_df = df.dropna()
+    elif strategy == 'fill':
+        if fill_value is None:
+            fill_value = df.mean(numeric_only=True)
+        cleaned_df = df.fillna(fill_value)
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+    
+    return cleaned_df
+
+def normalize_column(df, column):
+    """
+    Normalize a column to range [0, 1] using min-max scaling.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to normalize.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = df[column].min()
+    max_val = df[column].max()
+    
+    if max_val == min_val:
+        df[column + '_normalized'] = 0.5
+    else:
+        df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 3, 4, 5, 100],
+        'B': [10, 20, np.nan, 40, 50, 60],
+        'C': [100, 200, 300, 400, 500, 600]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = remove_outliers_iqr(df, 'A')
+    print("\nDataFrame after removing outliers from column 'A':")
+    print(cleaned_df)
+    
+    filled_df = clean_missing_values(df, strategy='fill', fill_value=30)
+    print("\nDataFrame after filling missing values:")
+    print(filled_df)
+    
+    normalized_df = normalize_column(df.copy(), 'C')
+    print("\nDataFrame with normalized column 'C':")
+    print(normalized_df)
