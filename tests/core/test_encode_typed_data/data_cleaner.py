@@ -168,4 +168,102 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to process
+    
+    Returns:
+        pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean dataset by removing outliers from multiple numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        numeric_columns (list): List of numeric column names
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            original_count = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_count - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df
+
+def calculate_summary_statistics(df, numeric_columns):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        numeric_columns (list): List of numeric column names
+    
+    Returns:
+        pd.DataFrame: Summary statistics DataFrame
+    """
+    summary = pd.DataFrame()
+    
+    for column in numeric_columns:
+        if column in df.columns:
+            stats = {
+                'mean': df[column].mean(),
+                'median': df[column].median(),
+                'std': df[column].std(),
+                'min': df[column].min(),
+                'max': df[column].max(),
+                'count': df[column].count()
+            }
+            summary[column] = pd.Series(stats)
+    
+    return summary
+
+if __name__ == "__main__":
+    # Example usage
+    data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100),
+        'score': np.random.normal(50, 10, 100)
+    }
+    
+    # Introduce some outliers
+    data['value'][10] = 500
+    data['value'][20] = -100
+    data['score'][30] = 200
+    data['score'][40] = -50
+    
+    df = pd.DataFrame(data)
+    print("Original dataset shape:", df.shape)
+    
+    # Clean the dataset
+    numeric_cols = ['value', 'score']
+    cleaned_df = clean_dataset(df, numeric_cols)
+    print("Cleaned dataset shape:", cleaned_df.shape)
+    
+    # Calculate summary statistics
+    summary = calculate_summary_statistics(cleaned_df, numeric_cols)
+    print("\nSummary statistics:")
+    print(summary)
