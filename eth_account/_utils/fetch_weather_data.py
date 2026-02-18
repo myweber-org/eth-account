@@ -215,4 +215,206 @@ def main():
             continue
 
 if __name__ == "__main__":
+    main()import requests
+import json
+from datetime import datetime
+import os
+from typing import Optional, Dict, Any
+
+class WeatherFetcher:
+    """A class to fetch and process weather data from OpenWeatherMap API."""
+    
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
+    FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast"
+    
+    def __init__(self, api_key: Optional[str] = None):
+        """Initialize the WeatherFetcher with an API key."""
+        self.api_key = api_key or os.getenv("OPENWEATHER_API_KEY")
+        if not self.api_key:
+            raise ValueError("API key must be provided or set as OPENWEATHER_API_KEY environment variable")
+    
+    def get_current_weather(self, city: str, country_code: Optional[str] = None) -> Dict[str, Any]:
+        """Fetch current weather data for a given city."""
+        query = f"{city},{country_code}" if country_code else city
+        params = {
+            "q": query,
+            "appid": self.api_key,
+            "units": "metric"
+        }
+        
+        try:
+            response = requests.get(self.BASE_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            return self._process_current_weather(data)
+        except requests.exceptions.RequestException as e:
+            return {"error": f"Failed to fetch weather data: {str(e)}"}
+        except json.JSONDecodeError:
+            return {"error": "Invalid response from weather API"}
+    
+    def get_weather_forecast(self, city: str, country_code: Optional[str] = None) -> Dict[str, Any]:
+        """Fetch 5-day weather forecast for a given city."""
+        query = f"{city},{country_code}" if country_code else city
+        params = {
+            "q": query,
+            "appid": self.api_key,
+            "units": "metric"
+        }
+        
+        try:
+            response = requests.get(self.FORECAST_URL, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+            
+            return self._process_forecast_data(data)
+        except requests.exceptions.RequestException as e:
+            return {"error": f"Failed to fetch forecast data: {str(e)}"}
+        except json.JSONDecodeError:
+            return {"error": "Invalid response from forecast API"}
+    
+    def _process_current_weather(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process raw current weather data into a structured format."""
+        if data.get("cod") != 200:
+            return {"error": f"Weather API error: {data.get('message', 'Unknown error')}"}
+        
+        main = data.get("main", {})
+        weather = data.get("weather", [{}])[0]
+        wind = data.get("wind", {})
+        sys = data.get("sys", {})
+        
+        processed_data = {
+            "location": {
+                "city": data.get("name"),
+                "country": sys.get("country"),
+                "coordinates": {
+                    "latitude": data.get("coord", {}).get("lat"),
+                    "longitude": data.get("coord", {}).get("lon")
+                }
+            },
+            "temperature": {
+                "current": main.get("temp"),
+                "feels_like": main.get("feels_like"),
+                "min": main.get("temp_min"),
+                "max": main.get("temp_max")
+            },
+            "conditions": {
+                "main": weather.get("main"),
+                "description": weather.get("description"),
+                "icon": weather.get("icon")
+            },
+            "additional": {
+                "humidity": main.get("humidity"),
+                "pressure": main.get("pressure"),
+                "wind_speed": wind.get("speed"),
+                "wind_direction": wind.get("deg"),
+                "cloudiness": data.get("clouds", {}).get("all"),
+                "visibility": data.get("visibility"),
+                "sunrise": self._timestamp_to_datetime(sys.get("sunrise")),
+                "sunset": self._timestamp_to_datetime(sys.get("sunset"))
+            },
+            "timestamp": self._timestamp_to_datetime(data.get("dt")),
+            "timezone": data.get("timezone")
+        }
+        
+        return processed_data
+    
+    def _process_forecast_data(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Process raw forecast data into a structured format."""
+        if data.get("cod") != "200":
+            return {"error": f"Forecast API error: {data.get('message', 'Unknown error')}"}
+        
+        city_info = data.get("city", {})
+        forecast_list = data.get("list", [])
+        
+        processed_forecast = {
+            "location": {
+                "city": city_info.get("name"),
+                "country": city_info.get("country"),
+                "coordinates": {
+                    "latitude": city_info.get("coord", {}).get("lat"),
+                    "longitude": city_info.get("coord", {}).get("lon")
+                }
+            },
+            "forecast": []
+        }
+        
+        for forecast in forecast_list[:10]:  # Limit to first 10 entries (approx 2.5 days)
+            main = forecast.get("main", {})
+            weather = forecast.get("weather", [{}])[0]
+            wind = forecast.get("wind", {})
+            
+            forecast_entry = {
+                "timestamp": self._timestamp_to_datetime(forecast.get("dt")),
+                "temperature": {
+                    "current": main.get("temp"),
+                    "feels_like": main.get("feels_like"),
+                    "min": main.get("temp_min"),
+                    "max": main.get("temp_max")
+                },
+                "conditions": {
+                    "main": weather.get("main"),
+                    "description": weather.get("description"),
+                    "icon": weather.get("icon")
+                },
+                "additional": {
+                    "humidity": main.get("humidity"),
+                    "pressure": main.get("pressure"),
+                    "wind_speed": wind.get("speed"),
+                    "wind_direction": wind.get("deg"),
+                    "cloudiness": forecast.get("clouds", {}).get("all"),
+                    "precipitation": forecast.get("pop", 0)  # Probability of precipitation
+                }
+            }
+            processed_forecast["forecast"].append(forecast_entry)
+        
+        return processed_forecast
+    
+    def _timestamp_to_datetime(self, timestamp: Optional[int]) -> Optional[str]:
+        """Convert Unix timestamp to ISO format datetime string."""
+        if timestamp is None:
+            return None
+        return datetime.fromtimestamp(timestamp).isoformat()
+    
+    def save_weather_data(self, data: Dict[str, Any], filename: str = "weather_data.json") -> bool:
+        """Save weather data to a JSON file."""
+        try:
+            with open(filename, 'w') as f:
+                json.dump(data, f, indent=2)
+            return True
+        except (IOError, TypeError) as e:
+            print(f"Failed to save data: {str(e)}")
+            return False
+
+def main():
+    """Example usage of the WeatherFetcher class."""
+    # Replace with your actual API key or set OPENWEATHER_API_KEY environment variable
+    API_KEY = "your_api_key_here"
+    
+    fetcher = WeatherFetcher(API_KEY)
+    
+    # Fetch current weather for London
+    print("Fetching current weather for London...")
+    london_weather = fetcher.get_current_weather("London", "GB")
+    
+    if "error" not in london_weather:
+        print(f"Current temperature in London: {london_weather['temperature']['current']}°C")
+        print(f"Conditions: {london_weather['conditions']['description']}")
+        
+        # Save to file
+        if fetcher.save_weather_data(london_weather, "london_weather.json"):
+            print("Weather data saved to london_weather.json")
+    else:
+        print(f"Error: {london_weather['error']}")
+    
+    # Fetch forecast for New York
+    print("\nFetching forecast for New York...")
+    ny_forecast = fetcher.get_weather_forecast("New York", "US")
+    
+    if "error" not in ny_forecast and ny_forecast.get("forecast"):
+        print(f"Forecast for {ny_forecast['location']['city']}:")
+        for i, forecast in enumerate(ny_forecast["forecast"][:3], 1):
+            print(f"  {i}. {forecast['timestamp']}: {forecast['temperature']['current']}°C, {forecast['conditions']['description']}")
+
+if __name__ == "__main__":
     main()
