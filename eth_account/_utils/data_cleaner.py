@@ -209,3 +209,14 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df, missing_strategy='mean', outlier_method='iqr')
     print("\nCleaned DataFrame:")
     print(cleaned)
+def clean_data(data):
+    """
+    Remove duplicates from the provided list and sort the remaining items.
+    """
+    if not isinstance(data, list):
+        raise TypeError("Input must be a list")
+    # Remove duplicates by converting to a set, then back to a list
+    unique_data = list(set(data))
+    # Sort the list
+    unique_data.sort()
+    return unique_data
