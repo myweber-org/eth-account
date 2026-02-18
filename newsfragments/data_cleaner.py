@@ -104,3 +104,124 @@ if __name__ == "__main__":
     print("\nCleaned data shape:", cleaned_df.shape)
     print("\nCleaned statistics:")
     print(calculate_basic_stats(cleaned_df, 'value'))
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        DataFrame with normalized column
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val != min_val:
+        data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    else:
+        data[column + '_normalized'] = 0
+    
+    return data
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        DataFrame with standardized column
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val != 0:
+        data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    else:
+        data[column + '_standardized'] = 0
+    
+    return data
+
+def clean_dataset(data, numeric_columns, outlier_threshold=1.5):
+    """
+    Complete data cleaning pipeline.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names
+        outlier_threshold: IQR multiplier for outlier removal
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_threshold)
+            cleaned_data = normalize_minmax(cleaned_data, column)
+            cleaned_data = standardize_zscore(cleaned_data, column)
+    
+    return cleaned_data
+
+def validate_data(data, required_columns):
+    """
+    Validate data structure and required columns.
+    
+    Args:
+        data: pandas DataFrame
+        required_columns: list of required column names
+    
+    Returns:
+        Boolean indicating if data is valid
+    """
+    missing_columns = [col for col in required_columns if col not in data.columns]
+    
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
+    
+    if data.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000)
+    })
+    
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b', 'feature_c'])
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Columns after cleaning: {cleaned.columns.tolist()}")
