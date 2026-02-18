@@ -1,37 +1,36 @@
-
-import pandas as pd
 import numpy as np
-from scipy import stats
+import pandas as pd
 
-def remove_outliers_iqr(df, columns):
-    df_clean = df.copy()
-    for col in columns:
-        Q1 = df_clean[col].quantile(0.25)
-        Q3 = df_clean[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-    return df_clean
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def normalize_minmax(df, columns):
-    df_norm = df.copy()
-    for col in columns:
-        min_val = df_norm[col].min()
-        max_val = df_norm[col].max()
-        if max_val != min_val:
-            df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
-        else:
-            df_norm[col] = 0
-    return df_norm
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val - min_val == 0:
+        return df[column]
+    return (df[column] - min_val) / (max_val - min_val)
 
-def clean_dataset(filepath, numeric_columns):
-    df = pd.read_csv(filepath)
-    df_cleaned = remove_outliers_iqr(df, numeric_columns)
-    df_normalized = normalize_minmax(df_cleaned, numeric_columns)
-    return df_normalized
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df.dropna()
 
 if __name__ == "__main__":
-    cleaned_data = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
-    cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print("Data cleaning completed. Cleaned data saved to 'cleaned_data.csv'")
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 200),
+        'feature_b': np.random.exponential(50, 200),
+        'category': np.random.choice(['X', 'Y', 'Z'], 200)
+    })
+    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
+    print(f"Removed rows: {sample_data.shape[0] - cleaned.shape[0]}")
