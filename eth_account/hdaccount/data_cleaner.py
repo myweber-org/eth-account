@@ -399,4 +399,147 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns a cleaned Series.
+    """
+    if not isinstance(data, pd.Series):
+        raise TypeError("Input data must be a pandas Series")
+    
+    Q1 = data.quantile(0.25)
+    Q3 = data.quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    return data[(data >= lower_bound) & (data <= upper_bound)]
+
+def normalize_minmax(data):
+    """
+    Normalize data to [0, 1] range using min-max scaling.
+    Handles both pandas Series and numpy arrays.
+    """
+    if isinstance(data, pd.Series):
+        data_values = data.values
+    else:
+        data_values = np.array(data)
+    
+    if len(data_values) == 0:
+        return data_values
+    
+    min_val = np.min(data_values)
+    max_val = np.max(data_values)
+    
+    if max_val == min_val:
+        return np.zeros_like(data_values)
+    
+    normalized = (data_values - min_val) / (max_val - min_val)
+    
+    if isinstance(data, pd.Series):
+        return pd.Series(normalized, index=data.index)
+    return normalized
+
+def z_score_normalize(data):
+    """
+    Normalize data using z-score standardization.
+    Returns data with mean=0 and std=1.
+    """
+    if isinstance(data, pd.Series):
+        data_values = data.values
+    else:
+        data_values = np.array(data)
+    
+    if len(data_values) == 0:
+        return data_values
+    
+    mean_val = np.mean(data_values)
+    std_val = np.std(data_values)
+    
+    if std_val == 0:
+        return np.zeros_like(data_values)
+    
+    normalized = (data_values - mean_val) / std_val
+    
+    if isinstance(data, pd.Series):
+        return pd.Series(normalized, index=data.index)
+    return normalized
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Clean a DataFrame by removing outliers and normalizing numeric columns.
+    Returns a cleaned DataFrame.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            # Remove outliers
+            cleaned_series = remove_outliers_iqr(cleaned_df[col], col)
+            
+            # Normalize using z-score
+            normalized_series = z_score_normalize(cleaned_series)
+            
+            # Update the DataFrame
+            cleaned_df.loc[cleaned_series.index, col] = normalized_series
+    
+    return cleaned_df
+
+def validate_data(data, check_finite=True, check_nan=True):
+    """
+    Validate data for common issues.
+    Returns True if data passes all checks, False otherwise.
+    """
+    if isinstance(data, pd.DataFrame) or isinstance(data, pd.Series):
+        data_values = data.values
+    else:
+        data_values = np.array(data)
+    
+    if len(data_values) == 0:
+        return False
+    
+    if check_nan and np.any(np.isnan(data_values)):
+        return False
+    
+    if check_finite and not np.all(np.isfinite(data_values)):
+        return False
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 50),
+        'feature_b': np.random.exponential(2, 50),
+        'category': np.random.choice(['A', 'B', 'C'], 50)
+    })
+    
+    # Add some outliers
+    sample_data.loc[0, 'feature_a'] = 500
+    sample_data.loc[1, 'feature_b'] = 100
+    
+    print("Original data shape:", sample_data.shape)
+    print("Original data stats:")
+    print(sample_data.describe())
+    
+    # Clean the data
+    cleaned_data = clean_dataset(sample_data, ['feature_a', 'feature_b'])
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Cleaned data stats:")
+    print(cleaned_data.describe())
+    
+    # Validate the cleaned data
+    is_valid = validate_data(cleaned_data[['feature_a', 'feature_b']])
+    print(f"\nData validation passed: {is_valid}")
