@@ -435,4 +435,105 @@ def get_dataset_summary(df):
         'categorical_columns': len(df.select_dtypes(include=['object', 'category']).columns)
     }
     
+    return summaryimport pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        strategy: Method for imputation ('mean', 'median', 'mode', 'drop')
+        columns: List of columns to process, None processes all columns
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                df_clean[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median':
+                df_clean[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df_clean[col].fillna(df[col].mode()[0], inplace=True)
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+    
+    return df_clean
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using IQR method.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of numeric columns to check
+        multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        Q1 = df_clean[col].quantile(0.25)
+        Q3 = df_clean[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    return df_clean
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Args:
+        df: pandas DataFrame
+        columns: List of columns to standardize
+    
+    Returns:
+        DataFrame with standardized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_standardized = df.copy()
+    
+    for col in columns:
+        mean = df_standardized[col].mean()
+        std = df_standardized[col].std()
+        if std > 0:
+            df_standardized[col] = (df_standardized[col] - mean) / std
+    
+    return df_standardized
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+    
+    Returns:
+        Dictionary with summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'data_types': df.dtypes.to_dict(),
+        'numeric_stats': df.describe().to_dict() if df.select_dtypes(include=[np.number]).shape[1] > 0 else {}
+    }
     return summary
