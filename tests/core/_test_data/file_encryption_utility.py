@@ -1,62 +1,90 @@
 
 import os
-import sys
+import base64
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
 
-class XORCipher:
-    def __init__(self, key: str):
-        self.key = key.encode()
+class FileEncryptor:
+    def __init__(self, password):
+        self.password = password.encode()
+        self.salt = os.urandom(16)
+        self.backend = default_backend()
+        
+    def derive_key(self):
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=self.salt,
+            iterations=100000,
+            backend=self.backend
+        )
+        return kdf.derive(self.password)
     
-    def encrypt(self, data: bytes) -> bytes:
-        key_length = len(self.key)
-        return bytes([data[i] ^ self.key[i % key_length] for i in range(len(data))])
+    def encrypt_file(self, input_path, output_path):
+        key = self.derive_key()
+        iv = os.urandom(16)
+        
+        with open(input_path, 'rb') as f:
+            plaintext = f.read()
+        
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=self.backend)
+        encryptor = cipher.encryptor()
+        
+        pad_length = 16 - (len(plaintext) % 16)
+        padded_data = plaintext + bytes([pad_length] * pad_length)
+        
+        ciphertext = encryptor.update(padded_data) + encryptor.finalize()
+        
+        with open(output_path, 'wb') as f:
+            f.write(self.salt + iv + ciphertext)
+        
+        return True
     
-    def decrypt(self, data: bytes) -> bytes:
-        return self.encrypt(data)
-
-def process_file(input_path: str, output_path: str, key: str, mode: str):
-    if not os.path.exists(input_path):
-        print(f"Error: Input file '{input_path}' not found.")
-        sys.exit(1)
-    
-    cipher = XORCipher(key)
-    
-    try:
+    def decrypt_file(self, input_path, output_path):
         with open(input_path, 'rb') as f:
             data = f.read()
         
-        if mode == 'encrypt':
-            processed_data = cipher.encrypt(data)
-            action = "Encrypted"
-        elif mode == 'decrypt':
-            processed_data = cipher.decrypt(data)
-            action = "Decrypted"
-        else:
-            print("Error: Mode must be 'encrypt' or 'decrypt'.")
-            sys.exit(1)
+        self.salt = data[:16]
+        iv = data[16:32]
+        ciphertext = data[32:]
+        
+        key = self.derive_key()
+        
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=self.backend)
+        decryptor = cipher.decryptor()
+        
+        padded_plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+        
+        pad_length = padded_plaintext[-1]
+        plaintext = padded_plaintext[:-pad_length]
         
         with open(output_path, 'wb') as f:
-            f.write(processed_data)
+            f.write(plaintext)
         
-        print(f"{action} file saved to: {output_path}")
-        print(f"Original size: {len(data)} bytes")
-        print(f"Processed size: {len(processed_data)} bytes")
-        
-    except Exception as e:
-        print(f"Error processing file: {e}")
-        sys.exit(1)
+        return True
 
 def main():
-    if len(sys.argv) != 5:
-        print("Usage: python file_encryption_utility.py <input_file> <output_file> <key> <mode>")
-        print("Mode: 'encrypt' or 'decrypt'")
-        sys.exit(1)
+    encryptor = FileEncryptor("secure_password_123")
     
-    input_file = sys.argv[1]
-    output_file = sys.argv[2]
-    key = sys.argv[3]
-    mode = sys.argv[4].lower()
+    test_data = b"This is a secret message that needs encryption."
+    with open("test_input.txt", "wb") as f:
+        f.write(test_data)
     
-    process_file(input_file, output_file, key, mode)
+    encryptor.encrypt_file("test_input.txt", "encrypted.dat")
+    encryptor.decrypt_file("encrypted.dat", "decrypted.txt")
+    
+    with open("decrypted.txt", "rb") as f:
+        result = f.read()
+    
+    print("Original:", test_data)
+    print("Decrypted:", result)
+    print("Match:", test_data == result)
+    
+    os.remove("test_input.txt")
+    os.remove("encrypted.dat")
+    os.remove("decrypted.txt")
 
 if __name__ == "__main__":
     main()
