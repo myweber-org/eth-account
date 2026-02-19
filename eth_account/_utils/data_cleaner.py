@@ -299,3 +299,73 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean dataset by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column mean
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if df_cleaned[col].isnull().any():
+            mode_value = df_cleaned[col].mode()[0]
+            df_cleaned[col] = df_cleaned[col].fillna(mode_value)
+    
+    return df_cleaned
+
+def validate_data(df):
+    """
+    Validate data after cleaning.
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'duplicates': df.duplicated().sum(),
+        'missing_values': df.isnull().sum().sum(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    return validation_results
+
+def process_data(input_file, output_file):
+    """
+    Main function to process data from input file and save cleaned data.
+    """
+    try:
+        # Read input data
+        df = pd.read_csv(input_file)
+        
+        # Clean the data
+        df_cleaned = clean_dataset(df)
+        
+        # Validate cleaned data
+        validation = validate_data(df_cleaned)
+        
+        # Save cleaned data
+        df_cleaned.to_csv(output_file, index=False)
+        
+        return {
+            'success': True,
+            'cleaned_rows': len(df_cleaned),
+            'removed_duplicates': len(df) - len(df_cleaned),
+            'validation': validation
+        }
+        
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }
+
+if __name__ == "__main__":
+    # Example usage
+    result = process_data('raw_data.csv', 'cleaned_data.csv')
+    print(result)
