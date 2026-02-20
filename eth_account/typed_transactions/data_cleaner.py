@@ -418,4 +418,59 @@ def validate_data(data, check_negative=True, check_zero=True, check_range=None):
         if issues:
             validation_results[column] = issues
     
-    return validation_results
+    return validation_resultsimport pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Standardize text by converting to lowercase, removing extra whitespace,
+    and stripping special characters (except basic punctuation).
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str).str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'\s+', ' ', x.strip()))
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^\w\s.,!?-]', '', x))
+    return df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def standardize_dates(df, column_name, date_format='%Y-%m-%d'):
+    """
+    Attempt to parse dates in a column to a standard format.
+    """
+    df[column_name] = pd.to_datetime(df[column_name], errors='coerce').dt.strftime(date_format)
+    return df
+
+def clean_dataset(file_path, text_columns=None, date_columns=None, deduplicate=True):
+    """
+    Main function to load and clean a dataset from a CSV file.
+    """
+    df = pd.read_csv(file_path)
+    
+    if text_columns:
+        for col in text_columns:
+            df = clean_text_column(df, col)
+    
+    if date_columns:
+        for col in date_columns:
+            df = standardize_dates(df, col)
+    
+    if deduplicate:
+        df = remove_duplicates(df)
+    
+    return df
+
+if __name__ == "__main__":
+    # Example usage
+    cleaned_df = clean_dataset(
+        'raw_data.csv',
+        text_columns=['name', 'description'],
+        date_columns=['created_at']
+    )
+    cleaned_df.to_csv('cleaned_data.csv', index=False)
