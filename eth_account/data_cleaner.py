@@ -1,48 +1,124 @@
+
 import numpy as np
 import pandas as pd
 
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers from a column using the IQR method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
 
-def normalize_minmax(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
+def normalize_minmax(data, column):
+    """
+    Normalize a column using min-max scaling to [0, 1] range.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
     if max_val == min_val:
-        return df[column].apply(lambda x: 0.0)
-    return df[column].apply(lambda x: (x - min_val) / (max_val - min_val))
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
 
-def clean_dataset(df, numeric_columns):
-    cleaned_df = df.copy()
-    for col in numeric_columns:
-        if col in cleaned_df.columns:
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-            cleaned_df[col] = normalize_minmax(cleaned_df, col)
-    return cleaned_df.reset_index(drop=True)
+def standardize_zscore(data, column):
+    """
+    Standardize a column using z-score normalization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to standardize
+    
+    Returns:
+        Series with standardized values
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in data")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
 
-def validate_cleaning(df_before, df_after, column):
-    if column not in df_before.columns or column not in df_after.columns:
-        return None
-    stats = {
-        'original_mean': df_before[column].mean(),
-        'cleaned_mean': df_after[column].mean(),
-        'original_std': df_before[column].std(),
-        'cleaned_std': df_after[column].std(),
-        'rows_removed': len(df_before) - len(df_after)
-    }
-    return stats
+def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5):
+    """
+    Clean dataset by removing outliers from numeric columns.
+    
+    Args:
+        data: pandas DataFrame
+        numeric_columns: list of numeric column names (default: all numeric columns)
+        outlier_multiplier: IQR multiplier for outlier detection
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_data.columns:
+            cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+    
+    return cleaned_data.reset_index(drop=True)
 
-if __name__ == "__main__":
-    sample_data = pd.DataFrame({
-        'feature_a': np.random.normal(100, 15, 200),
-        'feature_b': np.random.exponential(50, 200)
-    })
-    cleaned = clean_dataset(sample_data, ['feature_a', 'feature_b'])
-    validation = validate_cleaning(sample_data, cleaned, 'feature_a')
-    print(f"Original rows: {len(sample_data)}")
-    print(f"Cleaned rows: {len(cleaned)}")
-    print(f"Validation stats: {validation}")
+def process_numeric_features(data, columns, method='standardize'):
+    """
+    Process numeric features with specified normalization method.
+    
+    Args:
+        data: pandas DataFrame
+        columns: list of column names to process
+        method: 'standardize' (z-score) or 'normalize' (min-max)
+    
+    Returns:
+        DataFrame with processed columns
+    """
+    processed_data = data.copy()
+    
+    for column in columns:
+        if column not in processed_data.columns:
+            continue
+            
+        if method == 'standardize':
+            processed_data[column] = standardize_zscore(processed_data, column)
+        elif method == 'normalize':
+            processed_data[column] = normalize_minmax(processed_data, column)
+        else:
+            raise ValueError("Method must be 'standardize' or 'normalize'")
+    
+    return processed_data
