@@ -65,3 +65,60 @@ if __name__ == "__main__":
     cleaned = clean_dataset(df)
     print(cleaned)
     print(f"\nValidation passed: {validate_dataset(cleaned)}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    missing_strategy (str): Strategy for missing values. Options: 'mean', 'median', 'mode', 'drop'.
+    outlier_method (str): Method for outlier detection. Options: 'iqr', 'zscore'.
+    columns (list): List of column names to clean. If None, clean all numeric columns.
+
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+
+        if missing_strategy == 'mean':
+            fill_value = df_clean[col].mean()
+        elif missing_strategy == 'median':
+            fill_value = df_clean[col].median()
+        elif missing_strategy == 'mode':
+            fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else np.nan
+        elif missing_strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+            continue
+        else:
+            raise ValueError(f"Unsupported missing strategy: {missing_strategy}")
+
+        df_clean[col].fillna(fill_value, inplace=True)
+
+        if outlier_method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean[col] = np.where((df_clean[col] < lower_bound) | (df_clean[col] > upper_bound),
+                                     fill_value, df_clean[col])
+        elif outlier_method == 'zscore':
+            mean = df_clean[col].mean()
+            std = df_clean[col].std()
+            z_scores = np.abs((df_clean[col] - mean) / std)
+            df_clean[col] = np.where(z_scores > 3, fill_value, df_clean[col])
+        else:
+            raise ValueError(f"Unsupported outlier method: {outlier_method}")
+
+    return df_clean
