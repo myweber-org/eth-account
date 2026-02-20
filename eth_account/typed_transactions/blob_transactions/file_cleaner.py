@@ -91,3 +91,38 @@ def clean_filenames_in_directory(directory_path):
 if __name__ == "__main__":
     target_directory = input("Enter directory path to clean filenames: ").strip()
     clean_filenames_in_directory(target_directory)
+import os
+import glob
+import sys
+
+def clean_temp_files(directory, patterns):
+    """
+    Remove files matching given patterns in the specified directory.
+    """
+    if not os.path.isdir(directory):
+        print(f"Error: {directory} is not a valid directory.")
+        return False
+    
+    removed_count = 0
+    for pattern in patterns:
+        search_path = os.path.join(directory, pattern)
+        for file_path in glob.glob(search_path):
+            try:
+                os.remove(file_path)
+                print(f"Removed: {file_path}")
+                removed_count += 1
+            except OSError as e:
+                print(f"Error removing {file_path}: {e}")
+    
+    print(f"Total files removed: {removed_count}")
+    return True
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print("Usage: python file_cleaner.py <directory>")
+        sys.exit(1)
+    
+    target_dir = sys.argv[1]
+    temp_patterns = ['*.tmp', '*.temp', '~*', '*.bak']
+    
+    clean_temp_files(target_dir, temp_patterns)
