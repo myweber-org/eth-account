@@ -1,80 +1,82 @@
 
 import pandas as pd
 import numpy as np
-from typing import Optional, Dict, List
+import re
 
-class DataCleaner:
-    def __init__(self, df: pd.DataFrame):
-        self.df = df.copy()
-        self.original_shape = df.shape
+def clean_csv_data(input_file, output_file):
+    """
+    Clean and preprocess CSV data by handling missing values,
+    standardizing formats, and removing duplicates.
+    """
+    try:
+        df = pd.read_csv(input_file)
         
-    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+        # Remove duplicate rows
+        df = df.drop_duplicates()
         
-        for col in columns:
-            if col in self.df.columns:
-                if strategy == 'mean':
-                    self.df[col].fillna(self.df[col].mean(), inplace=True)
-                elif strategy == 'median':
-                    self.df[col].fillna(self.df[col].median(), inplace=True)
-                elif strategy == 'mode':
-                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
-                elif strategy == 'drop':
-                    self.df.dropna(subset=[col], inplace=True)
+        # Standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
         
-        return self
-    
-    def convert_types(self, type_map: Dict[str, str]) -> 'DataCleaner':
-        for col, dtype in type_map.items():
-            if col in self.df.columns:
-                try:
-                    if dtype == 'datetime':
-                        self.df[col] = pd.to_datetime(self.df[col])
-                    elif dtype == 'category':
-                        self.df[col] = self.df[col].astype('category')
-                    else:
-                        self.df[col] = self.df[col].astype(dtype)
-                except Exception as e:
-                    print(f"Error converting column {col} to {dtype}: {e}")
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
         
-        return self
-    
-    def remove_outliers(self, columns: List[str], method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
-        for col in columns:
-            if col in self.df.columns and self.df[col].dtype in [np.float64, np.int64]:
-                if method == 'iqr':
-                    Q1 = self.df[col].quantile(0.25)
-                    Q3 = self.df[col].quantile(0.75)
-                    IQR = Q3 - Q1
-                    lower_bound = Q1 - threshold * IQR
-                    upper_bound = Q3 + threshold * IQR
-                    self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        df[categorical_cols] = df[categorical_cols].fillna('unknown')
         
-        return self
-    
-    def get_cleaned_data(self) -> pd.DataFrame:
-        return self.df
-    
-    def get_summary(self) -> Dict:
-        return {
-            'original_shape': self.original_shape,
-            'cleaned_shape': self.df.shape,
-            'missing_values': self.df.isnull().sum().to_dict(),
-            'data_types': self.df.dtypes.astype(str).to_dict()
-        }
+        # Clean string columns
+        for col in categorical_cols:
+            df[col] = df[col].astype(str).str.strip()
+            df[col] = df[col].apply(lambda x: re.sub(r'\s+', ' ', x))
+        
+        # Remove outliers using IQR method for numeric columns
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaning completed. Cleaned data saved to {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty.")
+        return False
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return False
 
-def load_and_clean_csv(filepath: str, **kwargs) -> pd.DataFrame:
-    df = pd.read_csv(filepath)
-    cleaner = DataCleaner(df)
+def validate_data(file_path):
+    """
+    Validate the cleaned data file.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        
+        print("Data Validation Report:")
+        print(f"Total rows: {len(df)}")
+        print(f"Total columns: {len(df.columns)}")
+        print("\nMissing values per column:")
+        print(df.isnull().sum())
+        print("\nData types:")
+        print(df.dtypes)
+        
+        return True
+    except Exception as e:
+        print(f"Validation error: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
     
-    if 'missing_strategy' in kwargs:
-        cleaner.handle_missing_values(strategy=kwargs['missing_strategy'])
-    
-    if 'type_map' in kwargs:
-        cleaner.convert_types(kwargs['type_map'])
-    
-    if 'outlier_columns' in kwargs:
-        cleaner.remove_outliers(columns=kwargs['outlier_columns'])
-    
-    return cleaner.get_cleaned_data()
+    if clean_csv_data(input_csv, output_csv):
+        validate_data(output_csv)
