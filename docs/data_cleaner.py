@@ -114,3 +114,97 @@ def clean_dataset(input_path, output_path):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.0)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0.0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    else:
+        return data.fillna(0)
+
+def clean_dataset(data, outlier_columns=None, normalize_columns=None, standardize_columns=None, missing_strategy='mean'):
+    cleaned_data = data.copy()
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            if col in cleaned_data.columns:
+                cleaned_data = remove_outliers_iqr(cleaned_data, col)
+    
+    cleaned_data = handle_missing_values(cleaned_data, strategy=missing_strategy)
+    
+    if normalize_columns:
+        for col in normalize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data[col + '_normalized'] = normalize_minmax(cleaned_data, col)
+    
+    if standardize_columns:
+        for col in standardize_columns:
+            if col in cleaned_data.columns:
+                cleaned_data[col + '_standardized'] = standardize_zscore(cleaned_data, col)
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    summary = {
+        'rows': len(data),
+        'columns': len(data.columns),
+        'missing_values': data.isnull().sum().sum(),
+        'numeric_columns': list(data.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(data.select_dtypes(include=['object']).columns)
+    }
+    return summary
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 100),
+        'B': np.random.uniform(0, 1, 100),
+        'C': np.random.randint(1, 50, 100)
+    })
+    
+    sample_data.loc[10:15, 'A'] = np.nan
+    sample_data.loc[20, 'B'] = 999
+    
+    print("Original data shape:", sample_data.shape)
+    print("Data summary:", get_data_summary(sample_data))
+    
+    cleaned = clean_dataset(
+        sample_data,
+        outlier_columns=['A'],
+        normalize_columns=['B'],
+        standardize_columns=['C'],
+        missing_strategy='mean'
+    )
+    
+    print("\nCleaned data shape:", cleaned.shape)
+    print("Cleaned data summary:", get_data_summary(cleaned))
+    print("\nCleaned data columns:", list(cleaned.columns))
