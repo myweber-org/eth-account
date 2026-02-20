@@ -255,4 +255,75 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
 #     print(cleaned)
 #     
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
-#     print(f"\nValidation: {is_valid}, Message: {message}")
+#     print(f"\nValidation: {is_valid}, Message: {message}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns a filtered Series.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    Returns a filtered DataFrame.
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data to range [0, 1] using min-max scaling.
+    Returns a new Series with normalized values.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def normalize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization (mean=0, std=1).
+    Returns a new Series with standardized values.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_mean(data, column):
+    """
+    Fill missing values with the mean of the column.
+    Returns a new Series.
+    """
+    mean_val = data[column].mean()
+    filled = data[column].fillna(mean_val)
+    return filled
+
+def handle_missing_median(data, column):
+    """
+    Fill missing values with the median of the column.
+    Returns a new Series.
+    """
+    median_val = data[column].median()
+    filled = data[column].fillna(median_val)
+    return filled
+
+def get_data_summary(data):
+    """
+    Generate a summary statistics DataFrame for the given data.
+    """
+    summary = data.describe(include='all').transpose()
+    summary['missing'] = data.isnull().sum()
+    summary['dtype'] = data.dtypes
+    return summary
