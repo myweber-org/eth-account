@@ -728,3 +728,124 @@ def demonstrate_usage():
 
 if __name__ == "__main__":
     cleaned_data = demonstrate_usage()
+import pandas as pd
+import numpy as np
+from typing import List, Union
+
+def remove_duplicates(df: pd.DataFrame, subset: Union[List[str], str] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Column(s) to consider for duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def convert_column_types(df: pd.DataFrame, column_types: dict) -> pd.DataFrame:
+    """
+    Convert specified columns to given data types.
+    
+    Args:
+        df: Input DataFrame
+        column_types: Dictionary mapping column names to target types
+    
+    Returns:
+        DataFrame with converted column types
+    """
+    result_df = df.copy()
+    for column, dtype in column_types.items():
+        if column in result_df.columns:
+            result_df[column] = result_df[column].astype(dtype)
+    return result_df
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'drop', fill_value: any = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to fill missing entries with
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill' and fill_value is not None:
+        return df.fillna(fill_value)
+    return df
+
+def clean_dataframe(df: pd.DataFrame, 
+                    deduplicate: bool = True,
+                    type_conversions: dict = None,
+                    missing_strategy: str = 'drop',
+                    fill_value: any = None) -> pd.DataFrame:
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        df: Input DataFrame
+        deduplicate: Whether to remove duplicates
+        type_conversions: Column type conversion dictionary
+        missing_strategy: Strategy for handling missing values
+        fill_value: Value to fill missing entries
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if deduplicate:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if type_conversions:
+        cleaned_df = convert_column_types(cleaned_df, type_conversions)
+    
+    cleaned_df = handle_missing_values(cleaned_df, missing_strategy, fill_value)
+    
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame, required_columns: List[str] = None) -> bool:
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of columns that must be present
+    
+    Returns:
+        Boolean indicating if DataFrame is valid
+    """
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False
+    
+    return True
+
+def get_dataframe_stats(df: pd.DataFrame) -> dict:
+    """
+    Get basic statistics about DataFrame.
+    
+    Args:
+        df: Input DataFrame
+    
+    Returns:
+        Dictionary containing DataFrame statistics
+    """
+    stats = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicates': df.duplicated().sum(),
+        'memory_usage': df.memory_usage(deep=True).sum() / 1024 / 1024  # MB
+    }
+    return stats
