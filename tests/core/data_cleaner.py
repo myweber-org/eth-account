@@ -143,4 +143,96 @@ if __name__ == "__main__":
     output_file = "cleaned_data.csv"
     
     cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+    save_cleaned_data(cleaned_df, output_file)import pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, method='median', z_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    method (str): Imputation method ('mean', 'median', 'mode')
+    z_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col not in df_clean.columns:
+            continue
+            
+        # Handle missing values
+        if method == 'mean':
+            fill_value = df_clean[col].mean()
+        elif method == 'median':
+            fill_value = df_clean[col].median()
+        elif method == 'mode':
+            fill_value = df_clean[col].mode()[0] if not df_clean[col].mode().empty else np.nan
+        else:
+            fill_value = df_clean[col].median()
+        
+        df_clean[col] = df_clean[col].fillna(fill_value)
+        
+        # Remove outliers using z-score
+        if z_threshold > 0:
+            z_scores = np.abs(stats.zscore(df_clean[col]))
+            df_clean = df_clean[z_scores < z_threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    dict: Validation results
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'empty_rows': 0,
+        'total_rows': len(df),
+        'total_columns': len(df.columns)
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    validation_results['empty_rows'] = df.isnull().all(axis=1).sum()
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 8],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataset(df, numeric_columns=['A', 'B'], z_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
+    print("\nValidation Results:")
+    print(validation)
