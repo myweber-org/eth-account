@@ -4,7 +4,7 @@ import pandas as pd
 
 def remove_outliers_iqr(data, column, multiplier=1.5):
     """
-    Remove outliers from a column using the IQR method.
+    Remove outliers using the Interquartile Range method.
     
     Args:
         data: pandas DataFrame
@@ -12,10 +12,10 @@ def remove_outliers_iqr(data, column, multiplier=1.5):
         multiplier: IQR multiplier (default 1.5)
     
     Returns:
-        DataFrame with outliers removed
+        Filtered DataFrame without outliers
     """
     if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in data")
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
     q1 = data[column].quantile(0.25)
     q3 = data[column].quantile(0.75)
@@ -29,58 +29,64 @@ def remove_outliers_iqr(data, column, multiplier=1.5):
 
 def normalize_minmax(data, column):
     """
-    Normalize a column using min-max scaling to [0, 1] range.
+    Normalize data using Min-Max scaling.
     
     Args:
         data: pandas DataFrame
         column: column name to normalize
     
     Returns:
-        Series with normalized values
+        DataFrame with normalized column
     """
     if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in data")
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
     min_val = data[column].min()
     max_val = data[column].max()
     
     if max_val == min_val:
-        return pd.Series([0.5] * len(data), index=data.index)
+        normalized = 0.5
+    else:
+        normalized = (data[column] - min_val) / (max_val - min_val)
     
-    normalized = (data[column] - min_val) / (max_val - min_val)
-    return normalized
+    result = data.copy()
+    result[f"{column}_normalized"] = normalized
+    return result
 
 def standardize_zscore(data, column):
     """
-    Standardize a column using z-score normalization.
+    Standardize data using Z-score normalization.
     
     Args:
         data: pandas DataFrame
         column: column name to standardize
     
     Returns:
-        Series with standardized values
+        DataFrame with standardized column
     """
     if column not in data.columns:
-        raise ValueError(f"Column '{column}' not found in data")
+        raise ValueError(f"Column '{column}' not found in DataFrame")
     
     mean_val = data[column].mean()
     std_val = data[column].std()
     
     if std_val == 0:
-        return pd.Series([0] * len(data), index=data.index)
+        standardized = 0
+    else:
+        standardized = (data[column] - mean_val) / std_val
     
-    standardized = (data[column] - mean_val) / std_val
-    return standardized
+    result = data.copy()
+    result[f"{column}_standardized"] = standardized
+    return result
 
 def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5):
     """
-    Clean dataset by removing outliers from numeric columns.
+    Comprehensive data cleaning pipeline.
     
     Args:
         data: pandas DataFrame
-        numeric_columns: list of numeric column names (default: all numeric columns)
-        outlier_multiplier: IQR multiplier for outlier detection
+        numeric_columns: list of numeric columns to process (default: all numeric)
+        outlier_multiplier: IQR multiplier for outlier removal
     
     Returns:
         Cleaned DataFrame
@@ -93,32 +99,31 @@ def clean_dataset(data, numeric_columns=None, outlier_multiplier=1.5):
     for column in numeric_columns:
         if column in cleaned_data.columns:
             cleaned_data = remove_outliers_iqr(cleaned_data, column, outlier_multiplier)
+            cleaned_data = normalize_minmax(cleaned_data, column)
+            cleaned_data = standardize_zscore(cleaned_data, column)
     
-    return cleaned_data.reset_index(drop=True)
+    return cleaned_data
 
-def process_numeric_features(data, columns, method='standardize'):
+def validate_data(data, required_columns=None):
     """
-    Process numeric features with specified normalization method.
+    Validate data structure and content.
     
     Args:
         data: pandas DataFrame
-        columns: list of column names to process
-        method: 'standardize' (z-score) or 'normalize' (min-max)
+        required_columns: list of required column names
     
     Returns:
-        DataFrame with processed columns
+        Tuple of (is_valid, error_message)
     """
-    processed_data = data.copy()
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in data.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
     
-    for column in columns:
-        if column not in processed_data.columns:
-            continue
-            
-        if method == 'standardize':
-            processed_data[column] = standardize_zscore(processed_data, column)
-        elif method == 'normalize':
-            processed_data[column] = normalize_minmax(processed_data, column)
-        else:
-            raise ValueError("Method must be 'standardize' or 'normalize'")
+    if data.empty:
+        return False, "DataFrame is empty"
     
-    return processed_data
+    if data.isnull().all().any():
+        return False, "Some columns contain only null values"
+    
+    return True, "Data validation passed"
