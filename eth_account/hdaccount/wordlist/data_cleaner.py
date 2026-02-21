@@ -105,4 +105,53 @@ def validate_data(df, required_columns):
     if null_counts.any():
         raise ValueError(f"Null values found in columns: {null_counts[null_counts > 0].index.tolist()}")
     
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].median())
+
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().sum() > 0:
+                df[col] = df[col].fillna(df[col].mode()[0])
+
+        # Remove columns with more than 50% missing values
+        threshold = len(df) * 0.5
+        df = df.dropna(thresh=threshold, axis=1)
+        print(f"After removing high-missing columns: {df.shape}")
+
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        return True
+
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return False
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    clean_data(input_csv, output_csv)
