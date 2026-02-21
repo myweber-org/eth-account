@@ -388,4 +388,47 @@ def validate_dataframe(df):
     if df.isnull().all().any():
         raise ValueError("DataFrame contains columns with all missing values")
     
-    return True
+    return Trueimport pandas as pd
+import numpy as np
+import sys
+
+def clean_csv(input_file, output_file):
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original shape: {df.shape}")
+        
+        df.replace('', np.nan, inplace=True)
+        df.dropna(inplace=True)
+        print(f"After dropping missing values: {df.shape}")
+        
+        df.drop_duplicates(inplace=True)
+        print(f"After removing duplicates: {df.shape}")
+        
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to: {output_file}")
+        return True
+        
+    except FileNotFoundError:
+        print(f"Error: File '{input_file}' not found.")
+        return False
+    except pd.errors.EmptyDataError:
+        print("Error: The CSV file is empty.")
+        return False
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        return False
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    
+    success = clean_csv(input_file, output_file)
+    sys.exit(0 if success else 1)
