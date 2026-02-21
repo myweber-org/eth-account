@@ -1,76 +1,45 @@
+
 import pandas as pd
 import numpy as np
-
-def clean_csv_data(filepath, fill_strategy='mean', drop_threshold=0.5):
-    """
-    Load and clean a CSV file by handling missing values.
-    
-    Parameters:
-    filepath (str): Path to the CSV file.
-    fill_strategy (str): Strategy for filling missing values.
-                         Options: 'mean', 'median', 'mode', 'zero'.
-    drop_threshold (float): Drop columns with missing ratio above this threshold.
-    
-    Returns:
-    pd.DataFrame: Cleaned DataFrame.
-    """
-    try:
-        df = pd.read_csv(filepath)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"File not found: {filepath}")
-    
-    missing_ratio = df.isnull().sum() / len(df)
-    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
-    df = df.drop(columns=columns_to_drop)
-    
-    for column in df.columns:
-        if df[column].dtype in ['int64', 'float64']:
-            if fill_strategy == 'mean':
-                fill_value = df[column].mean()
-            elif fill_strategy == 'median':
-                fill_value = df[column].median()
-            elif fill_strategy == 'mode':
-                fill_value = df[column].mode()[0]
-            elif fill_strategy == 'zero':
-                fill_value = 0
-            else:
-                raise ValueError(f"Unsupported fill strategy: {fill_strategy}")
-            df[column] = df[column].fillna(fill_value)
-        else:
-            df[column] = df[column].fillna('Unknown')
-    
-    return df
+from scipy import stats
 
 def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using IQR method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to process.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
-    """
-    if column not in df.columns:
-        raise KeyError(f"Column '{column}' not found in DataFrame")
-    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
-    
-    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
 
-def save_cleaned_data(df, output_path):
-    """
-    Save cleaned DataFrame to a CSV file.
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def clean_dataset(file_path, numeric_columns):
+    df = pd.read_csv(file_path)
     
-    Parameters:
-    df (pd.DataFrame): Cleaned DataFrame.
-    output_path (str): Path for the output CSV file.
-    """
-    df.to_csv(output_path, index=False)
-    print(f"Cleaned data saved to: {output_path}")
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+            df = normalize_minmax(df, col)
+    
+    df = df.dropna()
+    return df
+
+def calculate_statistics(df, column):
+    return {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'skewness': stats.skew(df[column].dropna()),
+        'kurtosis': stats.kurtosis(df[column].dropna())
+    }
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('sample_data.csv', ['age', 'income', 'score'])
+    print(cleaned_data.head())
+    
+    stats_result = calculate_statistics(cleaned_data, 'income')
+    print(stats_result)
