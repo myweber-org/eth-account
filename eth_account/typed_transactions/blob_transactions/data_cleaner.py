@@ -246,3 +246,40 @@ if __name__ == "__main__":
     
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+import pandas as pd
+
+def clean_dataset(df, subset=None, fill_strategy='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+
+    Args:
+        df (pd.DataFrame): The input DataFrame.
+        subset (list, optional): Column labels to consider for identifying duplicates.
+                                 If None, all columns are used.
+        fill_strategy (str, optional): Strategy to fill missing values.
+                                       Options: 'mean', 'median', 'mode', or a constant value.
+                                       Defaults to 'mean'.
+
+    Returns:
+        pd.DataFrame: The cleaned DataFrame.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates(subset=subset, keep='first')
+
+    # Handle missing values
+    if fill_strategy in ['mean', 'median']:
+        numeric_cols = df_cleaned.select_dtypes(include=['number']).columns
+        if fill_strategy == 'mean':
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].mean())
+        elif fill_strategy == 'median':
+            df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+    elif fill_strategy == 'mode':
+        for col in df_cleaned.columns:
+            mode_val = df_cleaned[col].mode()
+            if not mode_val.empty:
+                df_cleaned[col] = df_cleaned[col].fillna(mode_val.iloc[0])
+    else:
+        # Assume fill_strategy is a constant value
+        df_cleaned = df_cleaned.fillna(fill_strategy)
+
+    return df_cleaned
