@@ -139,3 +139,33 @@ def organize_files(directory):
 if __name__ == "__main__":
     target_directory = input("Enter directory path to organize: ").strip()
     organize_files(target_directory)
+import os
+import shutil
+from pathlib import Path
+
+def organize_files_by_extension(directory_path):
+    if not os.path.exists(directory_path):
+        print(f"Directory '{directory_path}' does not exist.")
+        return
+
+    for item in os.listdir(directory_path):
+        item_path = os.path.join(directory_path, item)
+        if os.path.isfile(item_path):
+            file_extension = Path(item).suffix.lower()
+            if file_extension:
+                category_folder = file_extension[1:] + "_files"
+            else:
+                category_folder = "no_extension_files"
+
+            target_folder = os.path.join(directory_path, category_folder)
+            os.makedirs(target_folder, exist_ok=True)
+
+            try:
+                shutil.move(item_path, os.path.join(target_folder, item))
+                print(f"Moved '{item}' to '{category_folder}/'")
+            except Exception as e:
+                print(f"Error moving '{item}': {e}")
+
+if __name__ == "__main__":
+    target_directory = input("Enter directory path to organize: ").strip()
+    organize_files_by_extension(target_directory)
