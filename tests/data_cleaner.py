@@ -87,3 +87,83 @@ def remove_duplicates_preserve_order(iterable):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+from typing import Optional, Dict, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns.tolist()
+        
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df.dropna(subset=[col], inplace=True)
+        
+        return self
+    
+    def convert_types(self, type_mapping: Dict[str, str]) -> 'DataCleaner':
+        for column, dtype in type_mapping.items():
+            if column in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[column] = pd.to_datetime(self.df[column])
+                    else:
+                        self.df[column] = self.df[column].astype(dtype)
+                except Exception as e:
+                    print(f"Error converting {column} to {dtype}: {e}")
+        
+        return self
+    
+    def remove_outliers(self, column: str, method: str = 'iqr', threshold: float = 1.5) -> 'DataCleaner':
+        if column not in self.df.columns:
+            return self
+        
+        if method == 'iqr':
+            Q1 = self.df[column].quantile(0.25)
+            Q3 = self.df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_cleaning_report(self) -> Dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'missing_values': self.df.isnull().sum().sum()
+        }
+
+def load_and_clean_csv(filepath: str, cleaning_steps: Optional[Dict] = None) -> pd.DataFrame:
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    if cleaning_steps:
+        if 'missing_values' in cleaning_steps:
+            cleaner.handle_missing_values(**cleaning_steps['missing_values'])
+        if 'type_conversion' in cleaning_steps:
+            cleaner.convert_types(cleaning_steps['type_conversion'])
+        if 'outlier_removal' in cleaning_steps:
+            for outlier_config in cleaning_steps['outlier_removal']:
+                cleaner.remove_outliers(**outlier_config)
+    
+    return cleaner.get_cleaned_data()
