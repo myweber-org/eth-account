@@ -79,3 +79,11 @@ if __name__ == "__main__":
     cleaned_data = clean_dataset('sample_data.csv')
     cleaned_data.to_csv('cleaned_data.csv', index=False)
     print(f"Data cleaning complete. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
