@@ -455,3 +455,11 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nData validation result: {is_valid}")
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
