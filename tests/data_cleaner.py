@@ -230,3 +230,11 @@ def validate_email_column(df, email_column):
     print(f"Found {valid_count} valid emails out of {total_count} rows.")
     
     return df
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
