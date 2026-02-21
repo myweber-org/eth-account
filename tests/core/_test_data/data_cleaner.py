@@ -340,3 +340,69 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Remove duplicate rows and standardize column names.
+    """
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates()
+    
+    # Standardize column names
+    df_cleaned.columns = df_cleaned.columns.str.strip().str.lower().str.replace(' ', '_')
+    
+    return df_cleaned
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+    elif strategy == 'median':
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+    elif strategy == 'drop':
+        df = df.dropna(subset=numeric_cols)
+    
+    return df
+
+def validate_data(df, required_columns):
+    """
+    Validate that required columns exist in the dataframe.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'Customer ID': [1, 2, 2, 3, 4],
+        'Order Value': [100, 200, 200, None, 400],
+        'Product Name': ['A', 'B', 'B', 'C', 'D']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    df_cleaned = clean_dataframe(df)
+    print("\nAfter cleaning:")
+    print(df_cleaned)
+    
+    df_filled = handle_missing_values(df_cleaned, strategy='mean')
+    print("\nAfter handling missing values:")
+    print(df_filled)
+    
+    try:
+        validate_data(df_filled, ['customer_id', 'order_value'])
+        print("\nData validation passed")
+    except ValueError as e:
+        print(f"\nData validation failed: {e}")
