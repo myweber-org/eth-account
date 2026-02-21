@@ -982,4 +982,71 @@ def clean_dataframe(df: pd.DataFrame,
             if col in cleaned_df.columns:
                 cleaned_df = normalize_column(cleaned_df, col)
     
-    return cleaned_df
+    return cleaned_dfimport pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+        
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in df_clean.columns and pd.api.types.is_numeric_dtype(df_clean[col]):
+                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+                mask = z_scores < threshold
+                df_clean.loc[~mask, col] = np.nan
+        return df_clean
+    
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        df_normalized = self.df.copy()
+        for col in columns:
+            if col in df_normalized.columns and pd.api.types.is_numeric_dtype(df_normalized[col]):
+                col_min = df_normalized[col].min()
+                col_max = df_normalized[col].max()
+                if col_max > col_min:
+                    df_normalized[col] = (df_normalized[col] - col_min) / (col_max - col_min)
+        return df_normalized
+    
+    def fill_missing_interpolate(self, method='linear'):
+        return self.df.interpolate(method=method)
+    
+    def get_summary(self):
+        summary = {
+            'total_rows': len(self.df),
+            'total_columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': self.df.select_dtypes(include=[np.number]).columns.tolist(),
+            'categorical_columns': self.df.select_dtypes(include=['object']).columns.tolist()
+        }
+        return summary
+
+def process_dataset(file_path):
+    try:
+        df = pd.read_csv(file_path)
+        cleaner = DataCleaner(df)
+        
+        print("Dataset Summary:")
+        print(cleaner.get_summary())
+        
+        df_clean = cleaner.remove_outliers_zscore()
+        df_normalized = cleaner.normalize_minmax()
+        df_filled = cleaner.fill_missing_interpolate()
+        
+        return {
+            'original': df,
+            'cleaned': df_clean,
+            'normalized': df_normalized,
+            'filled': df_filled
+        }
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        return None
