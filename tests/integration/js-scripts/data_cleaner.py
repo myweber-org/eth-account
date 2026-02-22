@@ -513,3 +513,86 @@ def validate_data(data, required_columns=None, allow_nan=False):
         return False, f"NaN values found in columns: {nan_cols}"
     
     return True, "Data validation passed"
+import pandas as pd
+import re
+
+def clean_text_column(df, column_name):
+    """
+    Clean a text column by removing extra whitespace, converting to lowercase,
+    and removing special characters.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    df[column_name] = df[column_name].astype(str)
+    df[column_name] = df[column_name].str.strip()
+    df[column_name] = df[column_name].str.lower()
+    df[column_name] = df[column_name].apply(lambda x: re.sub(r'[^a-z0-9\s]', '', x))
+    
+    return df
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from the DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_numeric_column(df, column_name):
+    """
+    Normalize a numeric column to have values between 0 and 1.
+    """
+    if column_name not in df.columns:
+        raise ValueError(f"Column '{column_name}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column_name]):
+        raise ValueError(f"Column '{column_name}' is not numeric")
+    
+    min_val = df[column_name].min()
+    max_val = df[column_name].max()
+    
+    if max_val == min_val:
+        df[column_name] = 0.5
+    else:
+        df[column_name] = (df[column_name] - min_val) / (max_val - min_val)
+    
+    return df
+
+def process_dataframe(df, text_columns=None, numeric_columns=None, deduplicate=True):
+    """
+    Main function to process a DataFrame with multiple cleaning steps.
+    """
+    if text_columns:
+        for col in text_columns:
+            df = clean_text_column(df, col)
+    
+    if numeric_columns:
+        for col in numeric_columns:
+            df = normalize_numeric_column(df, col)
+    
+    if deduplicate:
+        df = remove_duplicates(df)
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['John Doe', 'Jane Smith', 'John Doe', 'Alice Johnson  '],
+        'age': [25, 30, 25, 35],
+        'email': ['JOHN@example.com', 'jane@test.com', 'john@example.com', 'alice@demo.net'],
+        'score': [85, 92, 85, 78]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    processed_df = process_dataframe(
+        df,
+        text_columns=['name', 'email'],
+        numeric_columns=['age', 'score'],
+        deduplicate=True
+    )
+    
+    print("Processed DataFrame:")
+    print(processed_df)
