@@ -404,3 +404,85 @@ def get_summary_statistics(data, numeric_columns):
             }
     
     return pd.DataFrame(summary).T
+import pandas as pd
+import re
+
+def clean_dataframe(df, columns_to_clean=None, remove_duplicates=True, case_normalization='lower'):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing string columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns_to_clean (list, optional): List of column names to clean. If None, all object dtype columns are cleaned.
+    remove_duplicates (bool): If True, remove duplicate rows.
+    case_normalization (str): One of 'lower', 'upper', or None to specify case normalization.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if remove_duplicates:
+        initial_rows = len(df_clean)
+        df_clean = df_clean.drop_duplicates().reset_index(drop=True)
+        removed = initial_rows - len(df_clean)
+        print(f"Removed {removed} duplicate rows.")
+    
+    if columns_to_clean is None:
+        columns_to_clean = df_clean.select_dtypes(include=['object']).columns.tolist()
+    
+    for col in columns_to_clean:
+        if col in df_clean.columns and df_clean[col].dtype == 'object':
+            df_clean[col] = df_clean[col].astype(str).str.strip()
+            
+            if case_normalization == 'lower':
+                df_clean[col] = df_clean[col].str.lower()
+            elif case_normalization == 'upper':
+                df_clean[col] = df_clean[col].str.upper()
+            
+            df_clean[col] = df_clean[col].replace(r'^\s*$', pd.NA, regex=True)
+    
+    return df_clean
+
+def normalize_string(text, remove_special=True, replace_spaces=False):
+    """
+    Normalize a single string.
+    
+    Parameters:
+    text (str): Input string.
+    remove_special (bool): If True, remove special characters.
+    replace_spaces (bool): If True, replace spaces with underscores.
+    
+    Returns:
+    str: Normalized string.
+    """
+    if not isinstance(text, str):
+        return text
+    
+    normalized = text.strip().lower()
+    
+    if remove_special:
+        normalized = re.sub(r'[^a-z0-9\s]', '', normalized)
+    
+    if replace_spaces:
+        normalized = re.sub(r'\s+', '_', normalized)
+    
+    return normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'name': ['  John Doe  ', 'Jane Smith', 'JOHN DOE', 'Jane Smith', 'Alice@Wonderland'],
+        'age': [25, 30, 25, 30, 22],
+        'city': ['New York', 'Los Angeles', 'new york', 'Los Angeles', 'Wonderland']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame:")
+    cleaned_df = clean_dataframe(df, case_normalization='lower')
+    print(cleaned_df)
+    
+    test_string = "  Hello, World! This is a Test.  "
+    print(f"\nOriginal string: '{test_string}'")
+    print(f"Normalized string: '{normalize_string(test_string, replace_spaces=True)}'")
