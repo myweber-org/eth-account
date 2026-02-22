@@ -542,3 +542,77 @@ def validate_data(df, required_columns):
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     return True
+import pandas as pd
+import numpy as np
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+
+    def remove_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return self
+
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val != min_val:
+                self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            if std_val > 0:
+                self.df[column] = (self.df[column] - mean_val) / std_val
+        return self
+
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = 0
+        self.df[column].fillna(fill_value, inplace=True)
+        return self
+
+    def get_cleaned_data(self):
+        return self.df
+
+    def get_removed_count(self):
+        return self.original_shape[0] - self.df.shape[0]
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200)
+    }
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'feature1'] = np.nan
+    df.loc[5, 'feature2'] = 1000
+    
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner
+                 .remove_outliers_iqr('feature2')
+                 .fill_missing('feature1', strategy='median')
+                 .normalize_column('feature1', method='zscore')
+                 .normalize_column('feature2', method='minmax')
+                 .get_cleaned_data())
+    
+    print(f"Original rows: {cleaner.original_shape[0]}")
+    print(f"Cleaned rows: {cleaned_df.shape[0]}")
+    print(f"Rows removed: {cleaner.get_removed_count()}")
+    print(f"Cleaned data shape: {cleaned_df.shape}")
+    return cleaned_df
+
+if __name__ == "__main__":
+    example_usage()
