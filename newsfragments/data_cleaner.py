@@ -176,3 +176,64 @@ if __name__ == "__main__":
     print(cleaned_df)
     print("\nCleaned Statistics:")
     print(calculate_basic_stats(cleaned_df, 'values'))
+def remove_duplicates(input_list):
+    """
+    Remove duplicate elements from a list while preserving order.
+    
+    Args:
+        input_list (list): The list from which duplicates are to be removed.
+    
+    Returns:
+        list: A new list with duplicates removed.
+    """
+    seen = set()
+    result = []
+    
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_data_with_threshold(data, threshold=None):
+    """
+    Clean data by removing duplicates, optionally filtering by frequency threshold.
+    
+    Args:
+        data (list): Input data list.
+        threshold (int, optional): Minimum frequency to keep an item. Defaults to None.
+    
+    Returns:
+        list: Cleaned data list.
+    """
+    if not data:
+        return []
+    
+    cleaned = remove_duplicates(data)
+    
+    if threshold is not None and threshold > 0:
+        from collections import Counter
+        counts = Counter(data)
+        cleaned = [item for item in cleaned if counts[item] >= threshold]
+    
+    return cleaned
+
+def validate_input(data):
+    """
+    Validate that input is a list.
+    
+    Args:
+        data: Input to validate.
+    
+    Returns:
+        bool: True if input is a list, False otherwise.
+    """
+    return isinstance(data, list)
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 4, 5]
+    print(f"Original data: {sample_data}")
+    print(f"Cleaned data: {remove_duplicates(sample_data)}")
+    print(f"Cleaned with threshold 2: {clean_data_with_threshold(sample_data, threshold=2)}")
