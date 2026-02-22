@@ -164,3 +164,41 @@ def validate_data(data, required_columns=None, allow_nan=True, max_nan_ratio=0.1
                 return False, f"Column '{column}' has too many NaN values: {nan_ratio:.1%}"
     
     return True, "Data validation passed"
+import pandas as pd
+import re
+
+def clean_dataframe(df, column_names):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and normalizing
+    specified string columns (strip whitespace, lowercase).
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize specified string columns
+    for col in column_names:
+        if col in df_cleaned.columns:
+            # Convert to string, strip whitespace, convert to lowercase
+            df_cleaned[col] = df_cleaned[col].astype(str).str.strip().str.lower()
+    
+    return df_cleaned
+
+def validate_email(email_string):
+    """
+    Validate email format using regular expression.
+    Returns True if valid, False otherwise.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, str(email_string)))
+
+def process_dataset(file_path, output_path, columns_to_clean):
+    """
+    Load, clean, and save a dataset from CSV file.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        df_cleaned = clean_dataframe(df, columns_to_clean)
+        df_cleaned.to_csv(output_path, index=False)
+        return True, f"Data cleaned and saved to {output_path}"
+    except Exception as e:
+        return False, f"Error processing dataset: {str(e)}"
