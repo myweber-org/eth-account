@@ -296,4 +296,66 @@ def example_usage():
     print(f"Number of outliers removed: {sample_data.shape[0] - cleaned_data.shape[0]}")
 
 if __name__ == "__main__":
-    example_usage()
+    example_usage()import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by handling duplicates and missing values.
+    
+    Args:
+        df: pandas DataFrame to clean
+        columns_to_check: list of columns to check for duplicates (None for all columns)
+        drop_duplicates: boolean indicating whether to drop duplicate rows
+        fill_missing: strategy for filling missing values ('mean', 'median', 'mode', or value)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates(subset=columns_to_check)
+    
+    for column in cleaned_df.columns:
+        if cleaned_df[column].dtype in ['int64', 'float64']:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mean':
+                    cleaned_df[column].fillna(cleaned_df[column].mean(), inplace=True)
+                elif fill_missing == 'median':
+                    cleaned_df[column].fillna(cleaned_df[column].median(), inplace=True)
+                elif fill_missing == 'mode':
+                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+                else:
+                    cleaned_df[column].fillna(fill_missing, inplace=True)
+        else:
+            if cleaned_df[column].isnull().any():
+                if fill_missing == 'mode':
+                    cleaned_df[column].fillna(cleaned_df[column].mode()[0], inplace=True)
+                else:
+                    cleaned_df[column].fillna(fill_missing, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: list of columns that must be present
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
