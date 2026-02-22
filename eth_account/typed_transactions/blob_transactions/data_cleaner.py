@@ -370,3 +370,132 @@ def save_cleaned_data(df, output_path):
 if __name__ == "__main__":
     cleaned_df = clean_csv_data("sample_data.csv", fill_strategy='median', drop_threshold=0.3)
     save_cleaned_data(cleaned_df, "cleaned_sample_data.csv")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values in numerical columns
+    """
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'mean':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            data[col] = data[col].fillna(data[col].mode()[0])
+    elif strategy == 'drop':
+        data = data.dropna(subset=numeric_cols)
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    return data
+
+def detect_skewness(data, column, threshold=0.5):
+    """
+    Detect skewness in data column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    skewness = stats.skew(data[column].dropna())
+    is_skewed = abs(skewness) > threshold
+    
+    return skewness, is_skewed
+
+def log_transform(data, column):
+    """
+    Apply log transformation to reduce skewness
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if (data[column] <= 0).any():
+        transformed = np.log1p(data[column] - data[column].min() + 1)
+    else:
+        transformed = np.log(data[column])
+    
+    return transformed
+
+def create_cleaning_report(data, columns_to_analyze=None):
+    """
+    Generate a cleaning report for the dataset
+    """
+    if columns_to_analyze is None:
+        columns_to_analyze = data.select_dtypes(include=[np.number]).columns
+    
+    report = {
+        'original_shape': data.shape,
+        'missing_values': data.isnull().sum().to_dict(),
+        'data_types': data.dtypes.to_dict(),
+        'numeric_stats': {}
+    }
+    
+    for col in columns_to_analyze:
+        if col in data.columns and pd.api.types.is_numeric_dtype(data[col]):
+            report['numeric_stats'][col] = {
+                'mean': data[col].mean(),
+                'std': data[col].std(),
+                'min': data[col].min(),
+                'max': data[col].max(),
+                'skewness': stats.skew(data[col].dropna()),
+                'missing_count': data[col].isnull().sum()
+            }
+    
+    return report
