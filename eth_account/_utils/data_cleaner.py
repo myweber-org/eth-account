@@ -1526,3 +1526,74 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+
+def clean_dataframe(df, drop_na=True, column_case='lower'):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing column names.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_na (bool): If True, drop rows with any null values. Default is True.
+    column_case (str): Desired case for column names. Options: 'lower', 'upper', 'title'. Default is 'lower'.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if column_case == 'lower':
+        df_clean.columns = df_clean.columns.str.lower()
+    elif column_case == 'upper':
+        df_clean.columns = df_clean.columns.str.upper()
+    elif column_case == 'title':
+        df_clean.columns = df_clean.columns.str.title()
+    
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def validate_numeric_columns(df, columns):
+    """
+    Validate that specified columns contain only numeric data.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to validate.
+    
+    Returns:
+    dict: Dictionary with column names as keys and validation results as values.
+    """
+    validation_results = {}
+    
+    for col in columns:
+        if col in df.columns:
+            is_numeric = pd.to_numeric(df[col], errors='coerce').notna().all()
+            validation_results[col] = is_numeric
+        else:
+            validation_results[col] = False
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'Name': ['Alice', 'Bob', None, 'David'],
+        'Age': [25, None, 35, 40],
+        'Score': [85.5, 92.0, 78.5, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, drop_na=True, column_case='lower')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    validation = validate_numeric_columns(cleaned_df, ['age', 'score'])
+    print("\nColumn Validation:")
+    for col, is_valid in validation.items():
+        print(f"{col}: {'Valid' if is_valid else 'Invalid'}")
