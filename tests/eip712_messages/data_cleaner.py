@@ -111,3 +111,28 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+
+def filter_and_clean_dataframe(df, column, condition_func, drop_na=True):
+    """
+    Filters a DataFrame based on a condition applied to a specific column,
+    optionally drops rows with NaN values in that column, and returns a cleaned copy.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to apply the filter on.
+    condition_func (function): A function that takes a value and returns a boolean.
+    drop_na (bool): If True, drops rows where the specified column is NaN before filtering.
+
+    Returns:
+    pd.DataFrame: A new filtered and cleaned DataFrame.
+    """
+    df_clean = df.copy()
+
+    if drop_na:
+        df_clean = df_clean.dropna(subset=[column])
+
+    mask = df_clean[column].apply(condition_func)
+    filtered_df = df_clean[mask].reset_index(drop=True)
+
+    return filtered_df
