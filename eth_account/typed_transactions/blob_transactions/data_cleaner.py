@@ -211,3 +211,166 @@ def validate_dataset(df, check_duplicates=True, check_missing=True):
         validation_results['missing_values'] = missing_values
     
     return validation_results
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def z_score_normalize(dataframe, columns=None):
+    """
+    Apply z-score normalization to specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not np.issubdtype(normalized_df[col].dtype, np.number):
+            raise ValueError(f"Column '{col}' is not numeric")
+        
+        mean_val = normalized_df[col].mean()
+        std_val = normalized_df[col].std()
+        
+        if std_val > 0:
+            normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def min_max_scale(dataframe, columns=None, feature_range=(0, 1)):
+    """
+    Apply min-max scaling to specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to scale. If None, scale all numeric columns.
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    pd.DataFrame: DataFrame with scaled columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    scaled_df = dataframe.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        if col not in scaled_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if not np.issubdtype(scaled_df[col].dtype, np.number):
+            raise ValueError(f"Column '{col}' is not numeric")
+        
+        col_min = scaled_df[col].min()
+        col_max = scaled_df[col].max()
+        
+        if col_max > col_min:
+            scaled_df[col] = ((scaled_df[col] - col_min) / (col_max - col_min)) * (max_val - min_val) + min_val
+        else:
+            scaled_df[col] = min_val
+    
+    return scaled_df
+
+def handle_missing_values(dataframe, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'constant')
+    columns (list): List of column names to process. If None, process all columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with missing values handled
+    """
+    if columns is None:
+        columns = dataframe.columns
+    
+    processed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in processed_df.columns:
+            continue
+        
+        if processed_df[col].isnull().any():
+            if strategy == 'mean' and np.issubdtype(processed_df[col].dtype, np.number):
+                fill_value = processed_df[col].mean()
+            elif strategy == 'median' and np.issubdtype(processed_df[col].dtype, np.number):
+                fill_value = processed_df[col].median()
+            elif strategy == 'mode':
+                fill_value = processed_df[col].mode()[0] if not processed_df[col].mode().empty else None
+            elif strategy == 'constant':
+                fill_value = 0 if np.issubdtype(processed_df[col].dtype, np.number) else ''
+            else:
+                raise ValueError(f"Invalid strategy '{strategy}' for column '{col}'")
+            
+            if fill_value is not None:
+                processed_df[col] = processed_df[col].fillna(fill_value)
+    
+    return processed_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    dataframe (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame validation passed"
