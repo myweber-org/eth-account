@@ -674,3 +674,125 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+from typing import Optional, List
+
+def clean_dataset(
+    df: pd.DataFrame,
+    drop_duplicates: bool = True,
+    handle_nulls: str = 'drop',
+    fill_value: Optional[float] = None,
+    columns_to_clean: Optional[List[str]] = None
+) -> pd.DataFrame:
+    """
+    Clean a pandas DataFrame by removing duplicates and handling null values.
+    
+    Parameters:
+    df: Input DataFrame
+    drop_duplicates: Whether to drop duplicate rows
+    handle_nulls: Strategy for handling nulls - 'drop', 'fill', or 'ignore'
+    fill_value: Value to use when filling nulls (required if handle_nulls='fill')
+    columns_to_clean: Specific columns to apply cleaning to (None for all columns)
+    
+    Returns:
+    Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns_to_clean:
+        df_subset = df_clean[columns_to_clean]
+    else:
+        df_subset = df_clean
+    
+    if drop_duplicates:
+        df_clean = df_clean.drop_duplicates()
+    
+    if handle_nulls == 'drop':
+        df_clean = df_clean.dropna(subset=columns_to_clean)
+    elif handle_nulls == 'fill':
+        if fill_value is None:
+            raise ValueError("fill_value must be provided when handle_nulls='fill'")
+        df_clean[columns_to_clean] = df_subset.fillna(fill_value)
+    
+    return df_clean
+
+def validate_dataframe(df: pd.DataFrame, required_columns: List[str]) -> bool:
+    """
+    Validate that DataFrame contains required columns and has no negative values in numeric columns.
+    
+    Parameters:
+    df: DataFrame to validate
+    required_columns: List of column names that must be present
+    
+    Returns:
+    Boolean indicating if validation passed
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
+        return False
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    negative_check = (df[numeric_cols] < 0).any().any()
+    
+    if negative_check:
+        print("Warning: DataFrame contains negative values in numeric columns")
+    
+    return True
+
+def calculate_statistics(df: pd.DataFrame) -> dict:
+    """
+    Calculate basic statistics for numeric columns in DataFrame.
+    
+    Parameters:
+    df: Input DataFrame
+    
+    Returns:
+    Dictionary containing statistics for each numeric column
+    """
+    stats = {}
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'count': df[col].count(),
+            'null_count': df[col].isnull().sum()
+        }
+    
+    return stats
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 3, 4, 5, 5],
+        'value': [10.5, 20.3, np.nan, 15.7, 10.5, 10.5],
+        'category': ['A', 'B', 'A', 'C', 'A', 'A']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    cleaned_df = clean_dataset(
+        df,
+        drop_duplicates=True,
+        handle_nulls='fill',
+        fill_value=0.0,
+        columns_to_clean=['value']
+    )
+    
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    print("\n")
+    
+    if validate_dataframe(cleaned_df, ['id', 'value', 'category']):
+        stats = calculate_statistics(cleaned_df)
+        print("Statistics:")
+        for col, col_stats in stats.items():
+            print(f"{col}: {col_stats}")
