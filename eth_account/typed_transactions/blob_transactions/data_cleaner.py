@@ -449,3 +449,122 @@ if __name__ == "__main__":
     
     is_valid, msg = validate_dataset(cleaned, required_columns=['A', 'B'], min_rows=3)
     print(f"\nValidation: {msg}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method.
+    Returns indices of outliers.
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)].index
+    return outliers.tolist()
+
+def detect_outliers_zscore(data, column, threshold=3):
+    """
+    Detect outliers using Z-score method.
+    Returns indices of outliers.
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    outlier_indices = np.where(z_scores > threshold)[0]
+    original_indices = data[column].dropna().index[outlier_indices]
+    return original_indices.tolist()
+
+def impute_missing_mean(data, column):
+    """
+    Impute missing values with column mean.
+    Returns modified Series.
+    """
+    mean_value = data[column].mean()
+    return data[column].fillna(mean_value)
+
+def impute_missing_median(data, column):
+    """
+    Impute missing values with column median.
+    Returns modified Series.
+    """
+    median_value = data[column].median()
+    return data[column].fillna(median_value)
+
+def impute_missing_forward_fill(data, column):
+    """
+    Impute missing values with forward fill.
+    Returns modified Series.
+    """
+    return data[column].ffill()
+
+def remove_outliers(data, column, method='iqr', **kwargs):
+    """
+    Remove outliers from specified column.
+    Returns cleaned DataFrame.
+    """
+    if method == 'iqr':
+        threshold = kwargs.get('threshold', 1.5)
+        outliers = detect_outliers_iqr(data, column, threshold)
+    elif method == 'zscore':
+        threshold = kwargs.get('threshold', 3)
+        outliers = detect_outliers_zscore(data, column, threshold)
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return data.drop(index=outliers)
+
+def clean_dataset(data, numeric_columns, outlier_method='iqr', impute_method='mean'):
+    """
+    Comprehensive data cleaning pipeline.
+    Returns cleaned DataFrame.
+    """
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_data.columns:
+            # Remove outliers
+            cleaned_data = remove_outliers(cleaned_data, col, method=outlier_method)
+            
+            # Impute missing values
+            if impute_method == 'mean':
+                cleaned_data[col] = impute_missing_mean(cleaned_data, col)
+            elif impute_method == 'median':
+                cleaned_data[col] = impute_missing_median(cleaned_data, col)
+            elif impute_method == 'ffill':
+                cleaned_data[col] = impute_missing_forward_fill(cleaned_data, col)
+    
+    return cleaned_data.reset_index(drop=True)
+
+def get_data_summary(data):
+    """
+    Generate summary statistics for DataFrame.
+    Returns summary dictionary.
+    """
+    summary = {
+        'shape': data.shape,
+        'missing_values': data.isnull().sum().to_dict(),
+        'data_types': data.dtypes.astype(str).to_dict(),
+        'numeric_stats': data.describe().to_dict() if data.select_dtypes(include=[np.number]).shape[1] > 0 else {}
+    }
+    return summary
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = pd.DataFrame({
+        'A': [1, 2, 3, 4, 5, 100, 7, 8, 9, 10],
+        'B': [10, 20, None, 40, 50, 60, 70, 80, 90, 1000],
+        'C': [100, 200, 300, 400, 500, 600, 700, 800, 900, 10000]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nData summary:")
+    print(get_data_summary(sample_data))
+    
+    cleaned = clean_dataset(sample_data, ['A', 'B', 'C'])
+    print("\nCleaned data:")
+    print(cleaned)
+    print("\nCleaned data summary:")
+    print(get_data_summary(cleaned))
