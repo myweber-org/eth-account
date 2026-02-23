@@ -161,4 +161,128 @@ def clean_dataset(df, columns_to_clean=None):
                 'removal_percentage': (removed_count / original_count) * 100
             }
     
-    return cleaned_df, removal_stats
+    return cleaned_df, removal_statsimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a pandas Series using the IQR method.
+    Returns cleaned Series and outlier indices.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (data[column] >= lower_bound) & (data[column] <= upper_bound)
+    cleaned_data = data[mask].copy()
+    outlier_indices = data[~mask].index.tolist()
+    
+    return cleaned_data, outlier_indices
+
+def normalize_minmax(data, column):
+    """
+    Apply min-max normalization to a column.
+    Returns Series with normalized values.
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Apply z-score standardization to a column.
+    Returns Series with standardized values.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, method='zscore', remove_outliers=True):
+    """
+    Main cleaning function for datasets.
+    Supports outlier removal and normalization/standardization.
+    """
+    cleaned_df = df.copy()
+    
+    if remove_outliers:
+        outlier_report = {}
+        for col in numeric_columns:
+            if col in cleaned_df.columns:
+                cleaned_df, outliers = remove_outliers_iqr(cleaned_df, col)
+                outlier_report[col] = len(outliers)
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            if method == 'minmax':
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            elif method == 'zscore':
+                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns, numeric_columns):
+    """
+    Validate dataset structure and content.
+    Returns validation results dictionary.
+    """
+    validation_result = {
+        'missing_columns': [],
+        'non_numeric_columns': [],
+        'missing_values': {},
+        'is_valid': True
+    }
+    
+    for col in required_columns:
+        if col not in df.columns:
+            validation_result['missing_columns'].append(col)
+            validation_result['is_valid'] = False
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            if not np.issubdtype(df[col].dtype, np.number):
+                validation_result['non_numeric_columns'].append(col)
+                validation_result['is_valid'] = False
+            
+            missing_count = df[col].isna().sum()
+            if missing_count > 0:
+                validation_result['missing_values'][col] = missing_count
+    
+    return validation_result
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(2, 1000),
+        'feature_c': np.random.randint(1, 100, 1000)
+    })
+    
+    validation = validate_data(
+        sample_data,
+        required_columns=['feature_a', 'feature_b', 'feature_c'],
+        numeric_columns=['feature_a', 'feature_b', 'feature_c']
+    )
+    
+    print(f"Validation result: {validation['is_valid']}")
+    
+    cleaned = clean_dataset(
+        sample_data,
+        numeric_columns=['feature_a', 'feature_b', 'feature_c'],
+        method='zscore',
+        remove_outliers=True
+    )
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned.shape}")
