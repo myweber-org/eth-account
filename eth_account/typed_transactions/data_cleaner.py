@@ -227,3 +227,142 @@ def clean_dataset(data, outlier_method='iqr', normalize_method='minmax', missing
                 cleaned_data[col] = normalize_zscore(cleaned_data, col)
     
     return cleaned_data
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None, keep: str = 'first') -> pd.DataFrame:
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Parameters:
+    df: Input DataFrame
+    subset: Column labels to consider for identifying duplicates
+    keep: Which duplicates to keep - 'first', 'last', or False
+    
+    Returns:
+    Cleaned DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    if subset is not None:
+        invalid_columns = [col for col in subset if col not in df.columns]
+        if invalid_columns:
+            raise ValueError(f"Columns not found in DataFrame: {invalid_columns}")
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep, ignore_index=True)
+    
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate row(s)")
+    
+    return cleaned_df
+
+def clean_numeric_outliers(df: pd.DataFrame, column: str, method: str = 'iqr', threshold: float = 1.5) -> pd.DataFrame:
+    """
+    Clean outliers from a numeric column using specified method.
+    
+    Parameters:
+    df: Input DataFrame
+    column: Column name to clean
+    method: 'iqr' for interquartile range or 'zscore' for standard deviation
+    threshold: Threshold multiplier for outlier detection
+    
+    Returns:
+    DataFrame with outliers replaced by NaN
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if not pd.api.types.is_numeric_dtype(df[column]):
+        raise ValueError(f"Column '{column}' must be numeric")
+    
+    df_clean = df.copy()
+    
+    if method == 'iqr':
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        
+        outliers = (df[column] < lower_bound) | (df[column] > upper_bound)
+    
+    elif method == 'zscore':
+        mean = df[column].mean()
+        std = df[column].std()
+        z_scores = np.abs((df[column] - mean) / std)
+        outliers = z_scores > threshold
+    
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    outlier_count = outliers.sum()
+    if outlier_count > 0:
+        df_clean.loc[outliers, column] = np.nan
+        print(f"Replaced {outlier_count} outlier(s) in column '{column}' with NaN")
+    
+    return df_clean
+
+def validate_dataframe(df: pd.DataFrame, required_columns: List[str] = None) -> bool:
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df: DataFrame to validate
+    required_columns: List of columns that must be present
+    
+    Returns:
+    True if validation passes, raises exception otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return True
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    null_counts = df.isnull().sum()
+    total_nulls = null_counts.sum()
+    
+    if total_nulls > 0:
+        print(f"DataFrame contains {total_nulls} null values")
+        for col, count in null_counts[null_counts > 0].items():
+            print(f"  - {col}: {count} nulls")
+    
+    return True
+
+def main():
+    """Example usage of data cleaning functions."""
+    sample_data = {
+        'id': [1, 2, 3, 4, 4, 5, 6, 6, 7],
+        'name': ['Alice', 'Bob', 'Charlie', 'David', 'David', 'Eve', 'Frank', 'Frank', 'Grace'],
+        'score': [85, 92, 78, 150, 150, 88, -10, -10, 95],
+        'age': [25, 30, 35, 40, 40, 28, 32, 32, 29]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    validate_dataframe(df, required_columns=['id', 'name', 'score'])
+    
+    df_no_dups = remove_duplicates(df, subset=['id', 'name'], keep='first')
+    print("\nAfter removing duplicates:")
+    print(df_no_dups)
+    
+    df_clean_scores = clean_numeric_outliers(df_no_dups, 'score', method='iqr')
+    print("\nAfter cleaning score outliers:")
+    print(df_clean_scores)
+    
+    return df_clean_scores
+
+if __name__ == "__main__":
+    cleaned_df = main()
