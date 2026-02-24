@@ -186,3 +186,59 @@ def example_usage():
 
 if __name__ == "__main__":
     example_usage()
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def clean_dataset(df: pd.DataFrame, 
+                  drop_duplicates: bool = True,
+                  columns_to_standardize: Optional[List[str]] = None,
+                  date_columns: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Clean a pandas DataFrame by handling duplicates, standardizing text,
+    and parsing dates.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if columns_to_standardize:
+        for col in columns_to_standardize:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    
+    if date_columns:
+        for col in date_columns:
+            if col in cleaned_df.columns:
+                cleaned_df[col] = pd.to_datetime(cleaned_df[col], errors='coerce')
+    
+    cleaned_df = cleaned_df.replace(['', 'nan', 'null', 'none'], np.nan)
+    
+    print(f"Cleaning complete. Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
+
+def validate_dataframe(df: pd.DataFrame, required_columns: List[str]) -> bool:
+    """
+    Validate that a DataFrame contains all required columns.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        print(f"Missing required columns: {missing_columns}")
+        return False
+    
+    print("DataFrame validation passed")
+    return True
+
+def sample_data(df: pd.DataFrame, sample_size: int = 1000, random_state: int = 42) -> pd.DataFrame:
+    """
+    Return a random sample from the DataFrame.
+    """
+    if len(df) <= sample_size:
+        return df
+    
+    return df.sample(n=sample_size, random_state=random_state)
