@@ -443,4 +443,115 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
     else:
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
-    return df[mask]
+    return df[mask]import pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, method='median', z_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    method (str): Imputation method ('mean', 'median', 'mode')
+    z_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    df_clean = df.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col not in df.columns:
+            continue
+            
+        col_data = df_clean[col]
+        
+        if method == 'mean':
+            fill_value = col_data.mean()
+        elif method == 'median':
+            fill_value = col_data.median()
+        elif method == 'mode':
+            fill_value = col_data.mode()[0] if not col_data.mode().empty else col_data.median()
+        else:
+            fill_value = col_data.median()
+        
+        df_clean[col] = col_data.fillna(fill_value)
+        
+        z_scores = np.abs(stats.zscore(df_clean[col]))
+        outlier_indices = np.where(z_scores > z_threshold)[0]
+        
+        if len(outlier_indices) > 0:
+            non_outliers = df_clean[col][z_scores <= z_threshold]
+            if len(non_outliers) > 0:
+                replacement_value = non_outliers.median()
+                df_clean.loc[outlier_indices, col] = replacement_value
+    
+    return df_clean
+
+def validate_data(df, required_columns=None, min_rows=1):
+    """
+    Validate dataframe structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): Dataframe to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "Dataframe is empty"
+    
+    if len(df) < min_rows:
+        return False, f"Dataframe has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "Data validation passed"
+
+def summarize_cleaning(df_before, df_after, numeric_columns=None):
+    """
+    Generate summary of data cleaning operations.
+    
+    Parameters:
+    df_before (pd.DataFrame): Original dataframe
+    df_after (pd.DataFrame): Cleaned dataframe
+    numeric_columns (list): List of numeric column names to analyze
+    
+    Returns:
+    dict: Summary statistics
+    """
+    if numeric_columns is None:
+        numeric_columns = df_before.select_dtypes(include=[np.number]).columns.tolist()
+    
+    summary = {
+        'original_rows': len(df_before),
+        'cleaned_rows': len(df_after),
+        'columns_processed': len(numeric_columns),
+        'column_details': {}
+    }
+    
+    for col in numeric_columns:
+        if col in df_before.columns and col in df_after.columns:
+            before_data = df_before[col]
+            after_data = df_after[col]
+            
+            summary['column_details'][col] = {
+                'original_missing': before_data.isna().sum(),
+                'original_mean': before_data.mean(),
+                'original_std': before_data.std(),
+                'cleaned_mean': after_data.mean(),
+                'cleaned_std': after_data.std(),
+                'values_replaced': (before_data != after_data).sum()
+            }
+    
+    return summary
