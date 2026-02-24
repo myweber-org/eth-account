@@ -218,3 +218,67 @@ if __name__ == "__main__":
     cleaned_df = clean_numeric_data(df, columns=['A', 'B'])
     print("\nCleaned DataFrame:")
     print(cleaned_df)
+import pandas as pd
+
+def clean_dataset(df, remove_duplicates=True, fill_na=None):
+    """
+    Clean a pandas DataFrame by handling missing values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    remove_duplicates (bool): Whether to remove duplicate rows.
+    fill_na (optional): Value to fill missing entries, or None to drop rows.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if fill_na is not None:
+        cleaned_df = cleaned_df.fillna(fill_na)
+    else:
+        cleaned_df = cleaned_df.dropna()
+    
+    if remove_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    
+    Returns:
+    tuple: (bool, str) indicating success and message.
+    """
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            return False, f"Missing required columns: {missing}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "Data validation passed"
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, None, 4, 2],
+        'B': ['x', 'y', 'z', 'x', 'y'],
+        'C': [10.5, 20.3, 30.1, 10.5, 40.7]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, fill_na=0)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    valid, msg = validate_data(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {msg}")
