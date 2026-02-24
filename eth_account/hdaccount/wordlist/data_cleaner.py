@@ -496,3 +496,11 @@ if __name__ == "__main__":
     
     validation_result = validate_dataframe(cleaned_df, required_columns=['id', 'value'])
     print("Data validation passed:", validation_result)
+def remove_duplicates_preserve_order(iterable):
+    seen = set()
+    result = []
+    for item in iterable:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
