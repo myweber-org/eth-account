@@ -159,3 +159,179 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
     print(calculate_basic_stats(cleaned_df, 'A'))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def z_score_normalize(dataframe, columns=None):
+    """
+    Apply Z-score normalization to specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize. If None, normalize all numeric columns.
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if normalized_df[col].dtype in [np.float64, np.int64]:
+            mean_val = normalized_df[col].mean()
+            std_val = normalized_df[col].std()
+            
+            if std_val > 0:
+                normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def min_max_normalize(dataframe, columns=None, feature_range=(0, 1)):
+    """
+    Apply Min-Max normalization to specified columns.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to normalize
+    feature_range (tuple): Desired range of transformed data
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized columns
+    """
+    if columns is None:
+        numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    normalized_df = dataframe.copy()
+    min_range, max_range = feature_range
+    
+    for col in columns:
+        if col not in normalized_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if normalized_df[col].dtype in [np.float64, np.int64]:
+            min_val = normalized_df[col].min()
+            max_val = normalized_df[col].max()
+            
+            if max_val > min_val:
+                normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+                normalized_df[col] = normalized_df[col] * (max_range - min_range) + min_range
+            else:
+                normalized_df[col] = min_range
+    
+    return normalized_df
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with significant skewness.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    threshold (float): Absolute skewness threshold
+    
+    Returns:
+    dict: Dictionary with column names and their skewness values
+    """
+    skewed_cols = {}
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = stats.skew(dataframe[col].dropna())
+        if abs(skewness) > threshold:
+            skewed_cols[col] = skewness
+    
+    return skewed_cols
+
+def log_transform(dataframe, columns):
+    """
+    Apply log transformation to reduce skewness.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to transform
+    
+    Returns:
+    pd.DataFrame: DataFrame with transformed columns
+    """
+    transformed_df = dataframe.copy()
+    
+    for col in columns:
+        if col not in transformed_df.columns:
+            raise ValueError(f"Column '{col}' not found in DataFrame")
+        
+        if transformed_df[col].min() <= 0:
+            transformed_df[col] = np.log1p(transformed_df[col] - transformed_df[col].min() + 1)
+        else:
+            transformed_df[col] = np.log(transformed_df[col])
+    
+    return transformed_df
+
+def clean_dataset(dataframe, outlier_columns=None, normalize_columns=None, 
+                  normalization_method='zscore', skew_threshold=0.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    outlier_columns (list): Columns for outlier removal
+    normalize_columns (list): Columns for normalization
+    normalization_method (str): 'zscore' or 'minmax'
+    skew_threshold (float): Skewness detection threshold
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = dataframe.copy()
+    
+    if outlier_columns:
+        for col in outlier_columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    skewed_cols = detect_skewed_columns(cleaned_df, skew_threshold)
+    if skewed_cols:
+        cleaned_df = log_transform(cleaned_df, list(skewed_cols.keys()))
+    
+    if normalize_columns:
+        if normalization_method == 'zscore':
+            cleaned_df = z_score_normalize(cleaned_df, normalize_columns)
+        elif normalization_method == 'minmax':
+            cleaned_df = min_max_normalize(cleaned_df, normalize_columns)
+        else:
+            raise ValueError("Normalization method must be 'zscore' or 'minmax'")
+    
+    return cleaned_df
