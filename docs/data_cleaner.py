@@ -751,3 +751,79 @@ def validate_cleaned_data(dataframe, numeric_columns):
             'missing': dataframe[col].isnull().sum()
         }
     return validation_report
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, columns=None, factor=1.5):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        clean_df = self.df.copy()
+        for col in columns:
+            if col in clean_df.columns:
+                Q1 = clean_df[col].quantile(0.25)
+                Q3 = clean_df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - factor * IQR
+                upper_bound = Q3 + factor * IQR
+                
+                mask = (clean_df[col] >= lower_bound) & (clean_df[col] <= upper_bound)
+                clean_df = clean_df[mask]
+        
+        self.df = clean_df.reset_index(drop=True)
+        return self
+    
+    def normalize_data(self, columns=None, method='minmax'):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        normalized_df = self.df.copy()
+        
+        for col in columns:
+            if col in normalized_df.columns:
+                if method == 'minmax':
+                    min_val = normalized_df[col].min()
+                    max_val = normalized_df[col].max()
+                    if max_val != min_val:
+                        normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+                
+                elif method == 'zscore':
+                    mean_val = normalized_df[col].mean()
+                    std_val = normalized_df[col].std()
+                    if std_val > 0:
+                        normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+        
+        self.df = normalized_df
+        return self
+    
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_val = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_val = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_val = self.df[col].mode()[0]
+                elif strategy == 'constant' and fill_value is not None:
+                    fill_val = fill_value
+                else:
+                    continue
+                
+                self.df[col] = self.df[col].fillna(fill_val)
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_removed_count(self):
+        return self.original_shape[0] - self.df.shape[0]
