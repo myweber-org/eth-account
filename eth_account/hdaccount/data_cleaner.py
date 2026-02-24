@@ -879,3 +879,31 @@ def clean_dataset(df, numeric_columns):
             cleaned_df = normalize_minmax(cleaned_df, col)
             cleaned_df = standardize_zscore(cleaned_df, col)
     return cleaned_df
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    Returns a cleaned DataFrame.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    cleaned_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return cleaned_data
+
+def calculate_summary_stats(data, column):
+    """
+    Calculate summary statistics for a column after cleaning.
+    """
+    cleaned = remove_outliers_iqr(data, column)
+    stats = {
+        'mean': cleaned[column].mean(),
+        'median': cleaned[column].median(),
+        'std': cleaned[column].std(),
+        'min': cleaned[column].min(),
+        'max': cleaned[column].max()
+    }
+    return stats
