@@ -709,3 +709,45 @@ def validate_cleaning(df_before, df_after, column):
         'max': df_after[column].max()
     }
     return {'before': stats_before, 'after': stats_after}
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+
+def normalize_column(dataframe, column, method='minmax'):
+    if method == 'minmax':
+        min_val = dataframe[column].min()
+        max_val = dataframe[column].max()
+        if max_val != min_val:
+            dataframe[column] = (dataframe[column] - min_val) / (max_val - min_val)
+    elif method == 'zscore':
+        mean_val = dataframe[column].mean()
+        std_val = dataframe[column].std()
+        if std_val > 0:
+            dataframe[column] = (dataframe[column] - mean_val) / std_val
+    return dataframe
+
+def clean_dataset(dataframe, numeric_columns):
+    df_clean = dataframe.copy()
+    for col in numeric_columns:
+        df_clean = remove_outliers_iqr(df_clean, col)
+        df_clean = normalize_column(df_clean, col, method='zscore')
+    return df_clean
+
+def validate_cleaned_data(dataframe, numeric_columns):
+    validation_report = {}
+    for col in numeric_columns:
+        validation_report[col] = {
+            'mean': round(dataframe[col].mean(), 4),
+            'std': round(dataframe[col].std(), 4),
+            'min': round(dataframe[col].min(), 4),
+            'max': round(dataframe[col].max(), 4),
+            'missing': dataframe[col].isnull().sum()
+        }
+    return validation_report
