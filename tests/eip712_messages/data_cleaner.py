@@ -161,4 +161,74 @@ def get_data_summary(data):
             'kurtosis': data[col].kurtosis()
         }
     
-    return summary
+    return summaryimport pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    """
+    Fill missing values in specified columns using a given strategy.
+    """
+    df_filled = df.copy()
+    if columns is None:
+        columns = df.columns
+
+    for col in columns:
+        if df[col].dtype in [np.float64, np.int64]:
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            else:
+                fill_value = 0
+            df_filled[col].fillna(fill_value, inplace=True)
+        else:
+            df_filled[col].fillna('Unknown', inplace=True)
+    return df_filled
+
+def normalize_column(df, column):
+    """
+    Normalize a numeric column to range [0, 1].
+    """
+    if df[column].dtype in [np.float64, np.int64]:
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val > min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+    return df
+
+def categorize_age(df, age_column='age', bins=None, labels=None):
+    """
+    Categorize age column into groups.
+    """
+    if bins is None:
+        bins = [0, 18, 35, 50, 65, 100]
+    if labels is None:
+        labels = ['Child', 'Young Adult', 'Adult', 'Middle Aged', 'Senior']
+    
+    df['age_group'] = pd.cut(df[age_column], bins=bins, labels=labels, right=False)
+    return df
+
+def clean_dataframe(df, operations=None):
+    """
+    Apply a series of cleaning operations to the DataFrame.
+    """
+    if operations is None:
+        operations = ['remove_duplicates', 'fill_missing']
+    
+    cleaned_df = df.copy()
+    
+    if 'remove_duplicates' in operations:
+        cleaned_df = remove_duplicates(cleaned_df)
+    
+    if 'fill_missing' in operations:
+        cleaned_df = fill_missing_values(cleaned_df)
+    
+    return cleaned_df
