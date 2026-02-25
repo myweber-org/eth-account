@@ -45,3 +45,50 @@ def main():
 
 if __name__ == "__main__":
     main()
+import pandas as pd
+
+def clean_dataset(df, columns=None, drop_duplicates=True, drop_na=True):
+    """
+    Clean a pandas DataFrame by removing null values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    columns (list, optional): Specific columns to check for nulls/duplicates. 
+                               If None, uses all columns.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    drop_na (bool): Whether to drop rows with null values.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if columns is None:
+        columns = cleaned_df.columns
+    
+    if drop_na:
+        cleaned_df = cleaned_df.dropna(subset=columns)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates(subset=columns, keep='first')
+    
+    return cleaned_df
+
+def filter_by_value(df, column, value, keep=True):
+    """
+    Filter DataFrame rows based on column value.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to filter on.
+    value: Value to filter by.
+    keep (bool): If True, keep rows where column == value.
+                 If False, keep rows where column != value.
+    
+    Returns:
+    pd.DataFrame: Filtered DataFrame.
+    """
+    if keep:
+        return df[df[column] == value].copy()
+    else:
+        return df[df[column] != value].copy()
