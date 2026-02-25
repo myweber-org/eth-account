@@ -388,3 +388,38 @@ def remove_outliers(df, column, method='iqr', threshold=1.5):
         raise ValueError("Method must be 'iqr' or 'zscore'")
     
     return df[mask]
+import re
+import unicodedata
+
+def clean_text(text, remove_digits=False, remove_punctuation=False, normalize_unicode=True):
+    """
+    Clean and normalize a given text string.
+
+    Args:
+        text (str): The input text to clean.
+        remove_digits (bool): If True, remove all digits from the text.
+        remove_punctuation (bool): If True, remove all punctuation characters.
+        normalize_unicode (bool): If True, normalize unicode characters (e.g., convert accented characters to ASCII).
+
+    Returns:
+        str: The cleaned text.
+    """
+    if not isinstance(text, str):
+        raise TypeError("Input must be a string.")
+
+    cleaned_text = text
+
+    if normalize_unicode:
+        cleaned_text = unicodedata.normalize('NFKD', cleaned_text)
+        cleaned_text = cleaned_text.encode('ASCII', 'ignore').decode('ASCII')
+
+    if remove_digits:
+        cleaned_text = re.sub(r'\d+', '', cleaned_text)
+
+    if remove_punctuation:
+        cleaned_text = re.sub(r'[^\w\s]', '', cleaned_text)
+
+    cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
+    cleaned_text = cleaned_text.strip()
+
+    return cleaned_text
