@@ -130,3 +130,135 @@ def generate_summary(dataframe):
             'max': dataframe[column].max()
         }
     return summary
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier (default: 1.5)
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_column(dataframe, column, method='zscore'):
+    """
+    Normalize a column using specified method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    method (str): Normalization method ('zscore', 'minmax', 'robust')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = dataframe.copy()
+    
+    if method == 'zscore':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val > 0:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - mean_val) / std_val
+        else:
+            df_copy[f'{column}_normalized'] = 0
+    
+    elif method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        range_val = max_val - min_val
+        if range_val > 0:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - min_val) / range_val
+        else:
+            df_copy[f'{column}_normalized'] = 0
+    
+    elif method == 'robust':
+        median_val = df_copy[column].median()
+        iqr_val = stats.iqr(df_copy[column])
+        if iqr_val > 0:
+            df_copy[f'{column}_normalized'] = (df_copy[column] - median_val) / iqr_val
+        else:
+            df_copy[f'{column}_normalized'] = 0
+    
+    else:
+        raise ValueError("Method must be 'zscore', 'minmax', or 'robust'")
+    
+    return df_copy
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5, 
+                  normalize_method='zscore', drop_na=True):
+    """
+    Comprehensive dataset cleaning function.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric columns to process
+    outlier_threshold (float): IQR threshold for outlier removal
+    normalize_method (str): Normalization method
+    drop_na (bool): Whether to drop rows with missing values
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = dataframe.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    for column in numeric_columns:
+        if column in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, column, outlier_threshold)
+            df_clean = normalize_column(df_clean, column, normalize_method)
+    
+    return df_clean.reset_index(drop=True)
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    dataframe (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if len(dataframe) < min_rows:
+        return False, f"DataFrame must have at least {min_rows} rows"
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in dataframe.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    return True, "DataFrame is valid"
