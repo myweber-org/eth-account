@@ -382,3 +382,101 @@ if __name__ == "__main__":
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'], min_rows=2)
     print(f"\nData valid: {is_valid}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+def remove_duplicates(df: pd.DataFrame, subset: Optional[List[str]] = None) -> pd.DataFrame:
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        subset: Columns to consider for identifying duplicates
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df: pd.DataFrame, strategy: str = 'drop', fill_value: any = None) -> pd.DataFrame:
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        df: Input DataFrame
+        strategy: 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to fill when strategy is 'fill'
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        return df.fillna(fill_value)
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def clean_column_names(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Standardize column names to lowercase with underscores.
+    
+    Args:
+        df: Input DataFrame
+    
+    Returns:
+        DataFrame with cleaned column names
+    """
+    df.columns = df.columns.str.lower().str.replace(' ', '_')
+    return df
+
+def validate_dataframe(df: pd.DataFrame) -> bool:
+    """
+    Basic validation of DataFrame structure.
+    
+    Args:
+        df: DataFrame to validate
+    
+    Returns:
+        Boolean indicating if DataFrame is valid
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    if df.empty:
+        return False
+    return True
+
+def main_clean_pipeline(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Execute complete cleaning pipeline.
+    
+    Args:
+        df: Raw input DataFrame
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if not validate_dataframe(df):
+        raise ValueError("Invalid DataFrame provided")
+    
+    df = clean_column_names(df)
+    df = remove_duplicates(df)
+    df = handle_missing_values(df, strategy='fill', fill_value=0)
+    
+    return df
+
+if __name__ == "__main__":
+    sample_data = {
+        'Name': ['Alice', 'Bob', 'Alice', 'Charlie', None],
+        'Age': [25, 30, 25, 35, 40],
+        'Score': [85, 90, 85, 95, None]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = main_clean_pipeline(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
