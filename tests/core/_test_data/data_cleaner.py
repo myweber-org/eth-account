@@ -242,3 +242,122 @@ def sample_data(df: pd.DataFrame, sample_size: int = 1000, random_state: int = 4
         return df
     
     return df.sample(n=sample_size, random_state=random_state)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    missing_strategy (str): Strategy for handling missing values.
+                            Options: 'mean', 'median', 'drop', 'fill_zero'.
+    outlier_threshold (float): Number of standard deviations for outlier detection.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if missing_strategy == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean())
+    elif missing_strategy == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median())
+    elif missing_strategy == 'drop':
+        cleaned_df = cleaned_df.dropna()
+    elif missing_strategy == 'fill_zero':
+        cleaned_df = cleaned_df.fillna(0)
+    else:
+        raise ValueError(f"Unknown missing strategy: {missing_strategy}")
+    
+    # Handle outliers using Z-score method
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        z_scores = np.abs((cleaned_df[col] - cleaned_df[col].mean()) / cleaned_df[col].std())
+        outlier_mask = z_scores > outlier_threshold
+        
+        if outlier_mask.any():
+            # Replace outliers with column median
+            col_median = cleaned_df[col].median()
+            cleaned_df.loc[outlier_mask, col] = col_median
+    
+    # Reset index if rows were dropped
+    if missing_strategy == 'drop':
+        cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input is not a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            print(f"Error: Missing required columns: {missing_cols}")
+            return False
+    
+    return True
+
+# Example usage function
+def process_data_file(file_path, output_path=None):
+    """
+    Process a data file through the cleaning pipeline.
+    
+    Parameters:
+    file_path (str): Path to input data file.
+    output_path (str): Path to save cleaned data (optional).
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    
+    try:
+        # Read data file (supports CSV and Excel)
+        if file_path.endswith('.csv'):
+            df = pd.read_csv(file_path)
+        elif file_path.endswith(('.xls', '.xlsx')):
+            df = pd.read_excel(file_path)
+        else:
+            raise ValueError("Unsupported file format")
+        
+        # Validate data
+        if not validate_dataframe(df):
+            raise ValueError("Data validation failed")
+        
+        # Clean data
+        cleaned_df = clean_dataset(df, missing_strategy='median', outlier_threshold=3)
+        
+        # Save cleaned data if output path provided
+        if output_path:
+            if output_path.endswith('.csv'):
+                cleaned_df.to_csv(output_path, index=False)
+            elif output_path.endswith(('.xls', '.xlsx')):
+                cleaned_df.to_excel(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return cleaned_df
+        
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        raise
