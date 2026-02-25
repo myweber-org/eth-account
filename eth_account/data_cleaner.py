@@ -151,4 +151,92 @@ def main():
         print(df_cleaned)
 
 if __name__ == "__main__":
-    main()
+    main()import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column].dropna()))
+        self.df = self.df[(z_scores < threshold) | self.df[column].isna()]
+        return self
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[f'{column}_normalized'] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[f'{column}_normalized'] = (self.df[column] - mean_val) / std_val
+        return self
+    
+    def fill_missing(self, column, strategy='mean'):
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            fill_value = strategy
+            
+        self.df[column] = self.df[column].fillna(fill_value)
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_cleaning_report(self):
+        removed_rows = self.original_shape[0] - self.df.shape[0]
+        removed_cols = self.original_shape[1] - self.df.shape[1]
+        
+        report = {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'rows_removed': removed_rows,
+            'columns_removed': removed_cols,
+            'missing_values': self.df.isnull().sum().to_dict()
+        }
+        return report
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.loc[10:15, 'feature_a'] = np.nan
+    df.loc[20, 'feature_b'] = 1000
+    
+    cleaner = DataCleaner(df)
+    cleaner.remove_outliers_zscore('feature_b')
+    cleaner.fill_missing('feature_a', 'median')
+    cleaner.normalize_column('feature_a', 'zscore')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    report = cleaner.get_cleaning_report()
+    
+    return cleaned_df, report
+
+if __name__ == "__main__":
+    cleaned_data, cleaning_report = example_usage()
+    print(f"Cleaning Report: {cleaning_report}")
+    print(f"Cleaned data shape: {cleaned_data.shape}")
