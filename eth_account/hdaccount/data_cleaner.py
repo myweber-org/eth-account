@@ -1272,4 +1272,132 @@ def main():
     remove_duplicates(input_file, output_file)
 
 if __name__ == "__main__":
-    main()
+    main()import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): Strategy for handling missing values. 
+                       Options: 'mean', 'median', 'mode', 'drop', 'fill_zero'
+        columns (list): List of columns to apply cleaning to. If None, applies to all numeric columns.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    if strategy == 'drop':
+        df_clean = df_clean.dropna(subset=columns)
+    elif strategy == 'mean':
+        for col in columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+    elif strategy == 'median':
+        for col in columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    elif strategy == 'mode':
+        for col in columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0] if not df_clean[col].mode().empty else 0)
+    elif strategy == 'fill_zero':
+        df_clean[columns] = df_clean[columns].fillna(0)
+    
+    return df_clean
+
+def detect_outliers_iqr(df, column, multiplier=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to check for outliers
+        multiplier (float): IQR multiplier for outlier detection
+    
+    Returns:
+        pd.DataFrame: DataFrame with outlier information
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    
+    outlier_report = pd.DataFrame({
+        'column': [column],
+        'total_values': [len(df)],
+        'outlier_count': [len(outliers)],
+        'outlier_percentage': [len(outliers) / len(df) * 100],
+        'lower_bound': [lower_bound],
+        'upper_bound': [upper_bound]
+    })
+    
+    return outlier_report, outliers
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column in the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column (str): Column name to normalize
+        method (str): Normalization method. Options: 'minmax', 'zscore'
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_normalized = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_normalized[column].min()
+        max_val = df_normalized[column].max()
+        if max_val != min_val:
+            df_normalized[column] = (df_normalized[column] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        mean_val = df_normalized[column].mean()
+        std_val = df_normalized[column].std()
+        if std_val != 0:
+            df_normalized[column] = (df_normalized[column] - mean_val) / std_val
+    
+    return df_normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, np.nan, 30, 40, 50],
+        'C': [100, 200, 300, 400, 500]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_missing_data(df, strategy='mean')
+    print("\nCleaned DataFrame (mean imputation):")
+    print(cleaned_df)
+    
+    outlier_report, outliers = detect_outliers_iqr(cleaned_df, 'C')
+    print("\nOutlier Report:")
+    print(outlier_report)
+    
+    normalized_df = normalize_column(cleaned_df, 'C', method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized_df)
