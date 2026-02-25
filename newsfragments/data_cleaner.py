@@ -203,3 +203,96 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+        
+    def detect_outliers_zscore(self, threshold=3):
+        outliers = {}
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+            outlier_indices = np.where(z_scores > threshold)[0]
+            if len(outlier_indices) > 0:
+                outliers[col] = self.df.index[outlier_indices].tolist()
+        return outliers
+    
+    def remove_outliers_iqr(self):
+        cleaned_df = self.df.copy()
+        for col in self.numeric_columns:
+            Q1 = cleaned_df[col].quantile(0.25)
+            Q3 = cleaned_df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & (cleaned_df[col] <= upper_bound)]
+        return cleaned_df
+    
+    def impute_missing_median(self):
+        imputed_df = self.df.copy()
+        for col in self.numeric_columns:
+            if imputed_df[col].isnull().any():
+                median_val = imputed_df[col].median()
+                imputed_df[col].fillna(median_val, inplace=True)
+        return imputed_df
+    
+    def impute_missing_mode(self):
+        imputed_df = self.df.copy()
+        for col in self.categorical_columns:
+            if imputed_df[col].isnull().any():
+                mode_val = imputed_df[col].mode()[0]
+                imputed_df[col].fillna(mode_val, inplace=True)
+        return imputed_df
+    
+    def normalize_data(self, method='minmax'):
+        normalized_df = self.df.copy()
+        for col in self.numeric_columns:
+            if method == 'minmax':
+                min_val = normalized_df[col].min()
+                max_val = normalized_df[col].max()
+                if max_val != min_val:
+                    normalized_df[col] = (normalized_df[col] - min_val) / (max_val - min_val)
+            elif method == 'zscore':
+                mean_val = normalized_df[col].mean()
+                std_val = normalized_df[col].std()
+                if std_val != 0:
+                    normalized_df[col] = (normalized_df[col] - mean_val) / std_val
+        return normalized_df
+    
+    def get_summary(self):
+        summary = {
+            'total_rows': len(self.df),
+            'total_columns': len(self.df.columns),
+            'numeric_columns': list(self.numeric_columns),
+            'categorical_columns': list(self.categorical_columns),
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def load_and_clean_data(filepath, cleaning_steps=None):
+    df = pd.read_csv(filepath)
+    cleaner = DataCleaner(df)
+    
+    if cleaning_steps is None:
+        cleaning_steps = ['impute_missing_median', 'impute_missing_mode', 'remove_outliers_iqr']
+    
+    for step in cleaning_steps:
+        if step == 'impute_missing_median':
+            df = cleaner.impute_missing_median()
+        elif step == 'impute_missing_mode':
+            df = cleaner.impute_missing_mode()
+        elif step == 'remove_outliers_iqr':
+            df = cleaner.remove_outliers_iqr()
+        elif step == 'normalize_minmax':
+            df = cleaner.normalize_data(method='minmax')
+        elif step == 'normalize_zscore':
+            df = cleaner.normalize_data(method='zscore')
+        cleaner = DataCleaner(df)
+    
+    return df, cleaner.get_summary()
