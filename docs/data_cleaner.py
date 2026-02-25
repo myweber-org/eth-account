@@ -827,3 +827,195 @@ class DataCleaner:
     
     def get_removed_count(self):
         return self.original_shape[0] - self.df.shape[0]
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to process
+        multiplier: IQR multiplier (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - multiplier * iqr
+    upper_bound = q3 + multiplier * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def zscore_normalize(dataframe, column):
+    """
+    Normalize a column using z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val == 0:
+        return dataframe[column] - mean_val
+    
+    normalized = (dataframe[column] - mean_val) / std_val
+    return normalized
+
+def minmax_normalize(dataframe, column, feature_range=(0, 1)):
+    """
+    Normalize a column using min-max normalization.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to normalize
+        feature_range: Desired range of transformed data (default 0-1)
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if min_val == max_val:
+        return pd.Series([feature_range[0]] * len(dataframe), index=dataframe.index)
+    
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    normalized = normalized * (feature_range[1] - feature_range[0]) + feature_range[0]
+    
+    return normalized
+
+def detect_skewed_columns(dataframe, threshold=0.5):
+    """
+    Detect columns with significant skewness.
+    
+    Args:
+        dataframe: pandas DataFrame
+        threshold: Absolute skewness threshold (default 0.5)
+    
+    Returns:
+        Dictionary with column names and their skewness values
+    """
+    skewed_columns = {}
+    
+    for column in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[column].skew()
+        if abs(skewness) > threshold:
+            skewed_columns[column] = skewness
+    
+    return skewed_columns
+
+def log_transform(dataframe, column):
+    """
+    Apply log transformation to reduce skewness.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: Column name to transform
+    
+    Returns:
+        Series with log-transformed values
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    if dataframe[column].min() <= 0:
+        shifted = dataframe[column] - dataframe[column].min() + 1
+        transformed = np.log(shifted)
+    else:
+        transformed = np.log(dataframe[column])
+    
+    return transformed
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_multiplier=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: pandas DataFrame to clean
+        numeric_columns: List of numeric columns to process (default: all numeric)
+        outlier_multiplier: IQR multiplier for outlier removal
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column, outlier_multiplier)
+    
+    return cleaned_df
+
+def create_cleaning_report(dataframe):
+    """
+    Generate a report of data quality issues.
+    
+    Args:
+        dataframe: pandas DataFrame to analyze
+    
+    Returns:
+        Dictionary with data quality metrics
+    """
+    report = {
+        'total_rows': len(dataframe),
+        'total_columns': len(dataframe.columns),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'numeric_columns': dataframe.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': dataframe.select_dtypes(include=['object']).columns.tolist(),
+        'skewed_columns': detect_skewed_columns(dataframe),
+        'column_dtypes': dataframe.dtypes.to_dict()
+    }
+    
+    return report
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[np.random.choice(df.index, 50), 'feature_a'] = np.random.uniform(500, 1000, 50)
+    
+    print("Original dataset shape:", df.shape)
+    
+    cleaned_df = clean_dataset(df)
+    print("Cleaned dataset shape:", cleaned_df.shape)
+    
+    report = create_cleaning_report(df)
+    print("\nData quality report:")
+    print(f"Total rows: {report['total_rows']}")
+    print(f"Skewed columns: {len(report['skewed_columns'])}")
+    
+    normalized_feature = zscore_normalize(cleaned_df, 'feature_a')
+    print(f"\nNormalized 'feature_a' statistics:")
+    print(f"Mean: {normalized_feature.mean():.4f}")
+    print(f"Std: {normalized_feature.std():.4f}")
