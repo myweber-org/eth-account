@@ -330,4 +330,101 @@ if __name__ == "__main__":
     cleaned = clean_dataset(sample_data, numeric_cols, outlier_method='zscore', normalize_method='zscore')
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
-    print(cleaned.head())
+    print(cleaned.head())import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def load_data(filepath):
+    """Load data from CSV file."""
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Loaded data with shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+
+def remove_duplicates(df, subset=None):
+    """Remove duplicate rows from DataFrame."""
+    initial_count = len(df)
+    df_clean = df.drop_duplicates(subset=subset, keep='first')
+    removed = initial_count - len(df_clean)
+    print(f"Removed {removed} duplicate rows.")
+    return df_clean
+
+def standardize_column(df, column_name, case='lower'):
+    """Standardize text in a column to lower or upper case."""
+    if column_name not in df.columns:
+        print(f"Warning: Column '{column_name}' not found.")
+        return df
+    
+    if case == 'lower':
+        df[column_name] = df[column_name].astype(str).str.lower()
+    elif case == 'upper':
+        df[column_name] = df[column_name].astype(str).str.upper()
+    
+    print(f"Standardized column '{column_name}' to {case}case.")
+    return df
+
+def fill_missing_values(df, column_name, fill_value=np.nan):
+    """Fill missing values in a column with specified value."""
+    if column_name not in df.columns:
+        print(f"Warning: Column '{column_name}' not found.")
+        return df
+    
+    missing_count = df[column_name].isnull().sum()
+    df[column_name] = df[column_name].fillna(fill_value)
+    print(f"Filled {missing_count} missing values in column '{column_name}'.")
+    return df
+
+def clean_dataframe(df, config):
+    """Apply multiple cleaning operations based on configuration."""
+    df_clean = df.copy()
+    
+    if config.get('remove_duplicates'):
+        subset = config.get('duplicate_subset')
+        df_clean = remove_duplicates(df_clean, subset)
+    
+    for col_config in config.get('standardize_columns', []):
+        df_clean = standardize_column(df_clean, **col_config)
+    
+    for col_config in config.get('fill_missing', []):
+        df_clean = fill_missing_values(df_clean, **col_config)
+    
+    return df_clean
+
+def save_cleaned_data(df, input_path, suffix='_cleaned'):
+    """Save cleaned DataFrame to CSV file."""
+    input_path = Path(input_path)
+    output_path = input_path.parent / f"{input_path.stem}{suffix}{input_path.suffix}"
+    
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+    return output_path
+
+def main():
+    """Main execution function."""
+    input_file = 'raw_data.csv'
+    output_suffix = '_processed'
+    
+    cleaning_config = {
+        'remove_duplicates': True,
+        'duplicate_subset': ['id', 'name'],
+        'standardize_columns': [
+            {'column_name': 'category', 'case': 'lower'},
+            {'column_name': 'status', 'case': 'upper'}
+        ],
+        'fill_missing': [
+            {'column_name': 'price', 'fill_value': 0},
+            {'column_name': 'quantity', 'fill_value': 1}
+        ]
+    }
+    
+    raw_data = load_data(input_file)
+    if raw_data is not None:
+        cleaned_data = clean_dataframe(raw_data, cleaning_config)
+        save_cleaned_data(cleaned_data, input_file, output_suffix)
+        print("Data cleaning completed successfully.")
+
+if __name__ == "__main__":
+    main()
