@@ -82,3 +82,106 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import re
+
+def clean_dataset(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    
+    Args:
+        df: Input pandas DataFrame
+        column_mapping: Dictionary mapping original column names to new names
+        drop_duplicates: Boolean flag to remove duplicate rows
+        normalize_text: Boolean flag to normalize text columns
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        initial_rows = len(cleaned_df)
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - len(cleaned_df)
+        print(f"Removed {removed} duplicate rows")
+    
+    if normalize_text:
+        text_columns = cleaned_df.select_dtypes(include=['object']).columns
+        for col in text_columns:
+            if cleaned_df[col].dtype == 'object':
+                cleaned_df[col] = cleaned_df[col].apply(lambda x: normalize_string(x) if isinstance(x, str) else x)
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+def normalize_string(text):
+    """
+    Normalize a string by converting to lowercase, removing extra whitespace,
+    and stripping special characters.
+    
+    Args:
+        text: Input string
+    
+    Returns:
+        Normalized string
+    """
+    if not isinstance(text, str):
+        return text
+    
+    normalized = text.lower().strip()
+    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = re.sub(r'[^\w\s-]', '', normalized)
+    return normalized
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for required columns and data types.
+    
+    Args:
+        df: Input pandas DataFrame
+        required_columns: List of required column names
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    return True, "DataFrame is valid"
+
+def sample_data_cleaning():
+    """
+    Example usage of the data cleaning functions.
+    """
+    sample_data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson  ', 'ALICE WONDER'],
+        'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', 'alice@example.com'],
+        'Age': [25, 30, 25, 35, 28],
+        'City': ['New York', 'Los Angeles', 'New York', 'Chicago', 'SAN FRANCISCO']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, normalize_text=True)
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid, message = validate_dataframe(cleaned, required_columns=['Name', 'Email', 'Age'])
+    print(f"\nValidation: {message}")
+    
+    return cleaned
+
+if __name__ == "__main__":
+    cleaned_df = sample_data_cleaning()
