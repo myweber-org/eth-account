@@ -246,4 +246,117 @@ def main():
     display_weather(weather_data)
 
 if __name__ == "__main__":
-    main()
+    main()import requests
+import json
+from datetime import datetime
+import logging
+
+class WeatherFetcher:
+    def __init__(self, api_key, base_url="http://api.openweathermap.org/data/2.5"):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+        logging.basicConfig(level=logging.INFO)
+        self.logger = logging.getLogger(__name__)
+
+    def get_current_weather(self, city_name, country_code=None):
+        query = city_name
+        if country_code:
+            query += f",{country_code}"
+        
+        params = {
+            'q': query,
+            'appid': self.api_key,
+            'units': 'metric'
+        }
+        
+        try:
+            response = self.session.get(
+                f"{self.base_url}/weather",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            return {
+                'city': data['name'],
+                'temperature': data['main']['temp'],
+                'humidity': data['main']['humidity'],
+                'description': data['weather'][0]['description'],
+                'timestamp': datetime.fromtimestamp(data['dt']).isoformat()
+            }
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Request failed: {e}")
+            return None
+        except (KeyError, IndexError) as e:
+            self.logger.error(f"Data parsing error: {e}")
+            return None
+
+    def get_forecast(self, city_name, days=5):
+        params = {
+            'q': city_name,
+            'appid': self.api_key,
+            'units': 'metric',
+            'cnt': days
+        }
+        
+        try:
+            response = self.session.get(
+                f"{self.base_url}/forecast/daily",
+                params=params,
+                timeout=10
+            )
+            response.raise_for_status()
+            data = response.json()
+            
+            forecast = []
+            for item in data['list']:
+                forecast.append({
+                    'date': datetime.fromtimestamp(item['dt']).strftime('%Y-%m-%d'),
+                    'temp_day': item['temp']['day'],
+                    'temp_night': item['temp']['night'],
+                    'humidity': item['humidity'],
+                    'description': item['weather'][0]['description']
+                })
+            
+            return forecast
+            
+        except requests.exceptions.RequestException as e:
+            self.logger.error(f"Forecast request failed: {e}")
+            return None
+        except (KeyError, IndexError) as e:
+            self.logger.error(f"Forecast data parsing error: {e}")
+            return None
+
+def save_to_json(data, filename):
+    try:
+        with open(filename, 'w') as f:
+            json.dump(data, f, indent=2)
+        return True
+    except IOError as e:
+        logging.error(f"Failed to save data: {e}")
+        return False
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    
+    fetcher = WeatherFetcher(API_KEY)
+    
+    current = fetcher.get_current_weather("London", "UK")
+    if current:
+        print(f"Current weather in {current['city']}:")
+        print(f"Temperature: {current['temperature']}°C")
+        print(f"Humidity: {current['humidity']}%")
+        print(f"Conditions: {current['description']}")
+        
+        save_to_json(current, "current_weather.json")
+    
+    forecast = fetcher.get_forecast("London", 3)
+    if forecast:
+        print("\n3-day forecast:")
+        for day in forecast:
+            print(f"{day['date']}: {day['temp_day']}°C, {day['description']}")
+        
+        save_to_json(forecast, "weather_forecast.json")
