@@ -516,4 +516,56 @@ if __name__ == "__main__":
     output_file = "cleaned_data.csv"
     
     cleaned_df = load_and_clean_data(input_file)
-    save_cleaned_data(cleaned_df, output_file)
+    save_cleaned_data(cleaned_df, output_file)import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_zscore(data, column, threshold=3):
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+            cleaned_df = normalize_minmax(cleaned_df, col)
+    cleaned_df = cleaned_df.dropna()
+    return cleaned_df
+
+def main():
+    sample_data = {
+        'A': np.random.normal(100, 15, 200),
+        'B': np.random.exponential(50, 200),
+        'C': np.random.uniform(0, 1, 200)
+    }
+    df = pd.DataFrame(sample_data)
+    df.loc[10:15, 'A'] = 500
+    df.loc[20:25, 'B'] = 1000
+    
+    print("Original dataset shape:", df.shape)
+    outliers_a = detect_outliers_iqr(df, 'A')
+    print(f"Outliers in column A: {len(outliers_a)}")
+    
+    cleaned_df = clean_dataset(df, ['A', 'B', 'C'])
+    print("Cleaned dataset shape:", cleaned_df.shape)
+    print("Cleaned dataset columns:", cleaned_df.columns.tolist())
+
+if __name__ == "__main__":
+    main()
