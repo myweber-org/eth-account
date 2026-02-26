@@ -550,3 +550,101 @@ def validate_dataframe(df, required_columns=None):
 #     
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['name', 'age'])
 #     print(f"Validation: {is_valid}, Message: {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by handling missing values and standardizing text.
+    """
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Fill numeric missing values with column median
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if cleaned_df[col].isnull().any():
+            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+    
+    # Fill categorical missing values with mode
+    categorical_cols = cleaned_df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        if cleaned_df[col].isnull().any():
+            mode_value = cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 'Unknown'
+            cleaned_df[col] = cleaned_df[col].fillna(mode_value)
+    
+    # Standardize text columns: trim whitespace and convert to lowercase
+    for col in categorical_cols:
+        cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    return cleaned_df
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame structure and content.
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    return True
+
+def process_dataset(file_path):
+    """
+    Load and clean a dataset from file path.
+    """
+    # Determine file type and load accordingly
+    if file_path.endswith('.csv'):
+        df = pd.read_csv(file_path)
+    elif file_path.endswith('.xlsx'):
+        df = pd.read_excel(file_path)
+    else:
+        raise ValueError("Unsupported file format. Use .csv or .xlsx")
+    
+    # Validate the loaded data
+    validate_dataframe(df)
+    
+    # Clean the data
+    cleaned_df = clean_dataframe(df)
+    
+    # Generate summary statistics
+    summary = {
+        'original_rows': len(df),
+        'cleaned_rows': len(cleaned_df),
+        'removed_duplicates': len(df) - len(cleaned_df),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(df.select_dtypes(include=['object']).columns)
+    }
+    
+    return cleaned_df, summary
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Charlie', None, 'Eve  '],
+        'age': [25, None, 30, 35, 40],
+        'score': [85.5, 92.0, None, 78.5, 88.0],
+        'department': ['IT', 'HR', 'IT', 'HR', 'IT']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nMissing values:")
+    print(df.isnull().sum())
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Test validation
+    try:
+        validate_dataframe(cleaned_df)
+        print("\nData validation passed")
+    except Exception as e:
+        print(f"\nData validation failed: {e}")
