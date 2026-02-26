@@ -130,4 +130,108 @@ def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize_method='m
     
     df_processed = normalize_data(df_processed, numeric_columns, method=normalize_method)
     
-    return df_processed.reset_index(drop=True)
+    return df_processed.reset_index(drop=True)import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Clean CSV data by handling missing values and removing low-quality columns.
+    
+    Parameters:
+    file_path (str): Path to input CSV file.
+    output_path (str, optional): Path for cleaned CSV output. If None, returns DataFrame.
+    fill_strategy (str): Method for filling missing values ('mean', 'median', 'mode', 'zero').
+    drop_threshold (float): Drop columns with missing ratio above this threshold (0.0-1.0).
+    
+    Returns:
+    pd.DataFrame or None: Cleaned DataFrame if output_path is None, else None.
+    """
+    
+    df = pd.read_csv(file_path)
+    original_shape = df.shape
+    
+    missing_ratios = df.isnull().sum() / len(df)
+    columns_to_drop = missing_ratios[missing_ratios > drop_threshold].index
+    df = df.drop(columns=columns_to_drop)
+    
+    for column in df.columns:
+        if df[column].dtype in ['float64', 'int64']:
+            if fill_strategy == 'mean':
+                fill_value = df[column].mean()
+            elif fill_strategy == 'median':
+                fill_value = df[column].median()
+            elif fill_strategy == 'zero':
+                fill_value = 0
+            else:
+                fill_value = df[column].mode()[0] if not df[column].mode().empty else 0
+        else:
+            fill_value = df[column].mode()[0] if not df[column].mode().empty else 'Unknown'
+        
+        df[column] = df[column].fillna(fill_value)
+    
+    df = df.drop_duplicates()
+    
+    print(f"Original shape: {original_shape}")
+    print(f"Cleaned shape: {df.shape}")
+    print(f"Dropped columns: {list(columns_to_drop)}")
+    print(f"Missing values after cleaning: {df.isnull().sum().sum()}")
+    
+    if output_path:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return None
+    else:
+        return df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list, optional): List of columns that must be present.
+    
+    Returns:
+    dict: Validation results.
+    """
+    validation_results = {
+        'is_valid': True,
+        'errors': [],
+        'warnings': []
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            validation_results['is_valid'] = False
+            validation_results['errors'].append(f"Missing required columns: {missing_columns}")
+    
+    if df.empty:
+        validation_results['is_valid'] = False
+        validation_results['errors'].append("DataFrame is empty")
+    
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_columns:
+        if df[col].abs().max() > 1e10:
+            validation_results['warnings'].append(f"Column '{col}' contains extremely large values")
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, np.nan, np.nan, 10, 11],
+        'C': [7, 8, 9, 10, 11],
+        'D': ['x', 'y', np.nan, 'z', 'x']
+    })
+    
+    sample_data.to_csv('sample_data.csv', index=False)
+    
+    cleaned_df = clean_csv_data('sample_data.csv', fill_strategy='median', drop_threshold=0.6)
+    
+    validation = validate_dataframe(cleaned_df, required_columns=['A', 'C'])
+    print(f"Validation passed: {validation['is_valid']}")
+    if validation['errors']:
+        print(f"Errors: {validation['errors']}")
+    if validation['warnings']:
+        print(f"Warnings: {validation['warnings']}")
