@@ -444,3 +444,84 @@ def validate_data(df, required_columns, numeric_columns):
                 df[col] = df[col].fillna(df[col].median())
     
     return df
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df):
+    """
+    Clean a pandas DataFrame by removing duplicates,
+    handling missing values, and standardizing string columns.
+    """
+    # Create a copy to avoid modifying the original
+    df_clean = df.copy()
+    
+    # Remove duplicate rows
+    initial_rows = df_clean.shape[0]
+    df_clean = df_clean.drop_duplicates()
+    removed_duplicates = initial_rows - df_clean.shape[0]
+    
+    # Standardize string columns: trim whitespace and convert to lowercase
+    string_columns = df_clean.select_dtypes(include=['object']).columns
+    for col in string_columns:
+        df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+    
+    # Handle missing values in numeric columns
+    numeric_columns = df_clean.select_dtypes(include=[np.number]).columns
+    for col in numeric_columns:
+        df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    
+    # Handle missing values in string columns
+    for col in string_columns:
+        df_clean[col] = df_clean[col].replace('nan', 'unknown')
+    
+    # Reset index after cleaning
+    df_clean = df_clean.reset_index(drop=True)
+    
+    # Print cleaning summary
+    print(f"Removed {removed_duplicates} duplicate rows")
+    print(f"Cleaned {len(string_columns)} string columns")
+    print(f"Processed {len(numeric_columns)} numeric columns")
+    print(f"Final dataset shape: {df_clean.shape}")
+    
+    return df_clean
+
+def validate_dataframe(df):
+    """
+    Validate that the DataFrame meets basic quality criteria.
+    """
+    checks = {
+        'has_data': not df.empty,
+        'no_duplicates': df.duplicated().sum() == 0,
+        'no_null_strings': (df.select_dtypes(include=['object'])
+                           .applymap(lambda x: str(x).strip().lower() == 'nan').sum().sum() == 0),
+        'numeric_no_nan': df.select_dtypes(include=[np.number]).isna().sum().sum() == 0
+    }
+    
+    for check_name, check_result in checks.items():
+        status = "PASS" if check_result else "FAIL"
+        print(f"{check_name}: {status}")
+    
+    return all(checks.values())
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'name': ['Alice', 'Bob', 'Alice', 'Charlie', 'David', None],
+        'age': [25, 30, 25, 35, None, 40],
+        'city': ['New York', 'Los Angeles', 'New York', 'Chicago', 'Boston', 'Chicago'],
+        'score': [85.5, 92.0, 85.5, 78.5, 88.0, 91.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = clean_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    print("Data Validation:")
+    is_valid = validate_dataframe(cleaned_df)
+    print(f"\nOverall validation: {'PASS' if is_valid else 'FAIL'}")
