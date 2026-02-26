@@ -110,3 +110,56 @@ def validate_email_column(df, email_column):
     print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
     
     return result_df
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean
+
+def normalize_data(df, columns, method='minmax'):
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            if method == 'minmax':
+                min_val = df[col].min()
+                max_val = df[col].max()
+                if max_val != min_val:
+                    df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+                else:
+                    df_norm[col] = 0
+            elif method == 'zscore':
+                mean_val = df[col].mean()
+                std_val = df[col].std()
+                if std_val > 0:
+                    df_norm[col] = (df[col] - mean_val) / std_val
+                else:
+                    df_norm[col] = 0
+    return df_norm
+
+def clean_dataset(df, numeric_columns):
+    df_no_outliers = remove_outliers_iqr(df, numeric_columns)
+    df_normalized = normalize_data(df_no_outliers, numeric_columns, method='zscore')
+    return df_normalized
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature1': np.random.normal(100, 15, 200),
+        'feature2': np.random.exponential(50, 200),
+        'feature3': np.random.uniform(0, 1, 200)
+    }
+    df = pd.DataFrame(sample_data)
+    numeric_cols = ['feature1', 'feature2', 'feature3']
+    cleaned_df = clean_dataset(df, numeric_cols)
+    print(f"Original shape: {df.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
+    print(f"Cleaned data summary:\n{cleaned_df.describe()}")
