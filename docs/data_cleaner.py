@@ -1213,3 +1213,117 @@ def validate_data(df, required_columns, numeric_columns):
                 df[col] = df[col].fillna(df[col].median())
     
     return df
+import pandas as pd
+import numpy as np
+
+def clean_dataframe(df, missing_strategy='mean', outlier_threshold=3):
+    """
+    Clean a pandas DataFrame by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    missing_strategy (str): Strategy for handling missing values.
+        Options: 'mean', 'median', 'mode', 'drop'.
+    outlier_threshold (float): Number of standard deviations for outlier detection.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+    
+    if missing_strategy == 'mean':
+        for col in numeric_cols:
+            cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+    elif missing_strategy == 'median':
+        for col in numeric_cols:
+            cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+    elif missing_strategy == 'mode':
+        for col in numeric_cols:
+            cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+    elif missing_strategy == 'drop':
+        cleaned_df.dropna(subset=numeric_cols, inplace=True)
+    
+    # Handle outliers using z-score method
+    for col in numeric_cols:
+        z_scores = np.abs((cleaned_df[col] - cleaned_df[col].mean()) / cleaned_df[col].std())
+        cleaned_df = cleaned_df[z_scores < outlier_threshold]
+    
+    # Reset index after cleaning
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False
+    
+    if len(df) < min_rows:
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False
+    
+    return True
+
+def calculate_statistics(df):
+    """
+    Calculate basic statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    
+    Returns:
+    dict: Dictionary containing statistics for each numeric column.
+    """
+    stats = {}
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_cols:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'median': df[col].median(),
+            'std': df[col].std(),
+            'min': df[col].min(),
+            'max': df[col].max(),
+            'count': df[col].count(),
+            'missing': df[col].isnull().sum()
+        }
+    
+    return stats
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 100],
+        'B': [5, 6, 7, np.nan, 9],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataframe(df, missing_strategy='mean', outlier_threshold=2)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    stats = calculate_statistics(cleaned)
+    print("\nStatistics:")
+    for col, values in stats.items():
+        print(f"{col}: {values}")
