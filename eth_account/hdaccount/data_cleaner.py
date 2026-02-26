@@ -88,3 +88,36 @@ if __name__ == "__main__":
     cleaned_data = remove_outliers_iqr(sample_data, 'values')
     print("Cleaned data shape:", cleaned_data.shape)
     print("Cleaned statistics:", calculate_summary_statistics(cleaned_data, 'values'))
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    Returns a new list with unique elements.
+    """
+    seen = set()
+    unique_list = []
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            unique_list.append(item)
+    return unique_list
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to floats.
+    Non-numeric values are replaced with the default value.
+    """
+    cleaned = []
+    for val in values:
+        try:
+            cleaned.append(float(val))
+        except (ValueError, TypeError):
+            cleaned.append(default)
+    return cleaned
+
+if __name__ == "__main__":
+    sample_data = [1, 2, 2, 3, 4, 4, 5]
+    print("Original:", sample_data)
+    print("Cleaned:", remove_duplicates(sample_data))
+    
+    mixed_data = ["1.5", 2, "invalid", 3.7, None]
+    print("Numeric cleaning:", clean_numeric_data(mixed_data))
