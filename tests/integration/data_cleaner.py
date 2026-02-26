@@ -425,3 +425,86 @@ def validate_data(df, required_columns):
     if missing_cols:
         raise ValueError(f"Missing required columns: {missing_cols}")
     return True
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_na=None):
+    """
+    Clean a pandas DataFrame by handling null values and duplicates.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default True.
+    fill_na (str or dict): Method to fill null values. Can be 'mean', 'median', 
+                          'mode', or a dictionary of column:value pairs. Default None.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle null values
+    if fill_na is not None:
+        if isinstance(fill_na, dict):
+            cleaned_df.fillna(fill_na, inplace=True)
+        elif fill_na == 'mean':
+            cleaned_df.fillna(cleaned_df.mean(numeric_only=True), inplace=True)
+        elif fill_na == 'median':
+            cleaned_df.fillna(cleaned_df.median(numeric_only=True), inplace=True)
+        elif fill_na == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else '', inplace=True)
+                else:
+                    cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0, inplace=True)
+    
+    # Drop duplicates
+    if drop_duplicates:
+        cleaned_df.drop_duplicates(inplace=True)
+    
+    # Reset index
+    cleaned_df.reset_index(drop=True, inplace=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    min_rows (int): Minimum number of rows required.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Dataset is valid"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, None, 4, 1],
+        'B': [5, None, 7, 8, 5],
+        'C': ['x', 'y', 'z', None, 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame (fill with mean for numeric, mode for categorical):")
+    cleaned = clean_dataset(df, fill_na='mode')
+    print(cleaned)
+    
+    is_valid, message = validate_dataset(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {message}")
