@@ -588,3 +588,135 @@ def example_usage():
 if __name__ == "__main__":
     result = example_usage()
     print("Cleaned data shape:", result.shape)
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        subset: column label or sequence of labels to consider for duplicates
+        keep: {'first', 'last', False} determines which duplicates to keep
+    
+    Returns:
+        DataFrame with duplicates removed
+    """
+    if subset is None:
+        subset = df.columns.tolist()
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    print(f"Removed {len(df) - len(cleaned_df)} duplicate rows")
+    print(f"Original shape: {df.shape}, Cleaned shape: {cleaned_df.shape}")
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate DataFrame for missing values and required columns.
+    
+    Args:
+        df: pandas DataFrame
+        required_columns: list of column names that must be present
+    
+    Returns:
+        dict containing validation results
+    """
+    validation_results = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'missing_values': df.isnull().sum().to_dict(),
+        'duplicate_rows': df.duplicated().sum()
+    }
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        validation_results['missing_required_columns'] = missing_columns
+        validation_results['all_required_columns_present'] = len(missing_columns) == 0
+    
+    return validation_results
+
+def clean_numeric_columns(df, columns=None):
+    """
+    Clean numeric columns by converting to appropriate types and handling outliers.
+    
+    Args:
+        df: pandas DataFrame
+        columns: list of column names to clean (default: all numeric columns)
+    
+    Returns:
+        DataFrame with cleaned numeric columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in df.columns:
+            # Convert to numeric, coerce errors to NaN
+            cleaned_df[col] = pd.to_numeric(cleaned_df[col], errors='coerce')
+            
+            # Remove extreme outliers (beyond 3 standard deviations)
+            if cleaned_df[col].notna().sum() > 0:
+                mean_val = cleaned_df[col].mean()
+                std_val = cleaned_df[col].std()
+                
+                if std_val > 0:
+                    lower_bound = mean_val - 3 * std_val
+                    upper_bound = mean_val + 3 * std_val
+                    
+                    outliers = (cleaned_df[col] < lower_bound) | (cleaned_df[col] > upper_bound)
+                    cleaned_df.loc[outliers, col] = np.nan
+    
+    return cleaned_df
+
+def process_dataframe(df, cleaning_steps=None):
+    """
+    Apply multiple cleaning steps to a DataFrame.
+    
+    Args:
+        df: pandas DataFrame
+        cleaning_steps: list of cleaning functions to apply
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    if cleaning_steps is None:
+        cleaning_steps = [
+            lambda x: remove_duplicates(x),
+            lambda x: clean_numeric_columns(x)
+        ]
+    
+    cleaned_df = df.copy()
+    
+    for step in cleaning_steps:
+        cleaned_df = step(cleaned_df)
+    
+    validation = validate_data(cleaned_df)
+    
+    print("Data cleaning completed successfully")
+    print(f"Final shape: {cleaned_df.shape}")
+    print(f"Validation results: {validation}")
+    
+    return cleaned_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Charlie', 'David', 'David', 'Eve'],
+        'age': [25, 30, 35, 40, 40, 45],
+        'score': [85.5, 92.0, 78.5, 88.0, 88.0, 95.5]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    cleaned_df = process_dataframe(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
