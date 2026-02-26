@@ -121,3 +121,146 @@ if __name__ == "__main__":
     
     mixed_data = ["1.5", 2, "invalid", 3.7, None]
     print("Numeric cleaning:", clean_numeric_data(mixed_data))
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_summary_statistics(df):
+    """
+    Calculate summary statistics for numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    pd.DataFrame: Summary statistics
+    """
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    summary = df[numeric_cols].describe()
+    
+    summary.loc['variance'] = df[numeric_cols].var()
+    summary.loc['skewness'] = df[numeric_cols].skew()
+    summary.loc['kurtosis'] = df[numeric_cols].kurtosis()
+    
+    return summary
+
+def handle_missing_values(df, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): Imputation strategy ('mean', 'median', 'mode', 'drop')
+    
+    Returns:
+    pd.DataFrame: DataFrame with handled missing values
+    """
+    df_clean = df.copy()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        df_clean = df_clean.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        for col in numeric_cols:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mean())
+    elif strategy == 'median':
+        for col in numeric_cols:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+    elif strategy == 'mode':
+        for col in numeric_cols:
+            df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0])
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', 'mode', or 'drop'")
+    
+    return df_clean
+
+def normalize_data(df, method='minmax'):
+    """
+    Normalize numeric columns in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    method (str): Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+    pd.DataFrame: Normalized DataFrame
+    """
+    df_norm = df.copy()
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if method == 'minmax':
+        for col in numeric_cols:
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val > min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+    
+    elif method == 'zscore':
+        for col in numeric_cols:
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            if std_val > 0:
+                df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return df_norm
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    data = {
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'feature3': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df = pd.DataFrame(data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("\nOriginal summary statistics:")
+    print(calculate_summary_statistics(df))
+    
+    df_clean = remove_outliers_iqr(df, 'feature1')
+    print("\nAfter outlier removal shape:", df_clean.shape)
+    
+    df_filled = handle_missing_values(df, strategy='mean')
+    print("\nMissing values handled.")
+    
+    df_normalized = normalize_data(df_filled, method='minmax')
+    print("\nData normalized using min-max scaling.")
+    
+    print("\nFinal summary statistics:")
+    print(calculate_summary_statistics(df_normalized))
+
+if __name__ == "__main__":
+    main()
