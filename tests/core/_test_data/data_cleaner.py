@@ -1,165 +1,58 @@
-
 import pandas as pd
-import numpy as np
-from scipy import stats
 
-def load_dataset(filepath):
-    return pd.read_csv(filepath)
-
-def remove_outliers_iqr(df, column):
-    Q1 = df[column].quantile(0.25)
-    Q3 = df[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-
-def normalize_column(df, column):
-    min_val = df[column].min()
-    max_val = df[column].max()
-    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
-    return df
-
-def clean_data(df, numeric_columns):
-    for col in numeric_columns:
-        df = remove_outliers_iqr(df, col)
-        df = normalize_column(df, col)
-    return df
-
-def save_cleaned_data(df, output_path):
-    df.to_csv(output_path, index=False)
-
-if __name__ == "__main__":
-    input_file = 'raw_data.csv'
-    output_file = 'cleaned_data.csv'
-    numeric_cols = ['age', 'income', 'score']
-    
-    raw_df = load_dataset(input_file)
-    cleaned_df = clean_data(raw_df, numeric_cols)
-    save_cleaned_data(cleaned_df, output_file)
-    print(f"Data cleaning completed. Saved to {output_file}")
-import pandas as pd
-import re
-
-def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+def clean_dataset(df):
     """
-    Clean a pandas DataFrame by removing duplicates and normalizing text columns.
+    Clean a pandas DataFrame by removing null values and duplicate rows.
     
     Args:
-        df: Input pandas DataFrame
-        column_mapping: Dictionary to rename columns (optional)
-        drop_duplicates: Boolean to remove duplicate rows
-        normalize_text: Boolean to normalize text columns
+        df (pd.DataFrame): Input DataFrame to be cleaned.
     
     Returns:
-        Cleaned pandas DataFrame
+        pd.DataFrame: Cleaned DataFrame.
     """
-    cleaned_df = df.copy()
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
     
-    if column_mapping:
-        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
     
-    if drop_duplicates:
-        initial_rows = len(cleaned_df)
-        cleaned_df = cleaned_df.drop_duplicates()
-        removed = initial_rows - len(cleaned_df)
-        print(f"Removed {removed} duplicate rows")
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
     
-    if normalize_text:
-        text_columns = cleaned_df.select_dtypes(include=['object']).columns
-        for col in text_columns:
-            if cleaned_df[col].dtype == 'object':
-                cleaned_df[col] = cleaned_df[col].apply(_normalize_string)
-    
-    return cleaned_df
+    return df_cleaned
 
-def _normalize_string(text):
-    """Normalize a string by converting to lowercase and removing extra whitespace."""
-    if pd.isna(text):
-        return text
-    
-    normalized = str(text).strip().lower()
-    normalized = re.sub(r'\s+', ' ', normalized)
-    return normalized
-
-def validate_email_column(df, email_column):
+def validate_data(df, required_columns):
     """
-    Validate email addresses in a DataFrame column.
+    Validate that DataFrame contains all required columns.
     
     Args:
-        df: Input pandas DataFrame
-        email_column: Name of the column containing email addresses
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
     
     Returns:
-        DataFrame with validation results
+        bool: True if all required columns are present, False otherwise.
     """
-    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    missing_columns = [col for col in required_columns if col not in df.columns]
     
-    validation_results = df[email_column].apply(
-        lambda x: bool(re.match(email_pattern, str(x))) if pd.notna(x) else False
-    )
+    if missing_columns:
+        print(f"Missing columns: {missing_columns}")
+        return False
     
-    result_df = pd.DataFrame({
-        'email': df[email_column],
-        'is_valid': validation_results
-    })
-    
-    valid_count = validation_results.sum()
-    total_count = len(validation_results)
-    
-    print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
-    
-    return result_df
-import pandas as pd
-import numpy as np
-from scipy import stats
+    return True
 
-def remove_outliers_iqr(df, columns):
-    df_clean = df.copy()
-    for col in columns:
-        if col in df.columns:
-            Q1 = df[col].quantile(0.25)
-            Q3 = df[col].quantile(0.75)
-            IQR = Q3 - Q1
-            lower_bound = Q1 - 1.5 * IQR
-            upper_bound = Q3 + 1.5 * IQR
-            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
-    return df_clean
-
-def normalize_data(df, columns, method='minmax'):
-    df_norm = df.copy()
-    for col in columns:
-        if col in df.columns:
-            if method == 'minmax':
-                min_val = df[col].min()
-                max_val = df[col].max()
-                if max_val != min_val:
-                    df_norm[col] = (df[col] - min_val) / (max_val - min_val)
-                else:
-                    df_norm[col] = 0
-            elif method == 'zscore':
-                mean_val = df[col].mean()
-                std_val = df[col].std()
-                if std_val > 0:
-                    df_norm[col] = (df[col] - mean_val) / std_val
-                else:
-                    df_norm[col] = 0
-    return df_norm
-
-def clean_dataset(df, numeric_columns):
-    df_no_outliers = remove_outliers_iqr(df, numeric_columns)
-    df_normalized = normalize_data(df_no_outliers, numeric_columns, method='zscore')
-    return df_normalized
-
-if __name__ == "__main__":
-    sample_data = {
-        'feature1': np.random.normal(100, 15, 200),
-        'feature2': np.random.exponential(50, 200),
-        'feature3': np.random.uniform(0, 1, 200)
-    }
-    df = pd.DataFrame(sample_data)
-    numeric_cols = ['feature1', 'feature2', 'feature3']
-    cleaned_df = clean_dataset(df, numeric_cols)
-    print(f"Original shape: {df.shape}")
-    print(f"Cleaned shape: {cleaned_df.shape}")
-    print(f"Cleaned data summary:\n{cleaned_df.describe()}")
+def sample_data(df, sample_size=1000, random_state=42):
+    """
+    Create a random sample from the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame.
+        sample_size (int): Number of rows to sample.
+        random_state (int): Random seed for reproducibility.
+    
+    Returns:
+        pd.DataFrame: Sampled DataFrame.
+    """
+    if len(df) <= sample_size:
+        return df
+    
+    return df.sample(n=sample_size, random_state=random_state)
