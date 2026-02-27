@@ -1002,3 +1002,41 @@ def get_summary_statistics(data):
     summary['missing_pct'] = (summary['missing'] / len(data)) * 100
     
     return summary
+import pandas as pd
+
+def clean_dataframe(df, column, threshold, keep_above=True):
+    """
+    Filters a pandas DataFrame based on a numeric threshold in a specified column.
+    Returns a new DataFrame with rows where the column value is either above
+    (if keep_above is True) or below/equal to (if keep_above is False) the threshold.
+    """
+    if keep_above:
+        filtered_df = df[df[column] > threshold].copy()
+    else:
+        filtered_df = df[df[column] <= threshold].copy()
+    
+    filtered_df.reset_index(drop=True, inplace=True)
+    return filtered_df
+
+def remove_duplicates_by_column(df, column_subset, keep='first'):
+    """
+    Removes duplicate rows from a DataFrame based on a subset of columns.
+    Returns a new DataFrame with duplicates removed.
+    """
+    cleaned_df = df.drop_duplicates(subset=column_subset, keep=keep).copy()
+    cleaned_df.reset_index(drop=True, inplace=True)
+    return cleaned_df
+
+def validate_and_clean(df, required_columns):
+    """
+    Validates that the DataFrame contains all required columns.
+    If validation passes, drops rows with any NaN values in the required columns.
+    Returns a cleaned DataFrame or raises a ValueError.
+    """
+    missing_cols = [col for col in required_columns if col not in df.columns]
+    if missing_cols:
+        raise ValueError(f"DataFrame missing required columns: {missing_cols}")
+    
+    cleaned_df = df.dropna(subset=required_columns).copy()
+    cleaned_df.reset_index(drop=True, inplace=True)
+    return cleaned_df
