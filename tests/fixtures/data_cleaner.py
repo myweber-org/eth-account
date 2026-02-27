@@ -265,3 +265,72 @@ if __name__ == "__main__":
     if cleaned_data is not None:
         cleaned_data.to_csv("cleaned_data.csv", index=False)
         print("Data cleaning completed successfully.")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+def clean_csv_data(input_path, output_path=None):
+    """
+    Load a CSV file, clean missing values, convert data types,
+    and save the cleaned version.
+    """
+    df = pd.read_csv(input_path)
+    
+    # Remove duplicate rows
+    df = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df[col] = df[col].fillna(df[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+    
+    # Convert date columns if present
+    date_columns = [col for col in df.columns if 'date' in col.lower() or 'time' in col.lower()]
+    for col in date_columns:
+        try:
+            df[col] = pd.to_datetime(df[col], errors='coerce')
+        except:
+            pass
+    
+    # Remove rows where critical columns are still null
+    critical_cols = [col for col in df.columns if 'id' in col.lower() or 'key' in col.lower()]
+    if critical_cols:
+        df = df.dropna(subset=critical_cols)
+    
+    # Generate output path if not provided
+    if output_path is None:
+        input_file = Path(input_path)
+        output_path = input_file.parent / f"{input_file.stem}_cleaned{input_file.suffix}"
+    
+    # Save cleaned data
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to: {output_path}")
+    print(f"Original shape: {pd.read_csv(input_path).shape}, Cleaned shape: {df.shape}")
+    
+    return df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'user_id': [1, 2, 3, 4, 5, 5],
+        'name': ['Alice', 'Bob', None, 'David', 'Eve', 'Eve'],
+        'age': [25, 30, None, 35, 40, 40],
+        'score': [85.5, 92.0, 78.5, None, 88.0, 88.0],
+        'join_date': ['2023-01-15', '2023-02-20', None, '2023-03-10', '2023-04-05', '2023-04-05']
+    }
+    
+    # Create test CSV
+    test_df = pd.DataFrame(sample_data)
+    test_df.to_csv('test_data.csv', index=False)
+    
+    # Clean the data
+    cleaned_df = clean_csv_data('test_data.csv')
+    
+    # Display results
+    print("\nFirst few rows of cleaned data:")
+    print(cleaned_df.head())
