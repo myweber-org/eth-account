@@ -1123,3 +1123,62 @@ if __name__ == "__main__":
     print(f"Original shape: {sample_data.shape}")
     print(f"Cleaned shape: {cleaned.shape}")
     print(cleaned[['feature_a_normalized', 'feature_b_standardized']].head())
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (DataFrame): The pandas DataFrame containing the data.
+    column (str): The column name to process.
+    
+    Returns:
+    DataFrame: DataFrame with outliers removed from the specified column.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def calculate_summary_statistics(data, column):
+    """
+    Calculate summary statistics for a specified column.
+    
+    Parameters:
+    data (DataFrame): The pandas DataFrame containing the data.
+    column (str): The column name to process.
+    
+    Returns:
+    dict: A dictionary containing count, mean, std, min, max.
+    """
+    stats = {
+        'count': data[column].count(),
+        'mean': data[column].mean(),
+        'std': data[column].std(),
+        'min': data[column].min(),
+        'max': data[column].max()
+    }
+    return stats
+
+if __name__ == "__main__":
+    import pandas as pd
+    
+    sample_data = pd.DataFrame({
+        'values': [10, 12, 12, 13, 12, 11, 10, 100, 12, 14, 15, 12, 11, 10, 9, 8, 12, 13, 14, 200]
+    })
+    
+    print("Original data:")
+    print(sample_data)
+    print("\nOriginal statistics:")
+    print(calculate_summary_statistics(sample_data, 'values'))
+    
+    cleaned_data = remove_outliers_iqr(sample_data, 'values')
+    print("\nCleaned data:")
+    print(cleaned_data)
+    print("\nCleaned statistics:")
+    print(calculate_summary_statistics(cleaned_data, 'values'))
