@@ -597,4 +597,107 @@ if __name__ == "__main__":
     print(df)
     print("\nCleaned DataFrame:")
     cleaned = clean_dataset(df, ['feature_a', 'feature_b'])
-    print(cleaned)
+    print(cleaned)import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using the Interquartile Range method.
+    Returns a cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df.columns:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    return df_clean.reset_index(drop=True)
+
+def normalize_minmax(df, columns):
+    """
+    Normalize specified columns using Min-Max scaling.
+    Returns a DataFrame with normalized columns.
+    """
+    df_norm = df.copy()
+    for col in columns:
+        if col in df.columns:
+            min_val = df[col].min()
+            max_val = df[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df[col] - min_val) / (max_val - min_val)
+            else:
+                df_norm[col] = 0.0
+    return df_norm
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    """
+    return df.drop_duplicates(subset=subset, keep=keep).reset_index(drop=True)
+
+def fill_missing_with_statistic(df, columns, method='mean'):
+    """
+    Fill missing values with specified statistic (mean, median, mode).
+    """
+    df_filled = df.copy()
+    for col in columns:
+        if col in df.columns:
+            if method == 'mean':
+                fill_value = df[col].mean()
+            elif method == 'median':
+                fill_value = df[col].median()
+            elif method == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else np.nan
+            else:
+                fill_value = np.nan
+            df_filled[col] = df[col].fillna(fill_value)
+    return df_filled
+
+def validate_dataframe(df, required_columns=None, numeric_columns=None):
+    """
+    Basic DataFrame validation.
+    """
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            raise ValueError(f"Missing required columns: {missing}")
+    
+    if numeric_columns:
+        non_numeric = [col for col in numeric_columns if col in df.columns and not np.issubdtype(df[col].dtype, np.number)]
+        if non_numeric:
+            raise ValueError(f"Columns should be numeric: {non_numeric}")
+    
+    return True
+
+def example_usage():
+    """
+    Example usage of the data cleaning functions.
+    """
+    np.random.seed(42)
+    data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    df = pd.DataFrame(data)
+    
+    df.loc[10, 'value'] = 500
+    df.loc[20, 'value'] = -100
+    
+    print("Original DataFrame shape:", df.shape)
+    
+    df_clean = remove_outliers_iqr(df, ['value'])
+    print("After outlier removal:", df_clean.shape)
+    
+    df_norm = normalize_minmax(df_clean, ['value'])
+    print("Normalized 'value' column range:", df_norm['value'].min(), df_norm['value'].max())
+    
+    return df_norm
+
+if __name__ == "__main__":
+    cleaned_df = example_usage()
+    print("Data cleaning completed successfully.")
