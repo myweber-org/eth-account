@@ -55,3 +55,11 @@ def clean_dataset(data, numeric_columns, outlier_method='iqr', missing_strategy=
         cleaned_data = standardize_zscore(cleaned_data, col)
     
     return cleaned_data
+def remove_duplicates_preserve_order(input_list):
+    seen = set()
+    result = []
+    for item in input_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
