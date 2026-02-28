@@ -556,3 +556,83 @@ if __name__ == "__main__":
     CITY = "London"
     weather_data = get_weather(API_KEY, CITY)
     display_weather(weather_data)
+import requests
+import json
+import os
+from datetime import datetime
+
+def get_weather(city_name, api_key):
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city_name,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data['cod'] != 200:
+            print(f"Error: {data.get('message', 'Unknown error')}")
+            return None
+            
+        return data
+    except requests.exceptions.RequestException as e:
+        print(f"Network error occurred: {e}")
+        return None
+    except json.JSONDecodeError:
+        print("Error decoding JSON response")
+        return None
+
+def display_weather(data):
+    if not data:
+        return
+        
+    main = data['main']
+    weather = data['weather'][0]
+    sys = data['sys']
+    
+    print(f"Weather in {data['name']}, {sys['country']}:")
+    print(f"  Temperature: {main['temp']}°C")
+    print(f"  Feels like: {main['feels_like']}°C")
+    print(f"  Conditions: {weather['description'].title()}")
+    print(f"  Humidity: {main['humidity']}%")
+    print(f"  Pressure: {main['pressure']} hPa")
+    print(f"  Wind Speed: {data['wind']['speed']} m/s")
+    
+    sunrise = datetime.fromtimestamp(sys['sunrise'])
+    sunset = datetime.fromtimestamp(sys['sunset'])
+    print(f"  Sunrise: {sunrise.strftime('%H:%M:%S')}")
+    print(f"  Sunset: {sunset.strftime('%H:%M:%S')}")
+
+def main():
+    api_key = os.environ.get('OPENWEATHER_API_KEY')
+    
+    if not api_key:
+        print("Please set OPENWEATHER_API_KEY environment variable")
+        return
+    
+    city = input("Enter city name: ").strip()
+    
+    if not city:
+        print("City name cannot be empty")
+        return
+    
+    weather_data = get_weather(city, api_key)
+    
+    if weather_data:
+        display_weather(weather_data)
+        
+        save_option = input("Save to file? (y/n): ").strip().lower()
+        if save_option == 'y':
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"weather_{city}_{timestamp}.json"
+            
+            with open(filename, 'w') as f:
+                json.dump(weather_data, f, indent=2)
+            print(f"Weather data saved to {filename}")
+
+if __name__ == "__main__":
+    main()
