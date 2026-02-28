@@ -693,3 +693,14 @@ def validate_email(email):
         return False
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
     return bool(re.match(pattern, str(email)))
+def filter_none_values(input_list):
+    """
+    Return a new list with all None values removed.
+    
+    Args:
+        input_list: A list that may contain None values.
+    
+    Returns:
+        A list with all None values filtered out.
+    """
+    return [item for item in input_list if item is not None]
