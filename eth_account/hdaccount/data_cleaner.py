@@ -704,3 +704,11 @@ def filter_none_values(input_list):
         A list with all None values filtered out.
     """
     return [item for item in input_list if item is not None]
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
