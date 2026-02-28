@@ -109,3 +109,11 @@ def get_cleaning_summary(original_data, cleaned_data):
             summary[f'{col}_cleaned_std'] = cleaned_data[col].std()
     
     return summary
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
