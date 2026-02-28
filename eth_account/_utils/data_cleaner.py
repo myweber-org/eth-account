@@ -197,3 +197,122 @@ def remove_duplicates(seq):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, multiplier=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def remove_outliers_zscore(dataframe, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(dataframe[column].dropna()))
+    filtered_indices = np.where(z_scores < threshold)[0]
+    
+    filtered_df = dataframe.iloc[filtered_indices]
+    return filtered_df
+
+def normalize_minmax(dataframe, columns=None):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns
+    
+    normalized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col]):
+            min_val = dataframe[col].min()
+            max_val = dataframe[col].max()
+            
+            if max_val != min_val:
+                normalized_df[col] = (dataframe[col] - min_val) / (max_val - min_val)
+            else:
+                normalized_df[col] = 0
+    
+    return normalized_df
+
+def normalize_zscore(dataframe, columns=None):
+    """
+    Normalize data using Z-score standardization
+    """
+    if columns is None:
+        columns = dataframe.select_dtypes(include=[np.number]).columns
+    
+    standardized_df = dataframe.copy()
+    
+    for col in columns:
+        if col in dataframe.columns and pd.api.types.is_numeric_dtype(dataframe[col]):
+            mean_val = dataframe[col].mean()
+            std_val = dataframe[col].std()
+            
+            if std_val != 0:
+                standardized_df[col] = (dataframe[col] - mean_val) / std_val
+            else:
+                standardized_df[col] = 0
+    
+    return standardized_df
+
+def clean_dataset(dataframe, outlier_method='iqr', normalization_method='minmax', 
+                  outlier_columns=None, norm_columns=None, outlier_params=None):
+    """
+    Main function to clean dataset with outlier removal and normalization
+    """
+    cleaned_df = dataframe.copy()
+    
+    if outlier_method and outlier_columns:
+        if outlier_params is None:
+            outlier_params = {}
+        
+        for col in outlier_columns:
+            if col in cleaned_df.columns:
+                if outlier_method == 'iqr':
+                    multiplier = outlier_params.get('multiplier', 1.5)
+                    cleaned_df = remove_outliers_iqr(cleaned_df, col, multiplier)
+                elif outlier_method == 'zscore':
+                    threshold = outlier_params.get('threshold', 3)
+                    cleaned_df = remove_outliers_zscore(cleaned_df, col, threshold)
+    
+    if normalization_method and norm_columns:
+        if normalization_method == 'minmax':
+            cleaned_df = normalize_minmax(cleaned_df, norm_columns)
+        elif normalization_method == 'zscore':
+            cleaned_df = normalize_zscore(cleaned_df, norm_columns)
+    
+    return cleaned_df
+
+def get_data_summary(dataframe):
+    """
+    Generate summary statistics for the dataset
+    """
+    summary = {
+        'shape': dataframe.shape,
+        'columns': list(dataframe.columns),
+        'dtypes': dataframe.dtypes.to_dict(),
+        'missing_values': dataframe.isnull().sum().to_dict(),
+        'numeric_summary': dataframe.describe().to_dict() if not dataframe.select_dtypes(include=[np.number]).empty else {}
+    }
+    
+    return summary
