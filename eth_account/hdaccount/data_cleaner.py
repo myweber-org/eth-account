@@ -123,3 +123,11 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_data.shape)
     print("\nCleaned summary statistics:")
     print(get_summary_statistics(cleaned_data.select_dtypes(include=[np.number])))
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
