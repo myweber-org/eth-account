@@ -970,3 +970,58 @@ def clean_dataset(df, outlier_method='iqr', normalize_method=None, fill_missing=
         cleaner.fill_missing()
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Cleans a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Dropped {original_shape[0] - cleaned_df.shape[0]} duplicate rows.")
+
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        if fill_missing == 'mean':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+            print("Filled numeric missing values with column mean.")
+        elif fill_missing == 'median':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+            print("Filled numeric missing values with column median.")
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].isnull().any():
+                    mode_val = cleaned_df[col].mode()[0]
+                    cleaned_df[col] = cleaned_df[col].fillna(mode_val)
+            print("Filled missing values with column mode.")
+        elif fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+            print("Dropped rows containing missing values.")
+        else:
+            print(f"Warning: Unsupported fill_missing method '{fill_missing}'. Missing values remain.")
+
+    final_shape = cleaned_df.shape
+    print(f"Data cleaning complete. Original shape: {original_shape}, Cleaned shape: {final_shape}")
+
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, np.nan],
+        'B': [10, 20, 20, np.nan, 50, 60],
+        'C': ['x', 'y', 'y', 'z', np.nan, 'x']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
