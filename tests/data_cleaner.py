@@ -301,4 +301,86 @@ if __name__ == "__main__":
     
     validation = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
     print("\nValidation Results:")
-    print(validation)
+    print(validation)import pandas as pd
+import numpy as np
+
+def load_data(filepath):
+    """Load data from a CSV file."""
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File not found at {filepath}")
+        return None
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return None
+
+def remove_outliers_iqr(df, column):
+    """Remove outliers from a column using the IQR method."""
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    removed_count = len(df) - len(filtered_df)
+    print(f"Removed {removed_count} outliers from column '{column}'")
+    return filtered_df
+
+def normalize_column(df, column):
+    """Normalize a column using min-max scaling."""
+    if column in df.columns:
+        min_val = df[column].min()
+        max_val = df[column].max()
+        if max_val != min_val:
+            df[column] = (df[column] - min_val) / (max_val - min_val)
+            print(f"Normalized column '{column}'")
+        else:
+            print(f"Column '{column}' has constant values, skipping normalization")
+    else:
+        print(f"Column '{column}' not found in DataFrame")
+    return df
+
+def clean_data(df, numeric_columns):
+    """Main function to clean data by removing outliers and normalizing."""
+    if df is None or df.empty:
+        print("No data to clean")
+        return df
+    
+    original_shape = df.shape
+    print(f"Original data shape: {original_shape}")
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df = remove_outliers_iqr(df, col)
+    
+    for col in numeric_columns:
+        if col in df.columns:
+            df = normalize_column(df, col)
+    
+    print(f"Cleaned data shape: {df.shape}")
+    print(f"Rows removed: {original_shape[0] - df.shape[0]}")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned data to a CSV file."""
+    try:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    except Exception as e:
+        print(f"Error saving data: {e}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    numeric_cols = ['age', 'income', 'score']
+    
+    raw_data = load_data(input_file)
+    
+    if raw_data is not None:
+        cleaned_data = clean_data(raw_data, numeric_cols)
+        save_cleaned_data(cleaned_data, output_file)
