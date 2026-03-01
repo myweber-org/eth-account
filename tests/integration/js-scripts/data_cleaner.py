@@ -301,3 +301,111 @@ if __name__ == "__main__":
     print("\nSummary statistics:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}" if isinstance(value, float) else f"{key}: {value}")
+import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a pandas DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list, optional): Column labels to consider for duplicates
+    keep (str, optional): Which duplicates to keep: 'first', 'last', or False
+    
+    Returns:
+    pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    if subset is not None:
+        if not all(col in df.columns for col in subset):
+            raise ValueError("All subset columns must exist in DataFrame")
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def clean_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    strategy (str): 'drop' to remove rows, 'fill' to fill values
+    fill_value: Value to use when strategy='fill'
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if strategy == 'drop':
+        cleaned_df = df.dropna()
+        print(f"Removed {len(df) - len(cleaned_df)} rows with missing values")
+    elif strategy == 'fill':
+        if fill_value is None:
+            fill_value = df.mean(numeric_only=True)
+        cleaned_df = df.fillna(fill_value)
+        print("Filled missing values")
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    bool: True if validation passes
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+    
+    return True
+
+def main():
+    """
+    Example usage of data cleaning functions.
+    """
+    sample_data = {
+        'id': [1, 2, 2, 3, 4, 4, 5],
+        'name': ['Alice', 'Bob', 'Bob', 'Charlie', 'David', 'David', 'Eve'],
+        'score': [85, 90, 90, 78, None, 92, 88],
+        'department': ['HR', 'IT', 'IT', 'Finance', 'Sales', 'Sales', 'IT']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    validate_dataframe(df, required_columns=['id', 'name'])
+    
+    df_no_duplicates = remove_duplicates(df, subset=['id', 'name'])
+    print("\nAfter removing duplicates:")
+    print(df_no_duplicates)
+    
+    df_cleaned = clean_missing_values(df_no_duplicates, strategy='fill', fill_value=0)
+    print("\nAfter handling missing values:")
+    print(df_cleaned)
+    
+    return df_cleaned
+
+if __name__ == "__main__":
+    cleaned_data = main()
