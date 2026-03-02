@@ -7,3 +7,120 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    outliers_removed = len(data) - len(filtered_data)
+    
+    return filtered_data, outliers_removed
+
+def z_score_normalization(data, column):
+    """
+    Apply z-score normalization to a column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean = data[column].mean()
+    std = data[column].std()
+    
+    if std == 0:
+        return data[column]
+    
+    normalized = (data[column] - mean) / std
+    return normalized
+
+def min_max_normalization(data, column, feature_range=(0, 1)):
+    """
+    Apply min-max normalization to a column
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if min_val == max_val:
+        return data[column]
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        new_min, new_max = feature_range
+        normalized = normalized * (new_max - new_min) + new_min
+    
+    return normalized
+
+def clean_dataset(df, numeric_columns=None, outlier_factor=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = df.copy()
+    stats_report = {}
+    
+    for col in numeric_columns:
+        if col not in df.columns:
+            continue
+            
+        original_count = len(cleaned_df)
+        
+        cleaned_df, outliers_removed = remove_outliers_iqr(cleaned_df, col, outlier_factor)
+        stats_report[col] = {
+            'original_rows': original_count,
+            'outliers_removed': outliers_removed,
+            'remaining_rows': len(cleaned_df)
+        }
+        
+        if normalize_method == 'zscore':
+            cleaned_df[f'{col}_normalized'] = z_score_normalization(cleaned_df, col)
+        elif normalize_method == 'minmax':
+            cleaned_df[f'{col}_normalized'] = min_max_normalization(cleaned_df, col)
+    
+    return cleaned_df, stats_report
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    null_counts = df.isnull().sum()
+    total_nulls = null_counts.sum()
+    
+    validation_report = {
+        'total_rows': len(df),
+        'total_columns': len(df.columns),
+        'null_values': total_nulls,
+        'null_by_column': null_counts[null_counts > 0].to_dict(),
+        'dtypes': df.dtypes.to_dict()
+    }
+    
+    return validation_report
