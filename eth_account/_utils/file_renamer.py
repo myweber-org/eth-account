@@ -50,3 +50,24 @@ if __name__ == "__main__":
     replace_with = sys.argv[3]
     
     rename_files(target_dir, regex_pattern, replace_with)
+import os
+import glob
+from pathlib import Path
+
+def rename_files_sequential(directory, prefix="file", extension=".txt"):
+    files = sorted(Path(directory).iterdir(), key=os.path.getctime)
+    counter = 1
+    for file_path in files:
+        if file_path.is_file():
+            new_name = f"{prefix}_{counter:03d}{extension}"
+            new_path = file_path.parent / new_name
+            file_path.rename(new_path)
+            print(f"Renamed: {file_path.name} -> {new_name}")
+            counter += 1
+
+if __name__ == "__main__":
+    target_dir = "./documents"
+    if os.path.exists(target_dir):
+        rename_files_sequential(target_dir, prefix="doc", extension=".pdf")
+    else:
+        print(f"Directory '{target_dir}' does not exist.")
