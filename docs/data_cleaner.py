@@ -241,4 +241,97 @@ def validate_dataframe(dataframe, required_columns=None):
     if null_count > 0:
         print(f"Warning: DataFrame contains {null_count} null values")
     
-    return True, "DataFrame validation passed"
+    return True, "DataFrame validation passed"import re
+from typing import List, Optional
+
+def remove_special_characters(text: str, keep_spaces: bool = True) -> str:
+    """
+    Remove all non-alphanumeric characters from the input string.
+    
+    Args:
+        text: The input string to clean.
+        keep_spaces: If True, spaces are preserved. If False, spaces are removed.
+    
+    Returns:
+        The cleaned string containing only alphanumeric characters and optionally spaces.
+    """
+    if keep_spaces:
+        pattern = r'[^A-Za-z0-9 ]+'
+    else:
+        pattern = r'[^A-Za-z0-9]+'
+    
+    return re.sub(pattern, '', text)
+
+def normalize_whitespace(text: str) -> str:
+    """
+    Replace multiple consecutive whitespace characters with a single space.
+    
+    Args:
+        text: The input string to normalize.
+    
+    Returns:
+        The string with normalized whitespace.
+    """
+    return re.sub(r'\s+', ' ', text).strip()
+
+def clean_text_pipeline(text: str, 
+                       remove_special: bool = True,
+                       normalize_space: bool = True,
+                       to_lowercase: bool = False) -> str:
+    """
+    Apply a series of text cleaning operations.
+    
+    Args:
+        text: The input string to process.
+        remove_special: If True, remove special characters.
+        normalize_space: If True, normalize whitespace.
+        to_lowercase: If True, convert text to lowercase.
+    
+    Returns:
+        The processed text after applying all specified operations.
+    """
+    result = text
+    
+    if remove_special:
+        result = remove_special_characters(result)
+    
+    if normalize_space:
+        result = normalize_whitespace(result)
+    
+    if to_lowercase:
+        result = result.lower()
+    
+    return result
+
+def batch_clean_texts(texts: List[str], **kwargs) -> List[str]:
+    """
+    Apply text cleaning to a list of strings.
+    
+    Args:
+        texts: A list of strings to clean.
+        **kwargs: Arguments to pass to clean_text_pipeline.
+    
+    Returns:
+        A list of cleaned strings.
+    """
+    return [clean_text_pipeline(text, **kwargs) for text in texts]
+
+def validate_text(text: str, min_length: int = 1, max_length: Optional[int] = None) -> bool:
+    """
+    Validate that text meets length requirements.
+    
+    Args:
+        text: The text to validate.
+        min_length: Minimum allowed length.
+        max_length: Maximum allowed length (optional).
+    
+    Returns:
+        True if text meets all requirements, False otherwise.
+    """
+    if len(text) < min_length:
+        return False
+    
+    if max_length is not None and len(text) > max_length:
+        return False
+    
+    return True
