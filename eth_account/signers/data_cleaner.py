@@ -116,3 +116,108 @@ def validate_email_column(df, email_column):
     print(f"Valid emails: {valid_count}/{total_count} ({valid_count/total_count*100:.1f}%)")
     
     return validation_results
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, columns=None):
+    """
+    Normalize data using Min-Max scaling
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    normalized_data = data.copy()
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            min_val = data[col].min()
+            max_val = data[col].max()
+            if max_val != min_val:
+                normalized_data[col] = (data[col] - min_val) / (max_val - min_val)
+    
+    return normalized_data
+
+def normalize_zscore(data, columns=None):
+    """
+    Normalize data using Z-score standardization
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    standardized_data = data.copy()
+    for col in columns:
+        if col in data.columns and np.issubdtype(data[col].dtype, np.number):
+            mean_val = data[col].mean()
+            std_val = data[col].std()
+            if std_val != 0:
+                standardized_data[col] = (data[col] - mean_val) / std_val
+    
+    return standardized_data
+
+def clean_dataset(data, outlier_method='iqr', normalize_method='minmax', 
+                  numeric_columns=None, outlier_threshold=None):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_data = data.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = cleaned_data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    if outlier_method:
+        for col in numeric_columns:
+            if col in cleaned_data.columns:
+                if outlier_method == 'iqr':
+                    threshold = outlier_threshold if outlier_threshold else 1.5
+                    cleaned_data = remove_outliers_iqr(cleaned_data, col, threshold)
+                elif outlier_method == 'zscore':
+                    threshold = outlier_threshold if outlier_threshold else 3
+                    cleaned_data = remove_outliers_zscore(cleaned_data, col, threshold)
+    
+    if normalize_method:
+        if normalize_method == 'minmax':
+            cleaned_data = normalize_minmax(cleaned_data, numeric_columns)
+        elif normalize_method == 'zscore':
+            cleaned_data = normalize_zscore(cleaned_data, numeric_columns)
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    """
+    Generate summary statistics for the dataset
+    """
+    summary = {
+        'original_rows': len(data),
+        'numeric_columns': data.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': data.select_dtypes(include=['object']).columns.tolist(),
+        'missing_values': data.isnull().sum().to_dict(),
+        'basic_stats': data.describe().to_dict()
+    }
+    return summary
