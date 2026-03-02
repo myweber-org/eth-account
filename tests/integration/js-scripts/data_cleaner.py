@@ -523,4 +523,53 @@ def clean_dataset(data, outlier_method='iqr', normalize_method=None, missing_str
             elif normalize_method == 'zscore':
                 cleaned_data[column] = normalize_zscore(cleaned_data, column)
     
-    return cleaned_data
+    return cleaned_dataimport csv
+import re
+
+def clean_csv(input_file, output_file):
+    cleaned_rows = []
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            cleaned_row = {}
+            for key, value in row.items():
+                if value is None:
+                    cleaned_value = ''
+                else:
+                    cleaned_value = value.strip()
+                    cleaned_value = re.sub(r'\s+', ' ', cleaned_value)
+                cleaned_row[key] = cleaned_value
+            cleaned_rows.append(cleaned_row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(cleaned_rows)
+
+def validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(input_file, output_file, key_column):
+    seen = set()
+    unique_rows = []
+    
+    with open(input_file, 'r', newline='', encoding='utf-8') as infile:
+        reader = csv.DictReader(infile)
+        fieldnames = reader.fieldnames
+        
+        for row in reader:
+            if row[key_column] not in seen:
+                seen.add(row[key_column])
+                unique_rows.append(row)
+    
+    with open(output_file, 'w', newline='', encoding='utf-8') as outfile:
+        writer = csv.DictWriter(outfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(unique_rows)
+
+if __name__ == "__main__":
+    clean_csv('raw_data.csv', 'cleaned_data.csv')
+    remove_duplicates('cleaned_data.csv', 'final_data.csv', 'id')
