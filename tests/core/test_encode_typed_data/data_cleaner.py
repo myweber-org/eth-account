@@ -602,3 +602,136 @@ def clean_dataset(df, numeric_columns=None, outlier_columns=None,
                 cleaned_df = normalize_column(cleaned_df, col)
     
     return cleaned_df
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df
+
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            try:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            except Exception as e:
+                print(f"Warning: Could not clean column '{col}': {e}")
+    
+    return cleaned_df
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    summary = {
+        'original_rows': len(df),
+        'cleaned_rows': None,
+        'removed_rows': None,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'numeric_columns': list(df.select_dtypes(include=[np.number]).columns)
+    }
+    
+    return summary
+
+def process_dataset(file_path, output_path=None):
+    """
+    Complete data cleaning pipeline for a dataset file.
+    
+    Parameters:
+    file_path (str): Path to input data file
+    output_path (str): Path to save cleaned data
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    try:
+        if file_path.endswith('.csv'):
+            df = pd.read_csv(file_path)
+        elif file_path.endswith('.xlsx'):
+            df = pd.read_excel(file_path)
+        else:
+            raise ValueError("Unsupported file format. Use .csv or .xlsx")
+        
+        original_summary = get_data_summary(df)
+        print(f"Original dataset: {original_summary['original_rows']} rows")
+        
+        cleaned_df = clean_numeric_data(df)
+        
+        cleaned_summary = get_data_summary(cleaned_df)
+        removed = original_summary['original_rows'] - cleaned_summary['original_rows']
+        
+        print(f"Cleaned dataset: {cleaned_summary['original_rows']} rows")
+        print(f"Removed outliers: {removed} rows")
+        
+        if output_path:
+            if output_path.endswith('.csv'):
+                cleaned_df.to_csv(output_path, index=False)
+            elif output_path.endswith('.xlsx'):
+                cleaned_df.to_excel(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return cleaned_df
+        
+    except Exception as e:
+        print(f"Error processing dataset: {e}")
+        raise
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.randint(1, 100, 1000),
+        'category': np.random.choice(['X', 'Y', 'Z'], 1000)
+    })
+    
+    sample_data.loc[10:15, 'A'] = 500
+    sample_data.loc[20:25, 'B'] = 1000
+    
+    print("Sample data created with artificial outliers")
+    cleaned = clean_numeric_data(sample_data, ['A', 'B'])
+    print(f"Original: {len(sample_data)} rows, Cleaned: {len(cleaned)} rows")
