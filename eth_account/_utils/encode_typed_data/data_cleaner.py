@@ -173,3 +173,73 @@ if __name__ == "__main__":
         print("Data cleaning completed successfully")
     except Exception as e:
         print(f"Error during data cleaning: {e}")
+import pandas as pd
+import numpy as np
+
+def remove_missing_rows(df, columns=None):
+    """
+    Remove rows with missing values from DataFrame.
+    If columns specified, only check those columns.
+    """
+    if columns:
+        return df.dropna(subset=columns)
+    return df.dropna()
+
+def fill_missing_with_mean(df, columns):
+    """
+    Fill missing values in specified columns with column mean.
+    """
+    df_filled = df.copy()
+    for col in columns:
+        if col in df_filled.columns:
+            df_filled[col] = df_filled[col].fillna(df_filled[col].mean())
+    return df_filled
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers using IQR method for a specific column.
+    Returns boolean Series indicating outliers.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def remove_outliers(df, columns):
+    """
+    Remove rows containing outliers in specified columns using IQR method.
+    """
+    df_clean = df.copy()
+    for col in columns:
+        if col in df_clean.columns:
+            outliers = detect_outliers_iqr(df_clean, col)
+            df_clean = df_clean[~outliers]
+    return df_clean
+
+def standardize_column(df, column):
+    """
+    Standardize a column to have mean=0 and std=1.
+    """
+    if column in df.columns:
+        df_standardized = df.copy()
+        mean_val = df_standardized[column].mean()
+        std_val = df_standardized[column].std()
+        if std_val > 0:
+            df_standardized[column] = (df_standardized[column] - mean_val) / std_val
+        return df_standardized
+    return df
+
+def normalize_column(df, column):
+    """
+    Normalize a column to range [0, 1].
+    """
+    if column in df.columns:
+        df_normalized = df.copy()
+        min_val = df_normalized[column].min()
+        max_val = df_normalized[column].max()
+        if max_val > min_val:
+            df_normalized[column] = (df_normalized[column] - min_val) / (max_val - min_val)
+        return df_normalized
+    return df
