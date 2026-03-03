@@ -1,73 +1,84 @@
-
 import pandas as pd
 import numpy as np
 
+def load_data(filepath):
+    """Load dataset from CSV file."""
+    try:
+        df = pd.read_csv(filepath)
+        print(f"Data loaded successfully. Shape: {df.shape}")
+        return df
+    except FileNotFoundError:
+        print(f"Error: File '{filepath}' not found.")
+        return None
+
 def remove_outliers_iqr(df, column):
-    """
-    Remove outliers from a DataFrame column using the Interquartile Range method.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to process.
-    
-    Returns:
-    pd.DataFrame: DataFrame with outliers removed.
-    """
-    if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
-    
+    """Remove outliers using IQR method for specified column."""
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
-    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
     
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    removed_count = len(df) - len(filtered_df)
+    print(f"Removed {removed_count} outliers from column '{column}'")
     
-    return filtered_df.reset_index(drop=True)
+    return filtered_df
 
-def calculate_summary_statistics(df, column):
-    """
-    Calculate summary statistics for a column after outlier removal.
-    
-    Parameters:
-    df (pd.DataFrame): Input DataFrame.
-    column (str): Column name to analyze.
-    
-    Returns:
-    dict: Dictionary containing summary statistics.
-    """
+def normalize_column(df, column):
+    """Normalize column values to range [0, 1]."""
     if column not in df.columns:
-        raise ValueError(f"Column '{column}' not found in DataFrame")
+        print(f"Error: Column '{column}' not found in dataframe.")
+        return df
     
-    stats = {
-        'mean': df[column].mean(),
-        'median': df[column].median(),
-        'std': df[column].std(),
-        'min': df[column].min(),
-        'max': df[column].max(),
-        'count': df[column].count()
-    }
+    min_val = df[column].min()
+    max_val = df[column].max()
     
-    return stats
+    if max_val == min_val:
+        print(f"Warning: Column '{column}' has constant values. Normalization skipped.")
+        return df
+    
+    df[column + '_normalized'] = (df[column] - min_val) / (max_val - min_val)
+    print(f"Column '{column}' normalized successfully.")
+    
+    return df
+
+def clean_dataset(df, numeric_columns):
+    """Main cleaning pipeline for numeric columns."""
+    if df is None or df.empty:
+        print("Error: Invalid dataframe provided.")
+        return df
+    
+    original_shape = df.shape
+    
+    for column in numeric_columns:
+        if column in df.columns:
+            df = remove_outliers_iqr(df, column)
+            df = normalize_column(df, column)
+        else:
+            print(f"Warning: Column '{column}' not found. Skipping.")
+    
+    print(f"Data cleaning complete. Original shape: {original_shape}, Cleaned shape: {df.shape}")
+    return df
+
+def save_cleaned_data(df, output_path):
+    """Save cleaned dataframe to CSV."""
+    if df is not None and not df.empty:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+        return True
+    else:
+        print("Error: No data to save.")
+        return False
 
 if __name__ == "__main__":
-    sample_data = {
-        'values': [10, 12, 12, 13, 12, 11, 14, 13, 15, 100, 12, 14, 13, 12, 11]
-    }
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
     
-    df = pd.DataFrame(sample_data)
-    print("Original DataFrame:")
-    print(df)
-    print(f"\nOriginal shape: {df.shape}")
+    numeric_cols = ['age', 'income', 'score']
     
-    cleaned_df = remove_outliers_iqr(df, 'values')
-    print("\nCleaned DataFrame:")
-    print(cleaned_df)
-    print(f"\nCleaned shape: {cleaned_df.shape}")
+    raw_data = load_data(input_file)
     
-    stats = calculate_summary_statistics(cleaned_df, 'values')
-    print("\nSummary Statistics:")
-    for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+    if raw_data is not None:
+        cleaned_data = clean_dataset(raw_data, numeric_cols)
+        save_cleaned_data(cleaned_data, output_file)
