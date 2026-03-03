@@ -338,3 +338,79 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
     print(f"\nValidation: {message}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def detect_outliers_iqr(self, column):
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        outliers = self.df[(self.df[column] < lower_bound) | (self.df[column] > upper_bound)]
+        return outliers
+    
+    def remove_outliers(self, columns=None, method='iqr'):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        original_len = len(self.df)
+        for col in columns:
+            if method == 'iqr':
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+            elif method == 'zscore':
+                z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+                self.df = self.df[z_scores < 3]
+        
+        removed_count = original_len - len(self.df)
+        print(f"Removed {removed_count} outliers")
+        return self
+    
+    def normalize_column(self, column, method='minmax'):
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            self.df[f'{column}_normalized'] = (self.df[column] - min_val) / (max_val - min_val)
+        elif method == 'zscore':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            self.df[f'{column}_normalized'] = (self.df[column] - mean_val) / std_val
+        return self
+    
+    def fill_missing(self, strategy='mean', columns=None):
+        if columns is None:
+            columns = self.df.columns
+        
+        for col in columns:
+            if self.df[col].isnull().any():
+                if strategy == 'mean' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median' and pd.api.types.is_numeric_dtype(self.df[col]):
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'ffill':
+                    self.df[col].fillna(method='ffill', inplace=True)
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        print(f"Original shape: {self.original_shape}")
+        print(f"Cleaned shape: {self.df.shape}")
+        print(f"Removed rows: {self.original_shape[0] - self.df.shape[0]}")
+        print(f"Removed columns: {self.original_shape[1] - self.df.shape[1]}")
+        print("\nMissing values after cleaning:")
+        print(self.df.isnull().sum())
