@@ -620,4 +620,85 @@ if __name__ == "__main__":
     
     cleaned_df = clean_dataset(df, ['A', 'B'])
     print("\nCleaned DataFrame:")
+    print(cleaned_df)import pandas as pd
+
+def clean_dataframe(df, column_mapping=None, drop_duplicates=True, normalize_text=True):
+    """
+    Clean a pandas DataFrame by applying various data cleaning operations.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        column_mapping (dict, optional): Dictionary mapping old column names to new ones.
+        drop_duplicates (bool): Whether to drop duplicate rows.
+        normalize_text (bool): Whether to normalize text columns (strip, lower case).
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if column_mapping:
+        cleaned_df = cleaned_df.rename(columns=column_mapping)
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates().reset_index(drop=True)
+    
+    if normalize_text:
+        for col in cleaned_df.select_dtypes(include=['object']).columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.strip().str.lower()
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate a DataFrame for basic integrity checks.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def sample_data_cleaning():
+    """Example usage of the data cleaning functions."""
+    data = {
+        'Name': ['John Doe', 'Jane Smith', 'John Doe', 'Bob Johnson', 'ALICE WONDER'],
+        'Age': [25, 30, 25, 35, 28],
+        'Email': ['john@example.com', 'jane@example.com', 'john@example.com', 'bob@example.com', 'alice@example.com']
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    column_mapping = {'Name': 'full_name', 'Email': 'email_address'}
+    cleaned_df = clean_dataframe(df, column_mapping=column_mapping)
+    
+    print("Cleaned DataFrame:")
     print(cleaned_df)
+    print("\n" + "="*50 + "\n")
+    
+    is_valid, message = validate_dataframe(cleaned_df, required_columns=['full_name', 'Age'])
+    print(f"Validation result: {is_valid}")
+    print(f"Validation message: {message}")
+
+if __name__ == "__main__":
+    sample_data_cleaning()
