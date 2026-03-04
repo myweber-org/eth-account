@@ -504,3 +504,93 @@ def validate_dataset(df, required_columns=None):
         return False, "DataFrame is empty"
     
     return True, "Dataset is valid"
+import pandas as pd
+import numpy as np
+
+def clean_csv_data(filepath, missing_strategy='mean', columns_to_drop=None):
+    """
+    Load and clean CSV data by handling missing values and optionally dropping columns.
+    
+    Args:
+        filepath: Path to the CSV file
+        missing_strategy: Strategy for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns_to_drop: List of column names to drop (optional)
+    
+    Returns:
+        Cleaned DataFrame and report dictionary
+    """
+    try:
+        df = pd.read_csv(filepath)
+        original_shape = df.shape
+        report = {
+            'original_rows': original_shape[0],
+            'original_columns': original_shape[1],
+            'missing_values': df.isnull().sum().sum(),
+            'dropped_columns': []
+        }
+        
+        if columns_to_drop:
+            df = df.drop(columns=columns_to_drop, errors='ignore')
+            report['dropped_columns'] = [col for col in columns_to_drop if col in df.columns]
+        
+        if missing_strategy == 'drop':
+            df = df.dropna()
+        elif missing_strategy in ['mean', 'median']:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns
+            if missing_strategy == 'mean':
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+            else:
+                df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        elif missing_strategy == 'mode':
+            for col in df.columns:
+                if df[col].dtype == 'object':
+                    df[col] = df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else 'Unknown')
+        
+        report['final_rows'] = df.shape[0]
+        report['final_columns'] = df.shape[1]
+        report['remaining_missing'] = df.isnull().sum().sum()
+        
+        return df, report
+        
+    except FileNotFoundError:
+        raise ValueError(f"File not found: {filepath}")
+    except pd.errors.EmptyDataError:
+        raise ValueError("The CSV file is empty")
+    except Exception as e:
+        raise RuntimeError(f"Error processing CSV: {str(e)}")
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: DataFrame to validate
+        required_columns: List of required column names
+        min_rows: Minimum number of rows required
+    
+    Returns:
+        Boolean indicating if validation passed
+    """
+    if df.empty:
+        return False
+    
+    if len(df) < min_rows:
+        return False
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False
+    
+    return True
+
+def save_cleaned_data(df, output_path, index=False):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Args:
+        df: DataFrame to save
+        output_path: Path for output CSV file
+        index: Whether to include index in output
+    """
+    df.to_csv(output_path, index=index)
