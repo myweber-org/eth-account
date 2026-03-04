@@ -801,4 +801,71 @@ if __name__ == "__main__":
     stats = calculate_summary_statistics(sample_data, 'temperature')
     print("\nSummary statistics:")
     for key, value in stats.items():
-        print(f"{key}: {value:.2f}")
+        print(f"{key}: {value:.2f}")import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df: pandas DataFrame to clean.
+        drop_duplicates: Boolean indicating whether to drop duplicate rows.
+        fill_missing: Strategy to fill missing values. Can be None, 'mean', 'median', or a specific value.
+    
+    Returns:
+        Cleaned pandas DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        else:
+            cleaned_df = cleaned_df.fillna(fill_missing)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns=None):
+    """
+    Validate that the DataFrame meets basic requirements.
+    
+    Args:
+        df: pandas DataFrame to validate.
+        required_columns: List of column names that must be present.
+    
+    Returns:
+        Boolean indicating whether validation passed.
+    """
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    return True
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, None, 5],
+        'B': [10, None, 30, 40, 50],
+        'C': ['x', 'y', 'y', 'z', 'x']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df, drop_duplicates=True, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    is_valid = validate_data(cleaned, required_columns=['A', 'B', 'C'])
+    print(f"\nData validation passed: {is_valid}")
