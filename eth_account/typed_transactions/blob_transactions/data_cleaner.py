@@ -897,4 +897,54 @@ if __name__ == "__main__":
             stats = calculate_basic_stats(cleaned_df, column)
             print(f"Statistics for {column}:")
             for key, value in stats.items():
-                print(f"  {key}: {value:.2f}" if isinstance(value, float) else f"  {key}: {value}")
+                print(f"  {key}: {value:.2f}" if isinstance(value, float) else f"  {key}: {value}")import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+
+def normalize_minmax(df, column):
+    min_val = df[column].min()
+    max_val = df[column].max()
+    if max_val - min_val == 0:
+        return df[column]
+    return (df[column] - min_val) / (max_val - min_val)
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    return cleaned_df
+
+def calculate_statistics(df):
+    stats = {}
+    for col in df.select_dtypes(include=[np.number]).columns:
+        stats[col] = {
+            'mean': df[col].mean(),
+            'std': df[col].std(),
+            'median': df[col].median()
+        }
+    return stats
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': np.random.normal(100, 15, 1000),
+        'B': np.random.exponential(50, 1000),
+        'C': np.random.uniform(0, 200, 1000)
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original shape:", df.shape)
+    
+    cleaned = clean_dataset(df, ['A', 'B', 'C'])
+    print("Cleaned shape:", cleaned.shape)
+    
+    stats = calculate_statistics(cleaned)
+    for col, values in stats.items():
+        print(f"{col}: {values}")
