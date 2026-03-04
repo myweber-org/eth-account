@@ -180,4 +180,74 @@ if __name__ == "__main__":
     print(cleaned_df)
     
     is_valid, message = validate_dataset(cleaned_df, required_columns=['A', 'B', 'C'])
-    print(f"\nValidation: {message}")
+    print(f"\nValidation: {message}")import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_method='mean'):
+    """
+    Load a CSV file, clean missing values, and return cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File '{file_path}' not found.")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: File is empty.")
+        return None
+
+    print(f"Original shape: {df.shape}")
+    print(f"Missing values per column:\n{df.isnull().sum()}")
+
+    if fill_method == 'mean':
+        df_cleaned = df.fillna(df.mean(numeric_only=True))
+    elif fill_method == 'median':
+        df_cleaned = df.fillna(df.median(numeric_only=True))
+    elif fill_method == 'mode':
+        df_cleaned = df.fillna(df.mode().iloc[0])
+    elif fill_method == 'drop':
+        df_cleaned = df.dropna()
+    else:
+        print("Warning: Unknown fill method. Using forward fill.")
+        df_cleaned = df.fillna(method='ffill')
+
+    print(f"Cleaned shape: {df_cleaned.shape}")
+    print(f"Remaining missing values: {df_cleaned.isnull().sum().sum()}")
+
+    return df_cleaned
+
+def detect_outliers_iqr(df, column):
+    """
+    Detect outliers in a column using the IQR method.
+    """
+    if column not in df.columns:
+        print(f"Error: Column '{column}' not found.")
+        return None
+
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [5, np.nan, np.nan, 8, 10],
+        'C': [10, 20, 30, 40, 50]
+    }
+    df_sample = pd.DataFrame(sample_data)
+    df_sample.to_csv('sample_data.csv', index=False)
+
+    cleaned_df = clean_csv_data('sample_data.csv', fill_method='mean')
+    if cleaned_df is not None:
+        print("\nCleaned DataFrame:")
+        print(cleaned_df)
+
+        outliers = detect_outliers_iqr(cleaned_df, 'C')
+        if outliers is not None and not outliers.empty:
+            print(f"\nOutliers in column 'C':")
+            print(outliers)
