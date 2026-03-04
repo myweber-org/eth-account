@@ -254,3 +254,26 @@ if __name__ == "__main__":
     
     print(f"\nCleaned shape: {cleaned_df.shape}")
     print(f"Normalized data range: [{normalized_df['feature_a'].min():.3f}, {normalized_df['feature_a'].max():.3f}]")
+import re
+
+def clean_data(entries, required_keys=None, email_key='email'):
+    """
+    Filter a list of dictionaries to keep only entries with valid email addresses
+    and optionally containing all required keys.
+    """
+    if required_keys is None:
+        required_keys = []
+
+    email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
+    def is_valid(entry):
+        # Check required keys
+        if not all(key in entry for key in required_keys):
+            return False
+        # Check email validity
+        email = entry.get(email_key, '')
+        if not email or not email_pattern.match(email):
+            return False
+        return True
+
+    return [entry for entry in entries if is_valid(entry)]
