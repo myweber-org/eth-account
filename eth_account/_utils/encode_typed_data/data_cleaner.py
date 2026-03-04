@@ -355,3 +355,108 @@ if __name__ == "__main__":
     stats_df = calculate_statistics(cleaned)
     print("\nStatistics after cleaning:")
     print(stats_df)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(df, columns=None, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_clean = df.copy()
+    for col in columns:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - factor * IQR
+        upper_bound = Q3 + factor * IQR
+        
+        mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+        df_clean = df_clean[mask]
+    
+    return df_clean.reset_index(drop=True)
+
+def zscore_normalize(df, columns=None):
+    """
+    Normalize data using z-score method
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    for col in columns:
+        mean_val = df[col].mean()
+        std_val = df[col].std()
+        if std_val > 0:
+            df_normalized[col] = (df[col] - mean_val) / std_val
+    
+    return df_normalized
+
+def minmax_normalize(df, columns=None, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_normalized = df.copy()
+    min_val, max_val = feature_range
+    
+    for col in columns:
+        col_min = df[col].min()
+        col_max = df[col].max()
+        if col_max > col_min:
+            df_normalized[col] = min_val + (df[col] - col_min) * (max_val - min_val) / (col_max - col_min)
+    
+    return df_normalized
+
+def handle_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values using specified strategy
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    df_filled = df.copy()
+    
+    for col in columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0]
+            elif strategy == 'zero':
+                fill_value = 0
+            else:
+                raise ValueError(f"Unknown strategy: {strategy}")
+            
+            df_filled[col] = df[col].fillna(fill_value)
+    
+    return df_filled
+
+def clean_dataset(df, outlier_removal=True, normalization='zscore', missing_strategy='mean'):
+    """
+    Complete data cleaning pipeline
+    """
+    df_clean = df.copy()
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    
+    if outlier_removal and len(numeric_cols) > 0:
+        df_clean = remove_outliers_iqr(df_clean, numeric_cols)
+    
+    if missing_strategy and len(numeric_cols) > 0:
+        df_clean = handle_missing_values(df_clean, missing_strategy, numeric_cols)
+    
+    if normalization and len(numeric_cols) > 0:
+        if normalization == 'zscore':
+            df_clean = zscore_normalize(df_clean, numeric_cols)
+        elif normalization == 'minmax':
+            df_clean = minmax_normalize(df_clean, numeric_cols)
+    
+    return df_clean
