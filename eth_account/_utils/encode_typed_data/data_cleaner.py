@@ -460,3 +460,124 @@ def clean_dataset(df, outlier_removal=True, normalization='zscore', missing_stra
             df_clean = minmax_normalize(df_clean, numeric_cols)
     
     return df_clean
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers, lower_bound, upper_bound
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def handle_missing_values(data, strategy='mean'):
+    """
+    Handle missing values with different strategies
+    """
+    if strategy == 'mean':
+        return data.fillna(data.mean())
+    elif strategy == 'median':
+        return data.fillna(data.median())
+    elif strategy == 'mode':
+        return data.fillna(data.mode().iloc[0])
+    elif strategy == 'drop':
+        return data.dropna()
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+
+def clean_dataset(df, numeric_columns, outlier_method='iqr', normalize=False):
+    """
+    Comprehensive data cleaning pipeline
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    cleaned_df = handle_missing_values(cleaned_df[numeric_columns], strategy='mean')
+    
+    # Detect and optionally remove outliers
+    for col in numeric_columns:
+        if outlier_method == 'iqr':
+            outliers, _, _ = detect_outliers_iqr(cleaned_df, col)
+            if len(outliers) > 0:
+                print(f"Found {len(outliers)} outliers in column {col}")
+        elif outlier_method == 'zscore':
+            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+    
+    # Normalize data if requested
+    if normalize:
+        for col in numeric_columns:
+            cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(data, column, expected_type, min_value=None, max_value=None):
+    """
+    Validate data against constraints
+    """
+    if not data[column].dtype == expected_type:
+        raise TypeError(f"Column {column} must be of type {expected_type}")
+    
+    if min_value is not None:
+        if data[column].min() < min_value:
+            raise ValueError(f"Column {column} has values below minimum {min_value}")
+    
+    if max_value is not None:
+        if data[column].max() > max_value:
+            raise ValueError(f"Column {column} has values above maximum {max_value}")
+    
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    np.random.seed(42)
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 100),
+        'feature2': np.random.exponential(50, 100),
+        'feature3': np.random.uniform(0, 1, 100)
+    })
+    
+    # Add some outliers
+    sample_data.loc[0, 'feature1'] = 500
+    sample_data.loc[1, 'feature2'] = 1000
+    
+    # Clean the data
+    numeric_cols = ['feature1', 'feature2', 'feature3']
+    cleaned_data = clean_dataset(sample_data, numeric_cols, outlier_method='iqr', normalize=True)
+    
+    print(f"Original shape: {sample_data.shape}")
+    print(f"Cleaned shape: {cleaned_data.shape}")
+    print(f"Cleaned data statistics:")
+    print(cleaned_data.describe())
