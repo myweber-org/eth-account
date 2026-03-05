@@ -83,3 +83,60 @@ def main():
 
 if __name__ == "__main__":
     main()
+import requests
+import os
+
+def get_current_weather(city_name, api_key=None):
+    """
+    Fetch current weather data for a given city using OpenWeatherMap API.
+    Returns a dictionary containing weather information.
+    """
+    if api_key is None:
+        api_key = os.getenv('OPENWEATHER_API_KEY')
+        if api_key is None:
+            raise ValueError("API key not provided and OPENWEATHER_API_KEY environment variable not set")
+
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city_name,
+        'appid': api_key,
+        'units': 'metric'
+    }
+
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+
+        weather_info = {
+            'city': data['name'],
+            'country': data['sys']['country'],
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'pressure': data['main']['pressure'],
+            'weather': data['weather'][0]['main'],
+            'description': data['weather'][0]['description'],
+            'wind_speed': data['wind']['speed'],
+            'wind_deg': data['wind']['deg']
+        }
+        return weather_info
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching weather data: {e}")
+        return None
+    except KeyError as e:
+        print(f"Unexpected API response format: {e}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    api_key = "your_api_key_here"  # Replace with your actual API key
+    weather = get_current_weather("London", api_key)
+    if weather:
+        print(f"Weather in {weather['city']}, {weather['country']}:")
+        print(f"Temperature: {weather['temperature']}°C")
+        print(f"Feels like: {weather['feels_like']}°C")
+        print(f"Weather: {weather['weather']} - {weather['description']}")
+        print(f"Humidity: {weather['humidity']}%")
+        print(f"Wind: {weather['wind_speed']} m/s at {weather['wind_deg']}°")
