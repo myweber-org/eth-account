@@ -106,3 +106,124 @@ if __name__ == "__main__":
     print(cleaned)
     print("\nValidation Results after cleaning:")
     print(validate_dataset(cleaned))
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    
+    return filtered_df.reset_index(drop=True)
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to analyze
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    stats = {
+        'mean': df[column].mean(),
+        'median': df[column].median(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max(),
+        'count': df[column].count(),
+        'missing': df[column].isnull().sum()
+    }
+    
+    return stats
+
+def validate_numeric_data(df, columns):
+    """
+    Validate that specified columns contain only numeric data.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to validate
+    
+    Returns:
+    dict: Dictionary with validation results for each column
+    """
+    validation_results = {}
+    
+    for col in columns:
+        if col not in df.columns:
+            validation_results[col] = {'valid': False, 'error': 'Column not found'}
+            continue
+        
+        try:
+            numeric_series = pd.to_numeric(df[col], errors='coerce')
+            non_numeric_count = numeric_series.isna().sum() - df[col].isna().sum()
+            
+            validation_results[col] = {
+                'valid': non_numeric_count == 0,
+                'non_numeric_count': int(non_numeric_count),
+                'total_count': len(df[col]),
+                'numeric_percentage': 100 * (1 - non_numeric_count/len(df[col]))
+            }
+        except Exception as e:
+            validation_results[col] = {'valid': False, 'error': str(e)}
+    
+    return validation_results
+
+def example_usage():
+    """
+    Example demonstrating the usage of data cleaning functions.
+    """
+    np.random.seed(42)
+    
+    sample_data = {
+        'id': range(100),
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    }
+    
+    sample_data['value'][10] = 500
+    sample_data['value'][20] = -300
+    
+    df = pd.DataFrame(sample_data)
+    
+    print("Original DataFrame shape:", df.shape)
+    print("\nOriginal summary statistics:")
+    print(calculate_summary_statistics(df, 'value'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'value')
+    
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned summary statistics:")
+    print(calculate_summary_statistics(cleaned_df, 'value'))
+    
+    validation = validate_numeric_data(df, ['value', 'id', 'category'])
+    print("\nData validation results:")
+    for col, result in validation.items():
+        print(f"{col}: {result}")
+
+if __name__ == "__main__":
+    example_usage()
