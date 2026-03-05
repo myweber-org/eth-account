@@ -455,4 +455,74 @@ if __name__ == "__main__":
     cleaned_df = clean_numeric_data(df)
     print(f"\nCleaned shape: {cleaned_df.shape}")
     print("\nCleaned DataFrame:")
-    print(cleaned_df)
+    print(cleaned_df)import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling to range [0, 1].
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    if max_val - min_val == 0:
+        return data[column].apply(lambda x: 0.5)
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using Z-score normalization.
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, outlier_removal=True, normalization_method='minmax'):
+    """
+    Main function to clean dataset by handling outliers and normalizing numeric columns.
+    """
+    cleaned_df = df.copy()
+    
+    if outlier_removal:
+        for col in numeric_columns:
+            if col in cleaned_df.columns:
+                cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            if normalization_method == 'minmax':
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            elif normalization_method == 'zscore':
+                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df
+
+def validate_data(df, required_columns):
+    """
+    Validate that required columns exist and have no null values.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    null_counts = df[required_columns].isnull().sum()
+    if null_counts.any():
+        raise ValueError(f"Columns with null values: {null_counts[null_counts > 0].to_dict()}")
+    
+    return True
