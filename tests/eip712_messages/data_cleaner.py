@@ -106,3 +106,60 @@ if __name__ == "__main__":
         
         cleaned_no_outliers = remove_outliers_iqr(cleaned_df, 'A')
         print(f"Data shape after outlier removal: {cleaned_no_outliers.shape}")
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to clean.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def calculate_summary_statistics(df, column):
+    """
+    Calculate summary statistics for a DataFrame column.
+    
+    Parameters:
+    df (pd.DataFrame): The input DataFrame.
+    column (str): The column name to analyze.
+    
+    Returns:
+    dict: Dictionary containing count, mean, std, min, max.
+    """
+    stats = {
+        'count': df[column].count(),
+        'mean': df[column].mean(),
+        'std': df[column].std(),
+        'min': df[column].min(),
+        'max': df[column].max()
+    }
+    return stats
+
+if __name__ == "__main__":
+    sample_data = {'values': [10, 12, 12, 13, 14, 15, 15, 16, 17, 18, 100]}
+    df = pd.DataFrame(sample_data)
+    
+    print("Original DataFrame:")
+    print(df)
+    print("\nSummary Statistics (Original):")
+    print(calculate_summary_statistics(df, 'values'))
+    
+    cleaned_df = remove_outliers_iqr(df, 'values')
+    print("\nCleaned DataFrame (Outliers Removed):")
+    print(cleaned_df)
+    print("\nSummary Statistics (Cleaned):")
+    print(calculate_summary_statistics(cleaned_df, 'values'))
