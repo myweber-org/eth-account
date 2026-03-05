@@ -647,3 +647,71 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or array-like): The dataset containing the column.
+    column (int or str): Index or name of the column to clean.
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed from the specified column.
+    """
+    data_array = np.array(data)
+    col_data = data_array[:, column] if isinstance(column, int) else data_array[column]
+    
+    Q1 = np.percentile(col_data, 25)
+    Q3 = np.percentile(col_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    return data_array[mask]
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (list or array-like): The dataset.
+    column (int or str): Index or name of the column.
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation.
+    """
+    cleaned_data = remove_outliers_iqr(data, column)
+    col_data = cleaned_data[:, column] if isinstance(column, int) else cleaned_data[column]
+    
+    stats = {
+        'mean': np.mean(col_data),
+        'median': np.median(col_data),
+        'std_dev': np.std(col_data),
+        'sample_size': len(col_data)
+    }
+    return stats
+
+if __name__ == "__main__":
+    sample_data = [
+        [1, 150],
+        [2, 200],
+        [3, 250],
+        [4, 300],
+        [5, 1000],
+        [6, 350],
+        [7, 400],
+        [8, 450],
+        [9, 500],
+        [10, 2000]
+    ]
+    
+    print("Original data:", sample_data)
+    cleaned = remove_outliers_iqr(sample_data, 1)
+    print("Cleaned data:", cleaned)
+    
+    stats = calculate_statistics(sample_data, 1)
+    print("Statistics:", stats)
