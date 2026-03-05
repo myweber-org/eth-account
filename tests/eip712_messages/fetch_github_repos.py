@@ -1,3 +1,4 @@
+
 import requests
 import sys
 
@@ -6,35 +7,18 @@ def fetch_repositories(username):
     response = requests.get(url)
     if response.status_code == 200:
         repos = response.json()
-        for repo in repos:
-            print(f"Name: {repo['name']}")
-            print(f"Description: {repo['description']}")
-            print(f"URL: {repo['html_url']}")
-            print(f"Stars: {repo['stargazers_count']}")
-            print("-" * 40)
+        return repos
     else:
-        print(f"Error: Unable to fetch repositories for user '{username}'")
-        print(f"Status Code: {response.status_code}")
+        print(f"Error: Unable to fetch repositories (Status code: {response.status_code})")
+        return None
 
-if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python fetch_github_repos.py <github_username>")
-        sys.exit(1)
-    username = sys.argv[1]
-    fetch_repositories(username)import requests
-import sys
-
-def fetch_github_repos(username):
-    url = f"https://api.github.com/users/{username}/repos"
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        repos = response.json()
-        repo_names = [repo['name'] for repo in repos]
-        return repo_names
-    else:
-        print(f"Error: Unable to fetch repositories for user '{username}'")
-        return []
+def display_repositories(repos):
+    if not repos:
+        print("No repositories found.")
+        return
+    print(f"Found {len(repos)} repositories:")
+    for repo in repos:
+        print(f"- {repo['name']}: {repo['description'] or 'No description'}")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -42,11 +26,6 @@ if __name__ == "__main__":
         sys.exit(1)
     
     username = sys.argv[1]
-    repos = fetch_github_repos(username)
-    
+    repos = fetch_repositories(username)
     if repos:
-        print(f"Repositories for user '{username}':")
-        for repo in repos:
-            print(f"  - {repo}")
-    else:
-        print(f"No repositories found for user '{username}'")
+        display_repositories(repos)
