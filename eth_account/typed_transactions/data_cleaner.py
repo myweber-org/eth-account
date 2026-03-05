@@ -299,4 +299,16 @@ def calculate_summary_statistics(data, column):
         'min': data[column].min(),
         'max': data[column].max()
     }
-    return stats
+    return statsimport pandas as pd
+
+def clean_missing_with_mean(df):
+    """
+    Fill missing values in numeric columns with the column mean.
+    Non-numeric columns are left unchanged.
+    """
+    numeric_cols = df.select_dtypes(include=['number']).columns
+    df_cleaned = df.copy()
+    for col in numeric_cols:
+        col_mean = df[col].mean()
+        df_cleaned[col].fillna(col_mean, inplace=True)
+    return df_cleaned
