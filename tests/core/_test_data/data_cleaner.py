@@ -277,3 +277,87 @@ def clean_data(entries, required_keys=None, email_key='email'):
         return True
 
     return [entry for entry in entries if is_valid(entry)]
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to be cleaned
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate that input is a pandas DataFrame and not empty.
+    
+    Parameters:
+    df: Input to validate
+    
+    Returns:
+    bool: True if valid, False otherwise
+    """
+    if not isinstance(df, pd.DataFrame):
+        print("Error: Input must be a pandas DataFrame")
+        return False
+    
+    if df.empty:
+        print("Warning: DataFrame is empty")
+        return False
+    
+    return True
+
+def process_data_file(file_path):
+    """
+    Load and clean data from a CSV file.
+    
+    Parameters:
+    file_path (str): Path to the CSV file
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame or None if error occurs
+    """
+    try:
+        # Load data from CSV
+        df = pd.read_csv(file_path)
+        
+        # Validate the loaded data
+        if not validate_dataframe(df):
+            return None
+        
+        # Clean the data
+        cleaned_df = clean_dataset(df)
+        
+        # Print cleaning statistics
+        original_rows = len(df)
+        cleaned_rows = len(cleaned_df)
+        removed_rows = original_rows - cleaned_rows
+        
+        print(f"Original rows: {original_rows}")
+        print(f"Cleaned rows: {cleaned_rows}")
+        print(f"Rows removed: {removed_rows}")
+        
+        return cleaned_df
+        
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print("Error: File is empty")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {str(e)}")
+        return None
