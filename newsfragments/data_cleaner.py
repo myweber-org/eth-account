@@ -145,3 +145,97 @@ def validate_dataframe(dataframe, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        mask = (self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)
+        self.df = self.df[mask].reset_index(drop=True)
+        return self
+        
+    def normalize_column(self, column, method='minmax'):
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        if method == 'minmax':
+            col_min = self.df[column].min()
+            col_max = self.df[column].max()
+            if col_max != col_min:
+                self.df[column] = (self.df[column] - col_min) / (col_max - col_min)
+            else:
+                self.df[column] = 0
+                
+        elif method == 'zscore':
+            self.df[column] = stats.zscore(self.df[column])
+            
+        else:
+            raise ValueError("Method must be 'minmax' or 'zscore'")
+            
+        return self
+        
+    def fill_missing(self, column, strategy='mean'):
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        if strategy == 'mean':
+            fill_value = self.df[column].mean()
+        elif strategy == 'median':
+            fill_value = self.df[column].median()
+        elif strategy == 'mode':
+            fill_value = self.df[column].mode()[0]
+        else:
+            raise ValueError("Strategy must be 'mean', 'median', or 'mode'")
+            
+        self.df[column].fillna(fill_value, inplace=True)
+        return self
+        
+    def get_cleaned_data(self):
+        return self.df.copy()
+        
+    def get_summary(self):
+        summary = {
+            'original_rows': len(self.df),
+            'current_rows': len(self.df),
+            'columns': self.df.columns.tolist(),
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.to_dict()
+        }
+        return summary
+
+def clean_dataset(df, operations):
+    cleaner = DataCleaner(df)
+    
+    for operation in operations:
+        if operation['type'] == 'remove_outliers':
+            cleaner.remove_outliers_iqr(
+                operation['column'],
+                operation.get('multiplier', 1.5)
+            )
+        elif operation['type'] == 'normalize':
+            cleaner.normalize_column(
+                operation['column'],
+                operation.get('method', 'minmax')
+            )
+        elif operation['type'] == 'fill_missing':
+            cleaner.fill_missing(
+                operation['column'],
+                operation.get('strategy', 'mean')
+            )
+    
+    return cleaner.get_cleaned_data()
