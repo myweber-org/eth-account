@@ -162,4 +162,121 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame (Outliers Removed):")
     print(cleaned_df)
     print("\nSummary Statistics (Cleaned):")
-    print(calculate_summary_statistics(cleaned_df, 'values'))
+    print(calculate_summary_statistics(cleaned_df, 'values'))import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=False, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (bool): Whether to fill missing values. Default is False.
+    fill_value: Value to use for filling missing values. Default is 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def remove_outliers(df, column, method='iqr', threshold=1.5):
+    """
+    Remove outliers from a specific column in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to process.
+    method (str): Method for outlier detection ('iqr' or 'zscore').
+    threshold (float): Threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    data = df[column].copy()
+    
+    if method == 'iqr':
+        Q1 = data.quantile(0.25)
+        Q3 = data.quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - threshold * IQR
+        upper_bound = Q3 + threshold * IQR
+        mask = (data >= lower_bound) & (data <= upper_bound)
+    elif method == 'zscore':
+        mean = data.mean()
+        std = data.std()
+        z_scores = (data - mean) / std
+        mask = abs(z_scores) <= threshold
+    else:
+        raise ValueError("Method must be 'iqr' or 'zscore'")
+    
+    return df[mask]
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize values in a specific column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to normalize.
+    method (str): Normalization method ('minmax' or 'standard').
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = df.copy()
+    
+    if method == 'minmax':
+        min_val = df_copy[column].min()
+        max_val = df_copy[column].max()
+        if max_val != min_val:
+            df_copy[column] = (df_copy[column] - min_val) / (max_val - min_val)
+    elif method == 'standard':
+        mean_val = df_copy[column].mean()
+        std_val = df_copy[column].std()
+        if std_val != 0:
+            df_copy[column] = (df_copy[column] - mean_val) / std_val
+    else:
+        raise ValueError("Method must be 'minmax' or 'standard'")
+    
+    return df_copy
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 3, 4, 5, 100],
+        'B': [10, 20, None, 30, 40, 50, 60],
+        'C': [100, 200, 300, 400, 500, 600, 700]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    # Clean the dataset
+    cleaned = clean_dataset(df, fill_missing=True, fill_value=0)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    # Remove outliers
+    no_outliers = remove_outliers(cleaned, 'A', method='iqr')
+    print("\nDataFrame without outliers in column A:")
+    print(no_outliers)
+    
+    # Normalize column
+    normalized = normalize_column(no_outliers, 'C', method='minmax')
+    print("\nDataFrame with normalized column C:")
+    print(normalized)
