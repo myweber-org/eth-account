@@ -949,4 +949,94 @@ def get_data_summary(dataframe):
         'missing_values': dataframe.isnull().sum().to_dict()
     }
     
-    return summary
+    return summaryimport pandas as pd
+import numpy as np
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        self.categorical_columns = df.select_dtypes(exclude=[np.number]).columns
+
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        if strategy == 'mean' and self.numeric_columns.any():
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].mean()
+            )
+        elif strategy == 'median' and self.numeric_columns.any():
+            self.df[self.numeric_columns] = self.df[self.numeric_columns].fillna(
+                self.df[self.numeric_columns].median()
+            )
+        elif strategy == 'mode':
+            for col in self.df.columns:
+                self.df[col] = self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else fill_value)
+        elif strategy == 'constant' and fill_value is not None:
+            self.df = self.df.fillna(fill_value)
+        elif strategy == 'drop':
+            self.df = self.df.dropna()
+        return self
+
+    def remove_outliers(self, method='zscore', threshold=3):
+        if method == 'zscore':
+            z_scores = np.abs(stats.zscore(self.df[self.numeric_columns]))
+            self.df = self.df[(z_scores < threshold).all(axis=1)]
+        elif method == 'iqr':
+            for col in self.numeric_columns:
+                Q1 = self.df[col].quantile(0.25)
+                Q3 = self.df[col].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                self.df = self.df[(self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)]
+        return self
+
+    def normalize_data(self, method='minmax'):
+        if method == 'minmax':
+            for col in self.numeric_columns:
+                min_val = self.df[col].min()
+                max_val = self.df[col].max()
+                if max_val > min_val:
+                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            for col in self.numeric_columns:
+                mean_val = self.df[col].mean()
+                std_val = self.df[col].std()
+                if std_val > 0:
+                    self.df[col] = (self.df[col] - mean_val) / std_val
+        return self
+
+    def get_cleaned_data(self):
+        return self.df
+
+def create_sample_data():
+    dates = pd.date_range('2023-01-01', periods=100, freq='D')
+    data = {
+        'date': dates,
+        'temperature': np.random.normal(20, 5, 100),
+        'humidity': np.random.uniform(30, 80, 100),
+        'location': np.random.choice(['A', 'B', 'C'], 100),
+        'pressure': np.random.normal(1013, 10, 100)
+    }
+    df = pd.DataFrame(data)
+    df.loc[np.random.choice(df.index, 10), 'temperature'] = np.nan
+    df.loc[np.random.choice(df.index, 5), 'humidity'] = np.nan
+    df.loc[10:15, 'pressure'] = df['pressure'].max() * 5
+    return df
+
+if __name__ == "__main__":
+    raw_data = create_sample_data()
+    print("Original data shape:", raw_data.shape)
+    print("Missing values:\n", raw_data.isnull().sum())
+    
+    cleaner = DataCleaner(raw_data)
+    cleaned_data = (cleaner
+                   .handle_missing_values(strategy='mean')
+                   .remove_outliers(method='iqr')
+                   .normalize_data(method='minmax')
+                   .get_cleaned_data())
+    
+    print("\nCleaned data shape:", cleaned_data.shape)
+    print("Missing values after cleaning:\n", cleaned_data.isnull().sum())
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned_data.head())
