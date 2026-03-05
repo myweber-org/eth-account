@@ -490,3 +490,114 @@ def clean_dataset(input_path, output_path):
 
 if __name__ == "__main__":
     clean_dataset('raw_data.csv', 'cleaned_data.csv')
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from specified column using IQR method.
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    outliers_removed = len(dataframe) - len(filtered_df)
+    print(f"Removed {outliers_removed} outliers from column '{column}'")
+    
+    return filtered_df.reset_index(drop=True)
+
+def normalize_column_zscore(dataframe, column):
+    """
+    Normalize column using z-score normalization.
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in dataframe")
+    
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val == 0:
+        print(f"Warning: Standard deviation is zero for column '{column}'")
+        return dataframe
+    
+    dataframe[f"{column}_normalized"] = (dataframe[column] - mean_val) / std_val
+    return dataframe
+
+def detect_skewed_columns(dataframe, skew_threshold=0.5):
+    """
+    Identify columns with significant skewness.
+    """
+    skewed_columns = []
+    
+    for col in dataframe.select_dtypes(include=[np.number]).columns:
+        skewness = dataframe[col].skew()
+        if abs(skewness) > skew_threshold:
+            skewed_columns.append((col, skewness))
+    
+    return sorted(skewed_columns, key=lambda x: abs(x[1]), reverse=True)
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_threshold)
+            cleaned_df = normalize_column_zscore(cleaned_df, col)
+    
+    skewed_cols = detect_skewed_columns(cleaned_df)
+    if skewed_cols:
+        print("Skewed columns detected:")
+        for col, skew_val in skewed_cols:
+            print(f"  {col}: skewness = {skew_val:.3f}")
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe):
+    """
+    Perform basic dataframe validation.
+    """
+    validation_results = {
+        'total_rows': len(dataframe),
+        'total_columns': len(dataframe.columns),
+        'missing_values': dataframe.isnull().sum().sum(),
+        'duplicate_rows': dataframe.duplicated().sum(),
+        'numeric_columns': len(dataframe.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': len(dataframe.select_dtypes(include=['object']).columns)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[np.random.choice(1000, 50), 'feature_a'] = 500
+    
+    print("Original dataset validation:")
+    print(validate_dataframe(df))
+    
+    cleaned_df = clean_dataset(df, ['feature_a', 'feature_b', 'feature_c'])
+    
+    print("\nCleaned dataset validation:")
+    print(validate_dataframe(cleaned_df))
