@@ -514,3 +514,112 @@ if __name__ == "__main__":
     print("\nStatistics:")
     for key, value in stats.items():
         print(f"{key}: {value:.2f}")
+import pandas as pd
+import numpy as np
+from pathlib import Path
+
+class DataCleaner:
+    def __init__(self, file_path):
+        self.file_path = Path(file_path)
+        self.df = None
+        
+    def load_data(self):
+        if not self.file_path.exists():
+            raise FileNotFoundError(f"File not found: {self.file_path}")
+        
+        self.df = pd.read_csv(self.file_path)
+        return self.df.shape
+    
+    def remove_duplicates(self):
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        
+        initial_count = len(self.df)
+        self.df = self.df.drop_duplicates()
+        removed = initial_count - len(self.df)
+        return removed
+    
+    def handle_missing_values(self, strategy='mean', columns=None):
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean':
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median':
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0], inplace=True)
+                elif strategy == 'drop':
+                    self.df = self.df.dropna(subset=[col])
+        
+        return len(self.df)
+    
+    def normalize_column(self, column_name):
+        if self.df is None:
+            raise ValueError("Data not loaded. Call load_data() first.")
+        
+        if column_name not in self.df.columns:
+            raise KeyError(f"Column '{column_name}' not found in data")
+        
+        col_data = self.df[column_name]
+        if pd.api.types.is_numeric_dtype(col_data):
+            min_val = col_data.min()
+            max_val = col_data.max()
+            if max_val != min_val:
+                self.df[f'{column_name}_normalized'] = (col_data - min_val) / (max_val - min_val)
+                return True
+        return False
+    
+    def save_cleaned_data(self, output_path=None):
+        if self.df is None:
+            raise ValueError("No data to save. Load and clean data first.")
+        
+        if output_path is None:
+            output_path = self.file_path.parent / f'cleaned_{self.file_path.name}'
+        
+        self.df.to_csv(output_path, index=False)
+        return output_path
+    
+    def get_summary(self):
+        if self.df is None:
+            return {}
+        
+        summary = {
+            'total_rows': len(self.df),
+            'total_columns': len(self.df.columns),
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': list(self.df.select_dtypes(include=[np.number]).columns),
+            'categorical_columns': list(self.df.select_dtypes(include=['object']).columns)
+        }
+        return summary
+
+def process_csv_file(input_file, output_dir='cleaned_data'):
+    cleaner = DataCleaner(input_file)
+    
+    try:
+        print(f"Loading data from {input_file}")
+        shape = cleaner.load_data()
+        print(f"Loaded {shape[0]} rows and {shape[1]} columns")
+        
+        duplicates_removed = cleaner.remove_duplicates()
+        print(f"Removed {duplicates_removed} duplicate rows")
+        
+        cleaner.handle_missing_values(strategy='mean')
+        print("Handled missing values using mean imputation")
+        
+        summary = cleaner.get_summary()
+        print(f"Final dataset: {summary['total_rows']} rows, {summary['total_columns']} columns")
+        
+        output_path = cleaner.save_cleaned_data()
+        print(f"Cleaned data saved to {output_path}")
+        
+        return output_path
+        
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return None
