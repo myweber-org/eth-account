@@ -822,4 +822,109 @@ if __name__ == "__main__":
     
     normalized_df = normalize_column(cleaned_df, 'values', method='minmax')
     print("\nNormalized DataFrame:")
-    print(normalized_df)
+    print(normalized_df)import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(df, columns):
+    """
+    Remove outliers using IQR method for specified columns.
+    Returns cleaned DataFrame and outlier indices.
+    """
+    outlier_indices = []
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        col_outliers = df[(df[col] < lower_bound) | (df[col] > upper_bound)].index
+        outlier_indices.extend(col_outliers)
+        
+        cleaned_df = cleaned_df[(cleaned_df[col] >= lower_bound) & 
+                               (cleaned_df[col] <= upper_bound)]
+    
+    unique_outliers = list(set(outlier_indices))
+    return cleaned_df, unique_outliers
+
+def normalize_minmax(df, columns):
+    """
+    Apply min-max normalization to specified columns.
+    Returns DataFrame with normalized values.
+    """
+    normalized_df = df.copy()
+    
+    for col in columns:
+        if col not in df.columns:
+            continue
+            
+        col_min = df[col].min()
+        col_max = df[col].max()
+        
+        if col_max != col_min:
+            normalized_df[col] = (df[col] - col_min) / (col_max - col_min)
+        else:
+            normalized_df[col] = 0
+    
+    return normalized_df
+
+def clean_dataset(df, numeric_columns=None):
+    """
+    Main cleaning function: removes outliers and normalizes numeric columns.
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    # Remove outliers
+    cleaned_df, outliers = remove_outliers_iqr(df, numeric_columns)
+    
+    # Normalize remaining data
+    normalized_df = normalize_minmax(cleaned_df, numeric_columns)
+    
+    return {
+        'cleaned_data': normalized_df,
+        'outlier_indices': outliers,
+        'original_shape': df.shape,
+        'cleaned_shape': normalized_df.shape
+    }
+
+def validate_dataframe(df):
+    """
+    Basic DataFrame validation checks.
+    """
+    validation_results = {
+        'has_nulls': df.isnull().any().any(),
+        'null_count': df.isnull().sum().sum(),
+        'duplicate_rows': df.duplicated().sum(),
+        'data_types': df.dtypes.to_dict(),
+        'column_count': len(df.columns),
+        'row_count': len(df)
+    }
+    
+    return validation_results
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    }
+    
+    df = pd.DataFrame(sample_data)
+    df.loc[np.random.choice(1000, 50), 'feature_a'] = np.random.uniform(500, 1000, 50)
+    
+    print("Original data shape:", df.shape)
+    
+    results = clean_dataset(df, ['feature_a', 'feature_b'])
+    
+    print("Cleaned data shape:", results['cleaned_shape'])
+    print("Outliers removed:", len(results['outlier_indices']))
+    
+    validation = validate_dataframe(results['cleaned_data'])
+    print("Validation results:", validation)
