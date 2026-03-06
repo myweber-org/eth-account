@@ -191,4 +191,59 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid, message = validate_data(cleaned, required_columns=['A', 'B'], min_rows=3)
-    print(f"\nValidation: {is_valid} - {message}")
+    print(f"\nValidation: {is_valid} - {message}")import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        if column not in self.numeric_columns:
+            return self.df
+        
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        filtered_df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return filtered_df
+    
+    def impute_missing_median(self, column):
+        if column not in self.numeric_columns:
+            return self.df
+        
+        median_value = self.df[column].median()
+        self.df[column].fillna(median_value, inplace=True)
+        return self.df
+    
+    def standardize_column(self, column):
+        if column not in self.numeric_columns:
+            return self.df
+        
+        mean = self.df[column].mean()
+        std = self.df[column].std()
+        self.df[column] = (self.df[column] - mean) / std
+        return self.df
+    
+    def detect_skewed_columns(self, threshold=0.5):
+        skewed_cols = []
+        for col in self.numeric_columns:
+            skewness = stats.skew(self.df[col].dropna())
+            if abs(skewness) > threshold:
+                skewed_cols.append((col, skewness))
+        return skewed_cols
+    
+    def apply_log_transform(self, column):
+        if column not in self.numeric_columns:
+            return self.df
+        
+        if (self.df[column] <= 0).any():
+            self.df[column] = self.df[column] + abs(self.df[column].min()) + 1
+        
+        self.df[column] = np.log(self.df[column])
+        return self.df
