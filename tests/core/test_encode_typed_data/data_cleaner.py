@@ -941,3 +941,63 @@ if __name__ == "__main__":
     no_outliers = remove_outliers_iqr(cleaned, columns=['A', 'B'])
     print("DataFrame without outliers:")
     print(no_outliers)
+def remove_duplicates(data_list):
+    """
+    Remove duplicate entries from a list while preserving order.
+    
+    Args:
+        data_list: A list of elements (must be hashable)
+    
+    Returns:
+        A new list with duplicates removed
+    """
+    seen = set()
+    result = []
+    
+    for item in data_list:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    
+    return result
+
+def clean_numeric_data(values, default=0):
+    """
+    Clean numeric data by converting strings to floats and handling None values.
+    
+    Args:
+        values: List of values to clean
+        default: Default value for non-convertible entries
+    
+    Returns:
+        List of cleaned numeric values
+    """
+    cleaned = []
+    
+    for value in values:
+        if value is None:
+            cleaned.append(default)
+        elif isinstance(value, str):
+            try:
+                cleaned.append(float(value))
+            except ValueError:
+                cleaned.append(default)
+        else:
+            try:
+                cleaned.append(float(value))
+            except (TypeError, ValueError):
+                cleaned.append(default)
+    
+    return cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = [1, 2, 2, 3, 4, 4, 5, 1]
+    cleaned = remove_duplicates(sample_data)
+    print(f"Original: {sample_data}")
+    print(f"Cleaned: {cleaned}")
+    
+    numeric_data = ["1.5", "2.3", None, "invalid", 4.7]
+    cleaned_nums = clean_numeric_data(numeric_data)
+    print(f"Numeric data: {numeric_data}")
+    print(f"Cleaned numeric: {cleaned_nums}")
