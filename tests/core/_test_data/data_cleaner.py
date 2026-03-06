@@ -831,3 +831,32 @@ if __name__ == "__main__":
     summary = get_data_summary(cleaned)
     for key, value in summary.items():
         print(f"{key}: {value}")
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def load_and_clean_data(filepath):
+    df = pd.read_csv(filepath)
+    df.dropna(inplace=True)
+    
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        z_scores = np.abs(stats.zscore(df[col]))
+        df = df[z_scores < 3]
+    
+    for col in numeric_cols:
+        if col in df.columns:
+            df[col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
+    
+    return df.reset_index(drop=True)
+
+def save_cleaned_data(df, output_path):
+    df.to_csv(output_path, index=False)
+    print(f"Cleaned data saved to {output_path}")
+
+if __name__ == "__main__":
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = load_and_clean_data(input_file)
+    save_cleaned_data(cleaned_df, output_file)
