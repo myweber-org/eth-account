@@ -823,4 +823,121 @@ if __name__ == "__main__":
     cleaned_data, statistics = clean_dataset(sample_df, ['value'])
     
     print("Cleaned dataset shape:", cleaned_data.shape)
-    print("Statistics:", statistics)
+    print("Statistics:", statistics)import pandas as pd
+
+def clean_dataframe(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows.
+    fill_missing (str or dict): Strategy to fill missing values.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, str):
+            if fill_missing == 'mean':
+                cleaned_df = cleaned_df.fillna(cleaned_df.mean())
+            elif fill_missing == 'median':
+                cleaned_df = cleaned_df.fillna(cleaned_df.median())
+            elif fill_missing == 'mode':
+                cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+            elif fill_missing == 'ffill':
+                cleaned_df = cleaned_df.fillna(method='ffill')
+            elif fill_missing == 'bfill':
+                cleaned_df = cleaned_df.fillna(method='bfill')
+        elif isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input is not a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
+
+def remove_outliers_iqr(df, columns=None, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): Columns to check for outliers.
+    multiplier (float): IQR multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=['float64', 'int64']).columns
+    
+    filtered_df = df.copy()
+    
+    for column in columns:
+        if column in df.columns:
+            Q1 = df[column].quantile(0.25)
+            Q3 = df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - multiplier * IQR
+            upper_bound = Q3 + multiplier * IQR
+            
+            mask = (df[column] >= lower_bound) & (df[column] <= upper_bound)
+            filtered_df = filtered_df[mask]
+    
+    return filtered_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 3, 4, None, 6, 7, 8, 9, 100],
+        'B': [10, 20, 20, 30, 40, 50, 60, 70, 80, 90, 1000],
+        'C': ['a', 'b', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n")
+    
+    # Clean data
+    cleaned = clean_dataframe(df, drop_duplicates=True, fill_missing='mean')
+    print("Cleaned DataFrame:")
+    print(cleaned)
+    print("\n")
+    
+    # Validate data
+    is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B'])
+    print(f"Validation: {is_valid}, Message: {message}")
+    print("\n")
+    
+    # Remove outliers
+    no_outliers = remove_outliers_iqr(cleaned, columns=['A', 'B'])
+    print("DataFrame without outliers:")
+    print(no_outliers)
