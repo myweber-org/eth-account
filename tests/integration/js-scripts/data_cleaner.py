@@ -438,3 +438,79 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
             return False, f"Missing required columns: {missing_cols}"
     
     return True, "DataFrame is valid"
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the Interquartile Range method.
+    
+    Parameters:
+    data (list or array-like): The dataset containing the column.
+    column (int or str): Index or name of the column to process.
+    
+    Returns:
+    numpy.ndarray: Data with outliers removed.
+    """
+    data_array = np.array(data)
+    
+    if isinstance(column, str):
+        raise ValueError("Column name not supported for array input. Use integer index.")
+    
+    column_data = data_array[:, column].astype(float)
+    
+    Q1 = np.percentile(column_data, 25)
+    Q3 = np.percentile(column_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (column_data >= lower_bound) & (column_data <= upper_bound)
+    
+    return data_array[mask]
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column after outlier removal.
+    
+    Parameters:
+    data (list or array-like): The dataset.
+    column (int): Index of the column.
+    
+    Returns:
+    dict: Dictionary containing mean, median, and standard deviation.
+    """
+    cleaned_data = remove_outliers_iqr(data, column)
+    column_data = cleaned_data[:, column].astype(float)
+    
+    stats = {
+        'mean': np.mean(column_data),
+        'median': np.median(column_data),
+        'std': np.std(column_data),
+        'count': len(column_data)
+    }
+    
+    return stats
+
+if __name__ == "__main__":
+    sample_data = [
+        [1, 150.5],
+        [2, 162.3],
+        [3, 145.8],
+        [4, 210.1],
+        [5, 138.9],
+        [6, 155.2],
+        [7, 300.7],
+        [8, 148.6],
+        [9, 152.4],
+        [10, 165.0]
+    ]
+    
+    cleaned = remove_outliers_iqr(sample_data, 1)
+    print("Cleaned data:")
+    print(cleaned)
+    
+    stats = calculate_statistics(sample_data, 1)
+    print("\nStatistics:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
