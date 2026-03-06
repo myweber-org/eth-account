@@ -248,3 +248,95 @@ if __name__ == "__main__":
     validation = validate_dataframe(cleaned, required_columns=['id', 'value'])
     print("\nValidation results:")
     print(validation)
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        mask = (self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)
+        self.df = self.df[mask].reset_index(drop=True)
+        return self
+        
+    def remove_outliers_zscore(self, column, threshold=3):
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        mask = z_scores < threshold
+        self.df = self.df[mask].reset_index(drop=True)
+        return self
+        
+    def normalize_column(self, column, method='minmax'):
+        if column not in self.df.columns:
+            raise ValueError(f"Column '{column}' not found in DataFrame")
+            
+        if method == 'minmax':
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val != min_val:
+                self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+                
+        elif method == 'standard':
+            mean_val = self.df[column].mean()
+            std_val = self.df[column].std()
+            if std_val != 0:
+                self.df[column] = (self.df[column] - mean_val) / std_val
+                
+        elif method == 'robust':
+            median_val = self.df[column].median()
+            iqr_val = self.df[column].quantile(0.75) - self.df[column].quantile(0.25)
+            if iqr_val != 0:
+                self.df[column] = (self.df[column] - median_val) / iqr_val
+                
+        else:
+            raise ValueError("Method must be 'minmax', 'standard', or 'robust'")
+            
+        return self
+        
+    def handle_missing_values(self, strategy='mean', fill_value=None):
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in numeric_cols:
+            if self.df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_val = self.df[col].mean()
+                elif strategy == 'median':
+                    fill_val = self.df[col].median()
+                elif strategy == 'mode':
+                    fill_val = self.df[col].mode()[0]
+                elif strategy == 'constant' and fill_value is not None:
+                    fill_val = fill_value
+                else:
+                    continue
+                    
+                self.df[col] = self.df[col].fillna(fill_val)
+                
+        return self
+        
+    def get_cleaned_data(self):
+        return self.df
+        
+    def get_summary(self):
+        summary = {
+            'original_shape': (len(self.df), len(self.original_columns)),
+            'cleaned_shape': self.df.shape,
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': self.df.select_dtypes(include=[np.number]).columns.tolist(),
+            'categorical_columns': self.df.select_dtypes(exclude=[np.number]).columns.tolist()
+        }
+        return summary
