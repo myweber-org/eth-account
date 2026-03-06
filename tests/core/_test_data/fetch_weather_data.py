@@ -184,4 +184,95 @@ if __name__ == "__main__":
     city = sys.argv[2]
     
     weather_data = get_weather(api_key, city)
-    display_weather(weather_data)
+    display_weather(weather_data)import requests
+import json
+from datetime import datetime
+
+def get_weather_data(api_key, city):
+    """
+    Fetch current weather data for a given city.
+    """
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': 'metric'
+    }
+    
+    try:
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data['cod'] != 200:
+            print(f"Error: {data.get('message', 'Unknown error')}")
+            return None
+            
+        weather_info = {
+            'city': data['name'],
+            'country': data['sys']['country'],
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'pressure': data['main']['pressure'],
+            'weather': data['weather'][0]['description'],
+            'wind_speed': data['wind']['speed'],
+            'timestamp': datetime.fromtimestamp(data['dt']).isoformat()
+        }
+        
+        return weather_info
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Network error occurred: {e}")
+        return None
+    except (KeyError, ValueError) as e:
+        print(f"Error parsing response: {e}")
+        return None
+
+def display_weather(weather_data):
+    """
+    Display weather information in a readable format.
+    """
+    if not weather_data:
+        print("No weather data to display.")
+        return
+    
+    print("\n" + "="*40)
+    print(f"Weather in {weather_data['city']}, {weather_data['country']}")
+    print("="*40)
+    print(f"Temperature: {weather_data['temperature']}°C")
+    print(f"Feels like: {weather_data['feels_like']}°C")
+    print(f"Weather: {weather_data['weather'].title()}")
+    print(f"Humidity: {weather_data['humidity']}%")
+    print(f"Pressure: {weather_data['pressure']} hPa")
+    print(f"Wind Speed: {weather_data['wind_speed']} m/s")
+    print(f"Last Updated: {weather_data['timestamp']}")
+    print("="*40)
+
+def main():
+    """
+    Main function to demonstrate weather data fetching.
+    """
+    # Replace with your actual OpenWeatherMap API key
+    API_KEY = "your_api_key_here"
+    
+    # Example cities
+    cities = ["London", "New York", "Tokyo", "Paris", "Sydney"]
+    
+    print("Fetching weather data for multiple cities...")
+    
+    for city in cities:
+        print(f"\nFetching data for {city}...")
+        weather_data = get_weather_data(API_KEY, city)
+        
+        if weather_data:
+            display_weather(weather_data)
+        else:
+            print(f"Failed to fetch weather data for {city}")
+        
+        # Small delay to avoid hitting API rate limits
+        import time
+        time.sleep(1)
+
+if __name__ == "__main__":
+    main()
