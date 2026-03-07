@@ -168,3 +168,84 @@ def validate_data(data, required_columns=None, allow_nan=False):
         raise ValueError("Dataset contains NaN values")
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - factor * iqr
+    upper_bound = q3 + factor * iqr
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using min-max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column].apply(lambda x: 0.5)
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_zscore(data, column):
+    """
+    Standardize data using z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        return data[column].apply(lambda x: 0)
+    
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, outlier_factor=1.5, normalization_method='standardize'):
+    """
+    Main cleaning function for datasets
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            # Remove outliers
+            cleaned_df = remove_outliers_iqr(cleaned_df, col, outlier_factor)
+            
+            # Apply normalization
+            if normalization_method == 'minmax':
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+            elif normalization_method == 'standardize':
+                cleaned_df[col] = standardize_zscore(cleaned_df, col)
+    
+    return cleaned_df.reset_index(drop=True)
+
+def validate_data(data, column, check_nulls=True, check_range=None):
+    """
+    Validate data quality
+    """
+    validation_report = {}
+    
+    if check_nulls:
+        null_count = data[column].isnull().sum()
+        validation_report['null_count'] = null_count
+        validation_report['null_percentage'] = (null_count / len(data)) * 100
+    
+    if check_range:
+        min_val = data[column].min()
+        max_val = data[column].max()
+        validation_report['min_value'] = min_val
+        validation_report['max_value'] = max_val
+        validation_report['within_range'] = check_range[0] <= min_val and max_val <= check_range[1]
+    
+    return validation_report
