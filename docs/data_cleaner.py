@@ -976,4 +976,118 @@ def validate_dataframe(df, required_columns=None):
 #     
 #     validation = validate_dataframe(cleaned_df, required_columns=['name', 'age'])
 #     print("\nValidation Result:")
-#     print(validation)
+#     print(validation)import pandas as pd
+import numpy as np
+
+def remove_duplicates(df, subset=None):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Columns to consider for duplicates
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def handle_missing_values(df, strategy='drop', fill_value=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        strategy (str): 'drop' to remove rows, 'fill' to fill values
+        fill_value: Value to fill missing entries with
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    if strategy == 'drop':
+        return df.dropna()
+    elif strategy == 'fill':
+        return df.fillna(fill_value)
+    else:
+        raise ValueError("Strategy must be 'drop' or 'fill'")
+
+def normalize_column(df, column_name):
+    """
+    Normalize a column to have values between 0 and 1.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        column_name (str): Name of column to normalize
+    
+    Returns:
+        pd.DataFrame: DataFrame with normalized column
+    """
+    if column_name not in df.columns:
+        raise KeyError(f"Column '{column_name}' not found in DataFrame")
+    
+    col_min = df[column_name].min()
+    col_max = df[column_name].max()
+    
+    if col_max == col_min:
+        df[column_name] = 0.5
+    else:
+        df[column_name] = (df[column_name] - col_min) / (col_max - col_min)
+    
+    return df
+
+def clean_csv_file(input_path, output_path, **kwargs):
+    """
+    Clean a CSV file and save the result.
+    
+    Args:
+        input_path (str): Path to input CSV file
+        output_path (str): Path to save cleaned CSV file
+        **kwargs: Additional cleaning options
+    """
+    try:
+        df = pd.read_csv(input_path)
+        
+        # Apply cleaning operations
+        if 'remove_duplicates' in kwargs and kwargs['remove_duplicates']:
+            subset = kwargs.get('duplicate_subset', None)
+            df = remove_duplicates(df, subset)
+        
+        if 'handle_missing' in kwargs:
+            strategy = kwargs.get('missing_strategy', 'drop')
+            fill_value = kwargs.get('fill_value', 0)
+            df = handle_missing_values(df, strategy, fill_value)
+        
+        if 'normalize_columns' in kwargs:
+            columns = kwargs.get('normalize_columns', [])
+            for col in columns:
+                if col in df.columns:
+                    df = normalize_column(df, col)
+        
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_path}' not found")
+    except Exception as e:
+        print(f"Error during cleaning: {str(e)}")
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+    
+    Returns:
+        dict: Summary statistics
+    """
+    summary = {
+        'rows': len(df),
+        'columns': len(df.columns),
+        'missing_values': df.isnull().sum().sum(),
+        'duplicates': df.duplicated().sum(),
+        'dtypes': df.dtypes.to_dict(),
+        'numeric_columns': df.select_dtypes(include=[np.number]).columns.tolist(),
+        'categorical_columns': df.select_dtypes(include=['object']).columns.tolist()
+    }
+    return summary
