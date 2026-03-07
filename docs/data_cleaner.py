@@ -730,3 +730,158 @@ def remove_outliers_iqr(data, column):
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
     return filtered_data
+import pandas as pd
+import numpy as np
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values in a DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    strategy (str): Strategy to handle missing values. Options: 'mean', 'median', 'mode', 'drop'.
+    columns (list): List of columns to apply cleaning. If None, applies to all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    if strategy == 'drop':
+        df_clean = df_clean.dropna(subset=columns)
+    else:
+        for col in columns:
+            if col in df_clean.columns:
+                if strategy == 'mean':
+                    fill_value = df_clean[col].mean()
+                elif strategy == 'median':
+                    fill_value = df_clean[col].median()
+                elif strategy == 'mode':
+                    fill_value = df_clean[col].mode()[0]
+                else:
+                    raise ValueError(f"Unknown strategy: {strategy}")
+                
+                df_clean[col] = df_clean[col].fillna(fill_value)
+    
+    return df_clean
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range (IQR) method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of columns to check for outliers. If None, uses all numeric columns.
+    threshold (float): IQR multiplier for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col in df_clean.columns:
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            df_clean = df_clean[(df_clean[col] >= lower_bound) & (df_clean[col] <= upper_bound)]
+    
+    return df_clean
+
+def standardize_data(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of columns to standardize. If None, uses all numeric columns.
+    
+    Returns:
+    pd.DataFrame: Standardized DataFrame.
+    """
+    df_standardized = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_standardized.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col in df_standardized.columns:
+            mean = df_standardized[col].mean()
+            std = df_standardized[col].std()
+            if std > 0:
+                df_standardized[col] = (df_standardized[col] - mean) / std
+    
+    return df_standardized
+
+def normalize_data(df, columns=None, range_min=0, range_max=1):
+    """
+    Normalize numeric columns to a specified range.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of columns to normalize. If None, uses all numeric columns.
+    range_min (float): Minimum value of the target range.
+    range_max (float): Maximum value of the target range.
+    
+    Returns:
+    pd.DataFrame: Normalized DataFrame.
+    """
+    df_normalized = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_normalized.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col in df_normalized.columns:
+            col_min = df_normalized[col].min()
+            col_max = df_normalized[col].max()
+            col_range = col_max - col_min
+            
+            if col_range > 0:
+                df_normalized[col] = ((df_normalized[col] - col_min) / col_range) * (range_max - range_min) + range_min
+    
+    return df_normalized
+
+def clean_dataset(df, missing_strategy='mean', remove_outliers=True, standardize=False, normalize=False):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    missing_strategy (str): Strategy for handling missing values.
+    remove_outliers (bool): Whether to remove outliers using IQR method.
+    standardize (bool): Whether to standardize numeric columns.
+    normalize (bool): Whether to normalize numeric columns.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_clean = df.copy()
+    
+    numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    
+    df_clean = clean_missing_values(df_clean, strategy=missing_strategy, columns=list(numeric_cols))
+    
+    if remove_outliers:
+        df_clean = remove_outliers_iqr(df_clean, columns=list(numeric_cols))
+    
+    if standardize:
+        df_clean = standardize_data(df_clean, columns=list(numeric_cols))
+    
+    if normalize:
+        df_clean = normalize_data(df_clean, columns=list(numeric_cols))
+    
+    return df_clean
