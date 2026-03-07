@@ -136,3 +136,11 @@ if __name__ == "__main__":
     
     print("Data cleaning completed.")
     print(f"Validation results: {validation}")
+def remove_duplicates(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
