@@ -1072,4 +1072,123 @@ def clean_dataset(df, outlier_threshold=1.5, normalize=True, fill_missing=True):
     if normalize:
         cleaner.normalize_minmax()
     
-    return cleaner.get_cleaned_data(), cleaner.get_summary()
+    return cleaner.get_cleaned_data(), cleaner.get_summary()import pandas as pd
+import numpy as np
+from scipy import stats
+
+def clean_dataset(df, numeric_columns=None, method='median', z_threshold=3):
+    """
+    Clean dataset by handling missing values and removing outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    numeric_columns (list): List of numeric column names to process
+    method (str): Imputation method ('mean', 'median', 'mode')
+    z_threshold (float): Z-score threshold for outlier detection
+    
+    Returns:
+    pd.DataFrame: Cleaned dataframe
+    """
+    if numeric_columns is None:
+        numeric_columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_clean = df.copy()
+    
+    # Handle missing values
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            if df_clean[col].isnull().any():
+                if method == 'mean':
+                    fill_value = df_clean[col].mean()
+                elif method == 'median':
+                    fill_value = df_clean[col].median()
+                elif method == 'mode':
+                    fill_value = df_clean[col].mode()[0]
+                else:
+                    fill_value = df_clean[col].median()
+                
+                df_clean[col].fillna(fill_value, inplace=True)
+    
+    # Remove outliers using z-score
+    z_scores = np.abs(stats.zscore(df_clean[numeric_columns]))
+    outlier_mask = (z_scores < z_threshold).all(axis=1)
+    df_clean = df_clean[outlier_mask].reset_index(drop=True)
+    
+    return df_clean
+
+def normalize_data(df, columns=None, method='minmax'):
+    """
+    Normalize specified columns in dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    columns (list): Columns to normalize
+    method (str): Normalization method ('minmax', 'standard')
+    
+    Returns:
+    pd.DataFrame: Dataframe with normalized columns
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns.tolist()
+    
+    df_norm = df.copy()
+    
+    for col in columns:
+        if col in df_norm.columns:
+            if method == 'minmax':
+                min_val = df_norm[col].min()
+                max_val = df_norm[col].max()
+                if max_val > min_val:
+                    df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+            elif method == 'standard':
+                mean_val = df_norm[col].mean()
+                std_val = df_norm[col].std()
+                if std_val > 0:
+                    df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    return df_norm
+
+def get_data_summary(df):
+    """
+    Generate summary statistics for dataframe.
+    
+    Parameters:
+    df (pd.DataFrame): Input dataframe
+    
+    Returns:
+    dict: Dictionary containing summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'missing_values': df.isnull().sum().to_dict(),
+        'numeric_stats': df.describe().to_dict(),
+        'dtypes': df.dtypes.to_dict()
+    }
+    return summary
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data
+    sample_data = {
+        'feature1': [1, 2, np.nan, 4, 5, 100],
+        'feature2': [10, 20, 30, 40, 50, 60],
+        'category': ['A', 'B', 'A', 'B', 'A', 'B']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original data:")
+    print(df)
+    
+    # Clean data
+    df_clean = clean_dataset(df, method='median')
+    print("\nCleaned data:")
+    print(df_clean)
+    
+    # Normalize data
+    df_normalized = normalize_data(df_clean, method='minmax')
+    print("\nNormalized data:")
+    print(df_normalized)
+    
+    # Get summary
+    summary = get_data_summary(df_clean)
+    print(f"\nData shape: {summary['shape']}")
