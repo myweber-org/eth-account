@@ -606,3 +606,73 @@ def validate_dataframe(df, required_columns=None, min_rows=1):
 #     
 #     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
 #     print(f"\nValidation: {is_valid}, Message: {message}")
+import pandas as pd
+import numpy as np
+from typing import List, Optional
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+    
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
+        self.df = self.df.drop_duplicates(subset=subset, keep='first')
+        return self
+    
+    def handle_missing_values(self, strategy: str = 'drop', fill_value: Optional[float] = None) -> 'DataCleaner':
+        if strategy == 'drop':
+            self.df = self.df.dropna()
+        elif strategy == 'fill':
+            if fill_value is not None:
+                self.df = self.df.fillna(fill_value)
+            else:
+                self.df = self.df.fillna(self.df.mean(numeric_only=True))
+        return self
+    
+    def remove_outliers_iqr(self, column: str, multiplier: float = 1.5) -> 'DataCleaner':
+        if column not in self.df.columns:
+            return self
+        
+        Q1 = self.df[column].quantile(0.25)
+        Q3 = self.df[column].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - multiplier * IQR
+        upper_bound = Q3 + multiplier * IQR
+        
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return self
+    
+    def normalize_column(self, column: str) -> 'DataCleaner':
+        if column in self.df.columns and pd.api.types.is_numeric_dtype(self.df[column]):
+            min_val = self.df[column].min()
+            max_val = self.df[column].max()
+            if max_val > min_val:
+                self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_summary(self) -> dict:
+        return {
+            'original_rows': self.original_shape[0],
+            'original_columns': self.original_shape[1],
+            'cleaned_rows': self.df.shape[0],
+            'cleaned_columns': self.df.shape[1],
+            'rows_removed': self.original_shape[0] - self.df.shape[0],
+            'columns_removed': self.original_shape[1] - self.df.shape[1]
+        }
+
+def clean_dataset(df: pd.DataFrame, operations: List[str] = None) -> pd.DataFrame:
+    cleaner = DataCleaner(df)
+    
+    if operations is None:
+        operations = ['remove_duplicates', 'handle_missing_values']
+    
+    for op in operations:
+        if op == 'remove_duplicates':
+            cleaner.remove_duplicates()
+        elif op == 'handle_missing_values':
+            cleaner.handle_missing_values(strategy='fill')
+    
+    return cleaner.get_cleaned_data()
