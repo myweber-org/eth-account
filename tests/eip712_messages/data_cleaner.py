@@ -361,4 +361,87 @@ def remove_outliers_iqr(data, column):
     upper_bound = Q3 + 1.5 * IQR
     
     filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-    return filtered_data
+    return filtered_dataimport re
+import pandas as pd
+
+def clean_string(text):
+    if not isinstance(text, str):
+        return ''
+    text = text.strip()
+    text = re.sub(r'\s+', ' ', text)
+    return text
+
+def validate_email(email):
+    if not isinstance(email, str):
+        return False
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(df, subset=None):
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    return df.drop_duplicates(subset=subset, keep='first')
+
+def normalize_column_names(df):
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    df.columns = [col.strip().lower().replace(' ', '_') for col in df.columns]
+    return df
+
+def fill_missing_values(df, strategy='mean', columns=None):
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    
+    if columns is None:
+        columns = df.select_dtypes(include=['number']).columns
+    
+    for col in columns:
+        if col in df.columns:
+            if strategy == 'mean' and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].mean(), inplace=True)
+            elif strategy == 'median' and pd.api.types.is_numeric_dtype(df[col]):
+                df[col].fillna(df[col].median(), inplace=True)
+            elif strategy == 'mode':
+                df[col].fillna(df[col].mode()[0] if not df[col].mode().empty else None, inplace=True)
+            elif strategy == 'ffill':
+                df[col].fillna(method='ffill', inplace=True)
+            elif strategy == 'bfill':
+                df[col].fillna(method='bfill', inplace=True)
+            else:
+                df[col].fillna('', inplace=True)
+    return df
+
+def convert_data_types(df, column_types):
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    
+    for col, dtype in column_types.items():
+        if col in df.columns:
+            try:
+                if dtype == 'datetime':
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+                elif dtype == 'numeric':
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                elif dtype == 'category':
+                    df[col] = df[col].astype('category')
+                else:
+                    df[col] = df[col].astype(dtype)
+            except Exception as e:
+                print(f"Error converting column {col} to {dtype}: {e}")
+    return df
+
+def detect_outliers_iqr(df, column):
+    if not isinstance(df, pd.DataFrame):
+        raise ValueError("Input must be a pandas DataFrame")
+    
+    if column not in df.columns or not pd.api.types.is_numeric_dtype(df[column]):
+        return []
+    
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    outliers = df[(df[column] < lower_bound) | (df[column] > upper_bound)]
+    return outliers.index.tolist()
