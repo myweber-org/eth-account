@@ -188,4 +188,126 @@ def validate_data(data, required_columns=None, allow_nan=False):
     if len(numeric_columns) == 0:
         validation_result['warnings'].append("No numeric columns found in data")
     
-    return validation_result
+    return validation_resultimport pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=True, fill_value=0):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): Whether to drop duplicate rows. Default is True.
+    fill_missing (bool): Whether to fill missing values. Default is True.
+    fill_value: Value to use for filling missing data. Default is 0.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing:
+        cleaned_df = cleaned_df.fillna(fill_value)
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate a DataFrame for required columns and data types.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of required column names.
+    
+    Returns:
+    bool: True if validation passes, False otherwise.
+    """
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Missing required columns: {missing_columns}")
+            return False
+    
+    if df.empty:
+        print("DataFrame is empty")
+        return False
+    
+    return True
+
+def remove_outliers(df, column, threshold=3):
+    """
+    Remove outliers from a DataFrame column using z-score method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to check for outliers.
+    threshold (float): Z-score threshold for outlier detection.
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    from scipy import stats
+    import numpy as np
+    
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(df[column].dropna()))
+    filtered_entries = z_scores < threshold
+    return df[filtered_entries]
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column in the DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    column (str): Column name to normalize.
+    method (str): Normalization method ('minmax' or 'zscore').
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column.
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    normalized_df = df.copy()
+    
+    if method == 'minmax':
+        col_min = normalized_df[column].min()
+        col_max = normalized_df[column].max()
+        if col_max != col_min:
+            normalized_df[column] = (normalized_df[column] - col_min) / (col_max - col_min)
+    
+    elif method == 'zscore':
+        col_mean = normalized_df[column].mean()
+        col_std = normalized_df[column].std()
+        if col_std != 0:
+            normalized_df[column] = (normalized_df[column] - col_mean) / col_std
+    
+    else:
+        raise ValueError("Method must be 'minmax' or 'zscore'")
+    
+    return normalized_df
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, None],
+        'B': [10, 20, 20, 40, 50, 60],
+        'C': [100, 200, 300, 400, 500, 600]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned = clean_dataset(df)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
+    
+    normalized = normalize_column(cleaned, 'B', method='minmax')
+    print("\nNormalized DataFrame:")
+    print(normalized)
