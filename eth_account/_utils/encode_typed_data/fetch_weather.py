@@ -180,3 +180,82 @@ if __name__ == "__main__":
     city_name = sys.argv[2]
     weather_data = get_weather(api_key, city_name)
     display_weather(weather_data)
+import requests
+import json
+import os
+from datetime import datetime
+
+def get_weather(city_name, api_key):
+    base_url = "http://api.openweathermap.org/data/2.5/weather?"
+    complete_url = f"{base_url}appid={api_key}&q={city_name}&units=metric"
+    
+    try:
+        response = requests.get(complete_url)
+        response.raise_for_status()
+        data = response.json()
+        
+        if data["cod"] != 200:
+            print(f"Error: {data.get('message', 'Unknown error')}")
+            return None
+            
+        main_data = data["main"]
+        weather_data = data["weather"][0]
+        wind_data = data["wind"]
+        
+        weather_info = {
+            "city": data["name"],
+            "country": data["sys"]["country"],
+            "temperature": main_data["temp"],
+            "feels_like": main_data["feels_like"],
+            "humidity": main_data["humidity"],
+            "pressure": main_data["pressure"],
+            "weather": weather_data["main"],
+            "description": weather_data["description"],
+            "wind_speed": wind_data["speed"],
+            "wind_deg": wind_data.get("deg", 0),
+            "timestamp": datetime.fromtimestamp(data["dt"]).strftime('%Y-%m-%d %H:%M:%S')
+        }
+        
+        return weather_info
+        
+    except requests.exceptions.RequestException as e:
+        print(f"Network error: {e}")
+        return None
+    except (KeyError, json.JSONDecodeError) as e:
+        print(f"Data parsing error: {e}")
+        return None
+
+def display_weather(weather_info):
+    if not weather_info:
+        return
+        
+    print("\n" + "="*50)
+    print(f"Weather in {weather_info['city']}, {weather_info['country']}")
+    print("="*50)
+    print(f"Temperature: {weather_info['temperature']}°C")
+    print(f"Feels like: {weather_info['feels_like']}°C")
+    print(f"Weather: {weather_info['weather']} ({weather_info['description']})")
+    print(f"Humidity: {weather_info['humidity']}%")
+    print(f"Pressure: {weather_info['pressure']} hPa")
+    print(f"Wind: {weather_info['wind_speed']} m/s at {weather_info['wind_deg']}°")
+    print(f"Last updated: {weather_info['timestamp']}")
+    print("="*50)
+
+def main():
+    api_key = os.environ.get("OPENWEATHER_API_KEY")
+    
+    if not api_key:
+        print("Please set OPENWEATHER_API_KEY environment variable")
+        return
+    
+    city = input("Enter city name: ").strip()
+    
+    if not city:
+        print("City name cannot be empty")
+        return
+    
+    weather = get_weather(city, api_key)
+    display_weather(weather)
+
+if __name__ == "__main__":
+    main()
