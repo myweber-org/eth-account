@@ -291,3 +291,8 @@ if __name__ == "__main__":
     
     cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
     save_cleaned_data(cleaned_df, output_file)
+def filter_none_values(input_list):
+    """
+    Return a new list with all None values removed.
+    """
+    return [item for item in input_list if item is not None]
