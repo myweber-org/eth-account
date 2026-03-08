@@ -400,4 +400,132 @@ def process_dataset(file_path, column_name):
     except FileNotFoundError:
         raise FileNotFoundError(f"File not found: {file_path}")
     except Exception as e:
-        raise RuntimeError(f"Error processing dataset: {str(e)}")
+        raise RuntimeError(f"Error processing dataset: {str(e)}")import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Clean missing data in a DataFrame using specified strategy.
+    
+    Args:
+        df: pandas DataFrame containing data with potential missing values
+        strategy: Method for handling missing values ('mean', 'median', 'mode', 'drop')
+        columns: List of column names to apply cleaning to (None for all columns)
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    if columns is None:
+        columns = df.columns
+    
+    df_clean = df.copy()
+    
+    for col in columns:
+        if df[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = df[col].mean()
+            elif strategy == 'median':
+                fill_value = df[col].median()
+            elif strategy == 'mode':
+                fill_value = df[col].mode()[0] if not df[col].mode().empty else np.nan
+            elif strategy == 'drop':
+                df_clean = df_clean.dropna(subset=[col])
+                continue
+            else:
+                raise ValueError(f"Unsupported strategy: {strategy}")
+            
+            df_clean[col] = df[col].fillna(fill_value)
+    
+    return df_clean
+
+def detect_outliers_iqr(df, column, threshold=1.5):
+    """
+    Detect outliers using the Interquartile Range method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to check for outliers
+        threshold: IQR multiplier for outlier detection
+    
+    Returns:
+        Boolean mask indicating outliers
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - threshold * IQR
+    upper_bound = Q3 + threshold * IQR
+    
+    return (df[column] < lower_bound) | (df[column] > upper_bound)
+
+def normalize_column(df, column, method='minmax'):
+    """
+    Normalize a column using specified method.
+    
+    Args:
+        df: pandas DataFrame
+        column: Column name to normalize
+        method: Normalization method ('minmax' or 'zscore')
+    
+    Returns:
+        Series with normalized values
+    """
+    if method == 'minmax':
+        col_min = df[column].min()
+        col_max = df[column].max()
+        if col_max == col_min:
+            return pd.Series([0] * len(df), index=df.index)
+        return (df[column] - col_min) / (col_max - col_min)
+    
+    elif method == 'zscore':
+        col_mean = df[column].mean()
+        col_std = df[column].std()
+        if col_std == 0:
+            return pd.Series([0] * len(df), index=df.index)
+        return (df[column] - col_mean) / col_std
+    
+    else:
+        raise ValueError(f"Unsupported normalization method: {method}")
+
+def validate_dataframe(df, required_columns=None, numeric_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+        numeric_columns: List of column names that must be numeric
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            return False, f"Missing required columns: {missing_cols}"
+    
+    if numeric_columns:
+        non_numeric_cols = [col for col in numeric_columns if not pd.api.types.is_numeric_dtype(df[col])]
+        if non_numeric_cols:
+            return False, f"Non-numeric columns: {non_numeric_cols}"
+    
+    return True, "DataFrame validation passed"
+
+if __name__ == "__main__":
+    # Example usage
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [10, 20, 30, np.nan, 50],
+        'C': [100, 200, 300, 400, 500]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_missing_data(df, strategy='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    is_valid, message = validate_dataframe(cleaned_df, required_columns=['A', 'B', 'C'])
+    print(f"\nValidation: {is_valid} - {message}")
