@@ -1740,4 +1740,126 @@ if __name__ == "__main__":
     print("\nSummary statistics after cleaning:")
     for col in cleaned_df.columns:
         stats = calculate_summary_statistics(cleaned_df, col)
-        print(f"{col}: {stats}")
+        print(f"{col}: {stats}")import pandas as pd
+import numpy as np
+
+def clean_missing_data(df, strategy='mean', columns=None):
+    """
+    Clean missing data in a pandas DataFrame.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    strategy (str): Strategy for handling missing values.
+                    Options: 'mean', 'median', 'mode', 'drop', 'fill'.
+    columns (list): List of column names to apply cleaning.
+                    If None, applies to all numeric columns.
+
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    df_cleaned = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_cleaned.columns:
+            continue
+            
+        if strategy == 'mean':
+            fill_value = df_cleaned[col].mean()
+        elif strategy == 'median':
+            fill_value = df_cleaned[col].median()
+        elif strategy == 'mode':
+            fill_value = df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else np.nan
+        elif strategy == 'drop':
+            df_cleaned = df_cleaned.dropna(subset=[col])
+            continue
+        elif strategy == 'fill':
+            fill_value = 0
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        df_cleaned[col] = df_cleaned[col].fillna(fill_value)
+    
+    return df_cleaned
+
+def remove_outliers(df, columns=None, threshold=3):
+    """
+    Remove outliers using z-score method.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to check for outliers.
+    threshold (float): Z-score threshold for outlier detection.
+
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed.
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_clean.columns:
+            continue
+            
+        z_scores = np.abs((df_clean[col] - df_clean[col].mean()) / df_clean[col].std())
+        df_clean = df_clean[z_scores < threshold]
+    
+    return df_clean.reset_index(drop=True)
+
+def standardize_columns(df, columns=None):
+    """
+    Standardize numeric columns to have zero mean and unit variance.
+
+    Parameters:
+    df (pd.DataFrame): Input DataFrame.
+    columns (list): List of column names to standardize.
+
+    Returns:
+    pd.DataFrame: DataFrame with standardized columns.
+    """
+    df_std = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_std.select_dtypes(include=[np.number]).columns
+        columns = list(numeric_cols)
+    
+    for col in columns:
+        if col not in df_std.columns:
+            continue
+            
+        mean_val = df_std[col].mean()
+        std_val = df_std[col].std()
+        
+        if std_val > 0:
+            df_std[col] = (df_std[col] - mean_val) / std_val
+    
+    return df_std
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, np.nan, 4, 5],
+        'B': [np.nan, 2, 3, 4, 100],
+        'C': ['x', 'y', 'z', 'x', 'y']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_missing_data(df, strategy='mean', columns=['A', 'B'])
+    print("\nCleaned DataFrame:")
+    print(cleaned_df)
+    
+    no_outliers_df = remove_outliers(cleaned_df, columns=['B'], threshold=2)
+    print("\nDataFrame without outliers:")
+    print(no_outliers_df)
+    
+    standardized_df = standardize_columns(no_outliers_df, columns=['A', 'B'])
+    print("\nStandardized DataFrame:")
+    print(standardized_df)
