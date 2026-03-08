@@ -30,4 +30,62 @@ def filter_valid_entries(data_list, required_keys):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport pandas as pd
+import numpy as np
+
+def clean_csv_data(input_file, output_file):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        print(f"Original data shape: {df.shape}")
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        print(f"After removing duplicates: {df.shape}")
+        
+        # Fill missing numeric values with column median
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_cols:
+            if df[col].isnull().any():
+                median_val = df[col].median()
+                df[col] = df[col].fillna(median_val)
+                print(f"Filled missing values in {col} with median: {median_val}")
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                mode_val = df[col].mode()[0]
+                df[col] = df[col].fillna(mode_val)
+                print(f"Filled missing values in {col} with mode: {mode_val}")
+        
+        # Remove rows where critical columns are still null
+        critical_columns = ['id', 'timestamp', 'value']
+        existing_critical = [col for col in critical_columns if col in df.columns]
+        if existing_critical:
+            initial_count = len(df)
+            df = df.dropna(subset=existing_critical)
+            print(f"Removed {initial_count - len(df)} rows with null critical columns")
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Cleaned data saved to {output_file}")
+        print(f"Final data shape: {df.shape}")
+        
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file {input_file} not found")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    cleaned_df = clean_csv_data(input_csv, output_csv)
