@@ -434,3 +434,79 @@ if __name__ == "__main__":
     normalized = normalize_data(cleaned, method='minmax')
     print("Normalized dataset:")
     print(normalized)
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column):
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    return dataframe[(dataframe[column] >= lower_bound) & (dataframe[column] <= upper_bound)]
+
+def remove_outliers_zscore(dataframe, column, threshold=3):
+    z_scores = np.abs(stats.zscore(dataframe[column]))
+    return dataframe[z_scores < threshold]
+
+def normalize_minmax(dataframe, column):
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    dataframe[column + '_normalized'] = (dataframe[column] - min_val) / (max_val - min_val)
+    return dataframe
+
+def normalize_zscore(dataframe, column):
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    dataframe[column + '_standardized'] = (dataframe[column] - mean_val) / std_val
+    return dataframe
+
+def handle_missing_values(dataframe, strategy='mean'):
+    if strategy == 'mean':
+        return dataframe.fillna(dataframe.mean())
+    elif strategy == 'median':
+        return dataframe.fillna(dataframe.median())
+    elif strategy == 'mode':
+        return dataframe.fillna(dataframe.mode().iloc[0])
+    elif strategy == 'drop':
+        return dataframe.dropna()
+    else:
+        raise ValueError("Invalid strategy. Choose from 'mean', 'median', 'mode', or 'drop'")
+
+def clean_dataset(dataframe, numeric_columns, outlier_method='iqr', normalize_method='minmax', missing_strategy='mean'):
+    df_clean = dataframe.copy()
+    
+    for col in numeric_columns:
+        if outlier_method == 'iqr':
+            df_clean = remove_outliers_iqr(df_clean, col)
+        elif outlier_method == 'zscore':
+            df_clean = remove_outliers_zscore(df_clean, col)
+        
+        if normalize_method == 'minmax':
+            df_clean = normalize_minmax(df_clean, col)
+        elif normalize_method == 'zscore':
+            df_clean = normalize_zscore(df_clean, col)
+    
+    df_clean = handle_missing_values(df_clean, strategy=missing_strategy)
+    return df_clean
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': [1, 2, 3, 4, 5, 100, 6, 7, 8, 9],
+        'feature2': [10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
+        'feature3': [5, 15, 25, 35, 45, 55, 65, 75, 85, 95]
+    })
+    
+    cleaned_data = clean_dataset(
+        sample_data, 
+        numeric_columns=['feature1', 'feature2', 'feature3'],
+        outlier_method='iqr',
+        normalize_method='minmax',
+        missing_strategy='mean'
+    )
+    
+    print("Original dataset shape:", sample_data.shape)
+    print("Cleaned dataset shape:", cleaned_data.shape)
+    print("\nCleaned dataset preview:")
+    print(cleaned_data.head())
