@@ -209,3 +209,118 @@ def clean_dataset(df, numeric_columns):
 def save_cleaned_data(df, output_path):
     df.to_csv(output_path, index=False)
     print(f"Cleaned data saved to {output_path}")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_column(dataframe, column, method='zscore'):
+    """
+    Normalize a column using specified method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    method (str): Normalization method ('zscore', 'minmax', 'robust')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    result_df = dataframe.copy()
+    
+    if method == 'zscore':
+        result_df[f'{column}_normalized'] = stats.zscore(result_df[column])
+    
+    elif method == 'minmax':
+        col_min = result_df[column].min()
+        col_max = result_df[column].max()
+        result_df[f'{column}_normalized'] = (result_df[column] - col_min) / (col_max - col_min)
+    
+    elif method == 'robust':
+        col_median = result_df[column].median()
+        col_iqr = result_df[column].quantile(0.75) - result_df[column].quantile(0.25)
+        result_df[f'{column}_normalized'] = (result_df[column] - col_median) / col_iqr
+    
+    else:
+        raise ValueError(f"Unknown normalization method: {method}")
+    
+    return result_df
+
+def clean_dataset(dataframe, numeric_columns, outlier_threshold=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names to process
+    outlier_threshold (float): IQR multiplier for outlier removal
+    normalize_method (str): Normalization method to apply
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    cleaned_df = dataframe.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, column, outlier_threshold)
+            cleaned_df = normalize_column(cleaned_df, column, normalize_method)
+    
+    return cleaned_df
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    dataframe (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, raises exception otherwise
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if len(dataframe) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
