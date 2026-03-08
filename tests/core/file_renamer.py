@@ -70,3 +70,73 @@ if __name__ == "__main__":
         sys.exit(1)
     
     rename_files_with_sequence(target_directory, name_prefix)
+import os
+import re
+import sys
+from pathlib import Path
+
+def rename_files(directory, pattern, replacement, dry_run=True):
+    """
+    Rename files in a directory matching a regex pattern.
+    
+    Args:
+        directory: Path to directory containing files
+        pattern: Regex pattern to match in filenames
+        replacement: String to replace matched pattern
+        dry_run: If True, only show what would be changed
+    """
+    dir_path = Path(directory)
+    
+    if not dir_path.exists() or not dir_path.is_dir():
+        print(f"Error: Directory '{directory}' does not exist or is not a directory")
+        return False
+    
+    renamed_count = 0
+    
+    for file_path in dir_path.iterdir():
+        if file_path.is_file():
+            original_name = file_path.name
+            new_name = re.sub(pattern, replacement, original_name)
+            
+            if new_name != original_name:
+                new_path = file_path.parent / new_name
+                
+                if dry_run:
+                    print(f"Would rename: '{original_name}' -> '{new_name}'")
+                else:
+                    try:
+                        file_path.rename(new_path)
+                        print(f"Renamed: '{original_name}' -> '{new_name}'")
+                    except Exception as e:
+                        print(f"Error renaming '{original_name}': {e}")
+                        continue
+                
+                renamed_count += 1
+    
+    print(f"\nTotal files that would be renamed: {renamed_count}")
+    if dry_run:
+        print("This was a dry run. No files were actually renamed.")
+        print("Run with --apply to actually rename files.")
+    
+    return True
+
+def main():
+    if len(sys.argv) < 4:
+        print("Usage: python file_renamer.py <directory> <pattern> <replacement> [--apply]")
+        print("Example: python file_renamer.py ./photos 'IMG_\\d+' 'vacation_'")
+        return
+    
+    directory = sys.argv[1]
+    pattern = sys.argv[2]
+    replacement = sys.argv[3]
+    dry_run = '--apply' not in sys.argv
+    
+    try:
+        rename_files(directory, pattern, replacement, dry_run)
+    except re.error as e:
+        print(f"Invalid regex pattern: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
