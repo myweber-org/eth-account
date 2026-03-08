@@ -537,3 +537,66 @@ def remove_duplicates(sequence):
             seen.add(item)
             result.append(item)
     return result
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def standardize_zscore(data, column):
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    data[column + '_standardized'] = (data[column] - mean_val) / std_val
+    return data
+
+def handle_missing_values(data, strategy='mean'):
+    numeric_cols = data.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if data[col].isnull().any():
+            if strategy == 'mean':
+                fill_value = data[col].mean()
+            elif strategy == 'median':
+                fill_value = data[col].median()
+            elif strategy == 'mode':
+                fill_value = data[col].mode()[0]
+            else:
+                fill_value = 0
+            data[col].fillna(fill_value, inplace=True)
+    return data
+
+def create_sample_data():
+    np.random.seed(42)
+    dates = pd.date_range(start='2023-01-01', periods=100, freq='D')
+    values = np.random.randn(100) * 10 + 50
+    data = pd.DataFrame({'date': dates, 'value': values})
+    data.loc[10:15, 'value'] = np.nan
+    data.loc[95, 'value'] = 200
+    return data
+
+def process_data_pipeline(data):
+    print(f"Original data shape: {data.shape}")
+    data = handle_missing_values(data, strategy='mean')
+    print(f"After handling missing values: {data.shape}")
+    data = remove_outliers_iqr(data, 'value')
+    print(f"After outlier removal: {data.shape}")
+    data = normalize_minmax(data, 'value')
+    data = standardize_zscore(data, 'value')
+    return data
+
+if __name__ == "__main__":
+    sample_data = create_sample_data()
+    processed_data = process_data_pipeline(sample_data)
+    print(processed_data[['value', 'value_normalized', 'value_standardized']].head())
+    print("\nData processing completed.")
