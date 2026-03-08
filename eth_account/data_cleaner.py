@@ -239,3 +239,63 @@ if __name__ == "__main__":
         print("Data validation passed.")
     except ValueError as e:
         print(f"Data validation failed: {e}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates()
+    
+    # Fill missing numeric values with column median
+    numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].median())
+    
+    # Fill missing categorical values with mode
+    categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+    for col in categorical_cols:
+        df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0] if not df_cleaned[col].mode().empty else 'Unknown')
+    
+    return df_cleaned
+
+def validate_data(df, required_columns):
+    """
+    Validate that required columns exist in the DataFrame.
+    """
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+    return True
+
+def load_and_clean_data(file_path, required_columns=None):
+    """
+    Load data from a CSV file and clean it.
+    """
+    # Load data
+    df = pd.read_csv(file_path)
+    
+    # Validate required columns if provided
+    if required_columns:
+        validate_data(df, required_columns)
+    
+    # Clean the data
+    df_cleaned = clean_dataset(df)
+    
+    return df_cleaned
+
+if __name__ == "__main__":
+    # Example usage
+    try:
+        cleaned_data = load_and_clean_data('sample_data.csv', ['id', 'name', 'value'])
+        print(f"Original shape: {pd.read_csv('sample_data.csv').shape}")
+        print(f"Cleaned shape: {cleaned_data.shape}")
+        print("Data cleaning completed successfully.")
+    except FileNotFoundError:
+        print("Error: File not found.")
+    except ValueError as e:
+        print(f"Validation error: {e}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
