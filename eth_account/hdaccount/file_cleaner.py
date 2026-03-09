@@ -172,4 +172,91 @@ def main():
         print(f"Cleanup complete. {removed} files removed.")
 
 if __name__ == "__main__":
+    main()import os
+import shutil
+import tempfile
+from pathlib import Path
+from typing import List, Optional
+
+class TempFileCleaner:
+    """A utility class to clean temporary files and directories."""
+
+    def __init__(self, target_dir: Optional[str] = None):
+        """
+        Initialize the cleaner with a target directory.
+        If no directory is provided, uses the system's temp directory.
+        """
+        self.target_dir = Path(target_dir) if target_dir else Path(tempfile.gettempdir())
+        if not self.target_dir.exists():
+            raise FileNotFoundError(f"Directory not found: {self.target_dir}")
+
+    def list_temp_files(self, pattern: str = "*") -> List[Path]:
+        """List files in the target directory matching a pattern."""
+        return list(self.target_dir.glob(pattern))
+
+    def clean_files(self, pattern: str = "*", dry_run: bool = True) -> List[Path]:
+        """
+        Remove files matching the pattern.
+        If dry_run is True, only list files without deleting.
+        Returns list of files that would be/were removed.
+        """
+        files_to_clean = self.list_temp_files(pattern)
+        removed = []
+
+        for file_path in files_to_clean:
+            try:
+                if dry_run:
+                    removed.append(file_path)
+                else:
+                    if file_path.is_file():
+                        file_path.unlink()
+                    elif file_path.is_dir():
+                        shutil.rmtree(file_path)
+                    removed.append(file_path)
+            except (OSError, PermissionError) as e:
+                print(f"Error processing {file_path}: {e}")
+
+        return removed
+
+    def clean_old_files(self, days_old: int = 7, dry_run: bool = True) -> List[Path]:
+        """Remove files older than specified number of days."""
+        import time
+        current_time = time.time()
+        cutoff = current_time - (days_old * 86400)
+        old_files = []
+
+        for file_path in self.list_temp_files():
+            try:
+                if file_path.stat().st_mtime < cutoff:
+                    if dry_run:
+                        old_files.append(file_path)
+                    else:
+                        if file_path.is_file():
+                            file_path.unlink()
+                        elif file_path.is_dir():
+                            shutil.rmtree(file_path)
+                        old_files.append(file_path)
+            except (OSError, PermissionError) as e:
+                print(f"Error processing {file_path}: {e}")
+
+        return old_files
+
+def main():
+    """Example usage of the TempFileCleaner."""
+    cleaner = TempFileCleaner()
+    
+    print("Listing temporary files:")
+    temp_files = cleaner.list_temp_files()
+    for f in temp_files[:5]:  # Show first 5
+        print(f"  {f}")
+    
+    print("\nDry run - files that would be cleaned:")
+    to_clean = cleaner.clean_files("*.tmp", dry_run=True)
+    for f in to_clean[:5]:
+        print(f"  {f}")
+    
+    print(f"\nTotal files in temp dir: {len(temp_files)}")
+    print(f"Files to clean with pattern '*.tmp': {len(to_clean)}")
+
+if __name__ == "__main__":
     main()
