@@ -556,4 +556,84 @@ def process_dataframe(dataframe, numeric_columns=None):
     
     cleaned_df = clean_missing_values(cleaned_df, strategy='mean')
     
-    return cleaned_df, stats_summary
+    return cleaned_df, stats_summaryimport pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, fill_strategy='mean', drop_threshold=0.5):
+    """
+    Load and clean a CSV file by handling missing values.
+    
+    Args:
+        file_path (str): Path to the CSV file.
+        fill_strategy (str): Strategy for filling missing values.
+                             Options: 'mean', 'median', 'mode', 'zero'.
+        drop_threshold (float): Drop columns with missing ratio above this threshold.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error reading file: {e}")
+        return None
+    
+    print(f"Original shape: {df.shape}")
+    
+    # Calculate missing ratio per column
+    missing_ratio = df.isnull().sum() / len(df)
+    
+    # Drop columns with high missing ratio
+    columns_to_drop = missing_ratio[missing_ratio > drop_threshold].index
+    if len(columns_to_drop) > 0:
+        print(f"Dropping columns with high missing ratio: {list(columns_to_drop)}")
+        df = df.drop(columns=columns_to_drop)
+    
+    # Handle remaining missing values
+    for column in df.columns:
+        if df[column].isnull().any():
+            if df[column].dtype in ['int64', 'float64']:
+                if fill_strategy == 'mean':
+                    fill_value = df[column].mean()
+                elif fill_strategy == 'median':
+                    fill_value = df[column].median()
+                elif fill_strategy == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = df[column].mode()[0] if len(df[column].mode()) > 0 else 0
+                df[column].fillna(fill_value, inplace=True)
+            else:
+                # For categorical columns, use mode
+                mode_values = df[column].mode()
+                fill_value = mode_values[0] if len(mode_values) > 0 else 'Unknown'
+                df[column].fillna(fill_value, inplace=True)
+    
+    print(f"Cleaned shape: {df.shape}")
+    print(f"Missing values after cleaning: {df.isnull().sum().sum()}")
+    
+    return df
+
+def save_cleaned_data(df, output_path):
+    """
+    Save cleaned DataFrame to CSV.
+    
+    Args:
+        df (pd.DataFrame): Cleaned DataFrame.
+        output_path (str): Path to save the cleaned CSV.
+    """
+    if df is not None:
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to {output_path}")
+    else:
+        print("No data to save.")
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    
+    cleaned_df = clean_csv_data(input_file, fill_strategy='median', drop_threshold=0.3)
+    save_cleaned_data(cleaned_df, output_file)
