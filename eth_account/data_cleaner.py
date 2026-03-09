@@ -872,4 +872,85 @@ def deduplicate_list(input_list):
         if item not in seen:
             seen.add(item)
             result.append(item)
-    return result
+    return resultimport numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using IQR method
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method
+    """
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling
+    """
+    min_val = data[column].min()
+    max_val = data[column].max()
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    return normalized
+
+def standardize_data(data, column):
+    """
+    Standardize data using Z-score normalization
+    """
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    standardized = (data[column] - mean_val) / std_val
+    return standardized
+
+def clean_dataset(df, numeric_columns, outlier_method='zscore', normalize=False):
+    """
+    Main cleaning function for datasets
+    """
+    cleaned_df = df.copy()
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            if outlier_method == 'zscore':
+                cleaned_df = remove_outliers_zscore(cleaned_df, col)
+            elif outlier_method == 'iqr':
+                outliers = detect_outliers_iqr(cleaned_df, col)
+                cleaned_df = cleaned_df.drop(outliers.index)
+            
+            if normalize:
+                cleaned_df[col] = normalize_minmax(cleaned_df, col)
+    
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+def validate_data(df, required_columns, check_missing=True):
+    """
+    Validate dataset structure and completeness
+    """
+    validation_report = {}
+    
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        validation_report['missing_columns'] = missing_columns
+    
+    if check_missing:
+        missing_values = df.isnull().sum()
+        missing_values = missing_values[missing_values > 0]
+        if not missing_values.empty:
+            validation_report['missing_values'] = missing_values.to_dict()
+    
+    validation_report['total_rows'] = len(df)
+    validation_report['total_columns'] = len(df.columns)
+    
+    return validation_report
