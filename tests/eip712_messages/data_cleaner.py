@@ -920,3 +920,11 @@ def clean_dataset(df, remove_outliers=True, normalize=True):
         cleaner.normalize_data(method='standard')
     
     return cleaner.get_cleaned_data(), cleaner.get_cleaning_report()
+def remove_duplicates_preserve_order(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
