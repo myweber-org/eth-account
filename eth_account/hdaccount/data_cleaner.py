@@ -49,3 +49,48 @@ if __name__ == "__main__":
     print(f"Original rows: {len(sample_data)}")
     print(f"Cleaned rows: {stats['total_rows']}")
     print(f"Removed outliers: {len(sample_data) - stats['total_rows']}")
+import pandas as pd
+import numpy as np
+
+def clean_data(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Removed {original_shape[0] - cleaned_df.shape[0]} duplicate rows.")
+
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        if fill_missing == 'mean':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+        elif fill_missing == 'drop':
+            cleaned_df = cleaned_df.dropna()
+        else:
+            raise ValueError("fill_missing must be 'mean', 'median', 'mode', or 'drop'")
+
+    print(f"Data cleaned. Original shape: {original_shape}, New shape: {cleaned_df.shape}")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, 5, np.nan],
+        'B': [10, np.nan, 30, 30, 50, 60],
+        'C': ['x', 'y', 'y', 'z', 'z', 'x']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    cleaned = clean_data(df, fill_missing='mean')
+    print("\nCleaned DataFrame:")
+    print(cleaned)
