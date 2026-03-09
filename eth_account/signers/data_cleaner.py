@@ -1892,3 +1892,11 @@ if __name__ == "__main__":
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
     print(f"Data cleaning complete. Saved to {output_file}")
+def remove_duplicates_preserve_order(seq):
+    seen = set()
+    result = []
+    for item in seq:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
