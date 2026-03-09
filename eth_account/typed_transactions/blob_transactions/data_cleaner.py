@@ -393,3 +393,40 @@ def validate_dataframe(df, required_columns=None):
         return False, "DataFrame is empty"
     
     return True, "DataFrame is valid"
+import pandas as pd
+import numpy as np
+import sys
+
+def clean_data(input_file, output_file):
+    try:
+        df = pd.read_csv(input_file)
+        
+        df = df.dropna()
+        
+        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        for col in numeric_columns:
+            df[col] = df[col].apply(lambda x: max(x, 0))
+        
+        df = df.drop_duplicates()
+        
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Output saved to {output_file}")
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        sys.exit(1)
+    except pd.errors.EmptyDataError:
+        print("Error: Input file is empty.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"An error occurred: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    if len(sys.argv) != 3:
+        print("Usage: python data_cleaner.py <input_file> <output_file>")
+        sys.exit(1)
+    
+    input_file = sys.argv[1]
+    output_file = sys.argv[2]
+    clean_data(input_file, output_file)
