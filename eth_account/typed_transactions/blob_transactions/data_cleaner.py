@@ -430,3 +430,130 @@ if __name__ == "__main__":
     input_file = sys.argv[1]
     output_file = sys.argv[2]
     clean_data(input_file, output_file)
+import numpy as np
+import pandas as pd
+
+def remove_outliers_iqr(dataframe, column):
+    """
+    Remove outliers from specified column using Interquartile Range method.
+    
+    Args:
+        dataframe: pandas DataFrame containing the data
+        column: string name of column to process
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = dataframe[column].quantile(0.25)
+    Q3 = dataframe[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def calculate_basic_stats(dataframe, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: string name of column
+    
+    Returns:
+        Dictionary containing statistics
+    """
+    stats = {
+        'mean': dataframe[column].mean(),
+        'median': dataframe[column].median(),
+        'std': dataframe[column].std(),
+        'min': dataframe[column].min(),
+        'max': dataframe[column].max(),
+        'count': dataframe[column].count()
+    }
+    return stats
+
+def clean_missing_values(dataframe, strategy='mean'):
+    """
+    Handle missing values in numeric columns.
+    
+    Args:
+        dataframe: pandas DataFrame
+        strategy: string, either 'mean', 'median', or 'drop'
+    
+    Returns:
+        DataFrame with missing values handled
+    """
+    numeric_cols = dataframe.select_dtypes(include=[np.number]).columns
+    
+    if strategy == 'drop':
+        return dataframe.dropna(subset=numeric_cols)
+    elif strategy == 'mean':
+        return dataframe.fillna(dataframe[numeric_cols].mean())
+    elif strategy == 'median':
+        return dataframe.fillna(dataframe[numeric_cols].median())
+    else:
+        raise ValueError("Strategy must be 'mean', 'median', or 'drop'")
+
+def normalize_column(dataframe, column):
+    """
+    Normalize a column using min-max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame
+        column: string name of column to normalize
+    
+    Returns:
+        DataFrame with normalized column added as '{column}_normalized'
+    """
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if max_val == min_val:
+        normalized = 0.5
+    else:
+        normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    
+    dataframe[f'{column}_normalized'] = normalized
+    return dataframe
+
+def process_dataframe(dataframe, numeric_columns=None):
+    """
+    Main function to process dataframe with multiple cleaning steps.
+    
+    Args:
+        dataframe: pandas DataFrame to process
+        numeric_columns: list of column names to process (defaults to all numeric)
+    
+    Returns:
+        Tuple of (cleaned DataFrame, statistics dictionary)
+    """
+    if numeric_columns is None:
+        numeric_columns = dataframe.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_df = dataframe.copy()
+    stats_summary = {}
+    
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            original_stats = calculate_basic_stats(cleaned_df, col)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            cleaned_df = normalize_column(cleaned_df, col)
+            final_stats = calculate_basic_stats(cleaned_df, col)
+            
+            stats_summary[col] = {
+                'original': original_stats,
+                'cleaned': final_stats,
+                'outliers_removed': original_stats['count'] - final_stats['count']
+            }
+    
+    cleaned_df = clean_missing_values(cleaned_df, strategy='mean')
+    
+    return cleaned_df, stats_summary
