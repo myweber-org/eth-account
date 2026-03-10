@@ -674,3 +674,51 @@ if __name__ == "__main__":
     
     cleaned_df = load_and_clean_data(input_file)
     save_cleaned_data(cleaned_df, output_file)
+import pandas as pd
+import re
+
+def clean_dataframe(df, text_column='text'):
+    """
+    Clean a DataFrame by removing duplicates and normalizing text.
+    """
+    # Remove duplicate rows
+    df_clean = df.drop_duplicates().reset_index(drop=True)
+    
+    # Normalize text: lowercase, remove extra whitespace
+    if text_column in df_clean.columns:
+        df_clean[text_column] = df_clean[text_column].apply(
+            lambda x: re.sub(r'\s+', ' ', str(x).strip().lower())
+        )
+    
+    return df_clean
+
+def validate_email_column(df, email_column='email'):
+    """
+    Validate email format in a specified column.
+    """
+    if email_column not in df.columns:
+        return df
+    
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    df['email_valid'] = df[email_column].apply(
+        lambda x: bool(re.match(email_pattern, str(x))) if pd.notnull(x) else False
+    )
+    return df
+
+if __name__ == '__main__':
+    # Example usage
+    sample_data = {
+        'id': [1, 2, 3, 4, 5],
+        'text': ['Hello World  ', 'hello world', 'Test Data', '  TEST DATA  ', 'Another'],
+        'email': ['test@example.com', 'invalid-email', 'user@domain.org', None, 'wrong@format']
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    
+    cleaned_df = clean_dataframe(df, text_column='text')
+    validated_df = validate_email_column(cleaned_df, email_column='email')
+    
+    print("\nCleaned and Validated DataFrame:")
+    print(validated_df)
