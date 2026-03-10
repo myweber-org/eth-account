@@ -181,3 +181,121 @@ if __name__ == "__main__":
     print("\nValidation Results:")
     validation = validate_dataset(cleaned, required_columns=['id', 'name'], unique_columns=['id'])
     print(validation)
+import pandas as pd
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from a DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        subset (list, optional): Columns to consider for duplicates
+        keep (str, optional): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+        pd.DataFrame: DataFrame with duplicates removed
+    """
+    if df.empty:
+        return df
+    
+    cleaned_df = df.drop_duplicates(subset=subset, keep=keep)
+    
+    removed_count = len(df) - len(cleaned_df)
+    if removed_count > 0:
+        print(f"Removed {removed_count} duplicate rows")
+    
+    return cleaned_df
+
+def clean_numeric_columns(df, columns):
+    """
+    Clean numeric columns by removing non-numeric characters.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to clean
+    
+    Returns:
+        pd.DataFrame: DataFrame with cleaned numeric columns
+    """
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = pd.to_numeric(
+                cleaned_df[col].astype(str).str.replace(r'[^\d.-]', '', regex=True),
+                errors='coerce'
+            )
+    
+    return cleaned_df
+
+def standardize_text(df, columns):
+    """
+    Standardize text columns by converting to lowercase and stripping whitespace.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        columns (list): List of column names to standardize
+    
+    Returns:
+        pd.DataFrame: DataFrame with standardized text columns
+    """
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            cleaned_df[col] = cleaned_df[col].astype(str).str.lower().str.strip()
+    
+    return cleaned_df
+
+def validate_email_format(df, email_column):
+    """
+    Validate email format and flag invalid entries.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        email_column (str): Name of the email column
+    
+    Returns:
+        pd.DataFrame: DataFrame with email validation column
+    """
+    if email_column not in df.columns:
+        return df
+    
+    cleaned_df = df.copy()
+    email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    
+    cleaned_df['email_valid'] = cleaned_df[email_column].str.match(email_pattern)
+    
+    invalid_count = (~cleaned_df['email_valid']).sum()
+    if invalid_count > 0:
+        print(f"Found {invalid_count} invalid email addresses")
+    
+    return cleaned_df
+
+def clean_dataframe(df, config):
+    """
+    Apply multiple cleaning operations based on configuration.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame
+        config (dict): Configuration dictionary with cleaning options
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    if config.get('remove_duplicates', False):
+        subset = config.get('duplicate_subset', None)
+        cleaned_df = remove_duplicates(cleaned_df, subset=subset)
+    
+    if 'numeric_columns' in config:
+        cleaned_df = clean_numeric_columns(cleaned_df, config['numeric_columns'])
+    
+    if 'text_columns' in config:
+        cleaned_df = standardize_text(cleaned_df, config['text_columns'])
+    
+    if 'email_column' in config:
+        cleaned_df = validate_email_format(cleaned_df, config['email_column'])
+    
+    return cleaned_df
