@@ -225,4 +225,73 @@ if __name__ == "__main__":
     cleaned_df = clean_dataset(sample_df, ['A', 'B', 'C'])
     print("\nCleaned dataset shape:", cleaned_df.shape)
     print("\nSummary statistics for column 'A' after cleaning:")
-    print(calculate_summary_statistics(cleaned_df, 'A'))
+    print(calculate_summary_statistics(cleaned_df, 'A'))import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fillna_method=None, fillna_value=None):
+    """
+    Clean a pandas DataFrame by handling null values and duplicates.
+    
+    Args:
+        df: pandas DataFrame to clean
+        drop_duplicates: Boolean indicating whether to drop duplicate rows
+        fillna_method: Method for filling nulls ('ffill', 'bfill', or None)
+        fillna_value: Value to fill nulls with if fillna_method is None
+    
+    Returns:
+        Cleaned pandas DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    # Handle null values
+    if fillna_method == 'ffill':
+        cleaned_df = cleaned_df.ffill()
+    elif fillna_method == 'bfill':
+        cleaned_df = cleaned_df.bfill()
+    elif fillna_value is not None:
+        cleaned_df = cleaned_df.fillna(fillna_value)
+    
+    # Remove duplicates
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df: pandas DataFrame to validate
+        required_columns: List of column names that must be present
+    
+    Returns:
+        Boolean indicating whether DataFrame is valid
+    """
+    if df.empty:
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False
+    
+    return True
+
+def get_data_summary(df):
+    """
+    Generate a summary of the DataFrame including null counts and data types.
+    
+    Args:
+        df: pandas DataFrame to summarize
+    
+    Returns:
+        Dictionary containing summary statistics
+    """
+    summary = {
+        'shape': df.shape,
+        'columns': list(df.columns),
+        'dtypes': df.dtypes.to_dict(),
+        'null_counts': df.isnull().sum().to_dict(),
+        'unique_counts': df.nunique().to_dict()
+    }
+    return summary
