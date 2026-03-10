@@ -246,4 +246,126 @@ def main():
     display_weather(weather_data)
 
 if __name__ == "__main__":
-    main()
+    main()import requests
+import json
+from datetime import datetime
+
+def fetch_weather_data(api_key, city, units='metric'):
+    """
+    Fetch current weather data for a specified city.
+    
+    Args:
+        api_key (str): OpenWeatherMap API key
+        city (str): City name
+        units (str): Temperature units ('metric' for Celsius, 'imperial' for Fahrenheit)
+    
+    Returns:
+        dict: Weather data or error information
+    """
+    base_url = "http://api.openweathermap.org/data/2.5/weather"
+    
+    params = {
+        'q': city,
+        'appid': api_key,
+        'units': units
+    }
+    
+    try:
+        response = requests.get(base_url, params=params, timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        
+        if data.get('cod') != 200:
+            return {
+                'error': True,
+                'message': data.get('message', 'Unknown error'),
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        processed_data = {
+            'city': data['name'],
+            'country': data['sys']['country'],
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'pressure': data['main']['pressure'],
+            'weather': data['weather'][0]['main'],
+            'description': data['weather'][0]['description'],
+            'wind_speed': data['wind']['speed'],
+            'wind_direction': data['wind'].get('deg', 'N/A'),
+            'visibility': data.get('visibility', 'N/A'),
+            'cloudiness': data['clouds']['all'],
+            'sunrise': datetime.fromtimestamp(data['sys']['sunrise']).isoformat(),
+            'sunset': datetime.fromtimestamp(data['sys']['sunset']).isoformat(),
+            'timestamp': datetime.now().isoformat(),
+            'units': '°C' if units == 'metric' else '°F'
+        }
+        
+        return processed_data
+        
+    except requests.exceptions.RequestException as e:
+        return {
+            'error': True,
+            'message': f"Network error: {str(e)}",
+            'timestamp': datetime.now().isoformat()
+        }
+    except (KeyError, ValueError, json.JSONDecodeError) as e:
+        return {
+            'error': True,
+            'message': f"Data processing error: {str(e)}",
+            'timestamp': datetime.now().isoformat()
+        }
+
+def display_weather_data(weather_data):
+    """
+    Display weather data in a readable format.
+    
+    Args:
+        weather_data (dict): Weather data dictionary
+    """
+    if weather_data.get('error'):
+        print(f"Error: {weather_data['message']}")
+        return
+    
+    print("\n" + "="*50)
+    print(f"Weather Report for {weather_data['city']}, {weather_data['country']}")
+    print("="*50)
+    print(f"Current Temperature: {weather_data['temperature']}{weather_data['units']}")
+    print(f"Feels Like: {weather_data['feels_like']}{weather_data['units']}")
+    print(f"Weather: {weather_data['weather']} - {weather_data['description']}")
+    print(f"Humidity: {weather_data['humidity']}%")
+    print(f"Pressure: {weather_data['pressure']} hPa")
+    print(f"Wind: {weather_data['wind_speed']} m/s at {weather_data['wind_direction']}°")
+    print(f"Visibility: {weather_data['visibility']} meters")
+    print(f"Cloudiness: {weather_data['cloudiness']}%")
+    print(f"Sunrise: {weather_data['sunrise']}")
+    print(f"Sunset: {weather_data['sunset']}")
+    print("="*50)
+
+def save_weather_data(weather_data, filename='weather_data.json'):
+    """
+    Save weather data to a JSON file.
+    
+    Args:
+        weather_data (dict): Weather data dictionary
+        filename (str): Output filename
+    """
+    try:
+        with open(filename, 'w') as f:
+            json.dump(weather_data, f, indent=2)
+        print(f"Weather data saved to {filename}")
+    except IOError as e:
+        print(f"Error saving data: {str(e)}")
+
+if __name__ == "__main__":
+    API_KEY = "your_api_key_here"
+    CITY = "London"
+    
+    print(f"Fetching weather data for {CITY}...")
+    weather_data = fetch_weather_data(API_KEY, CITY)
+    
+    display_weather_data(weather_data)
+    
+    if not weather_data.get('error'):
+        save_weather_data(weather_data)
