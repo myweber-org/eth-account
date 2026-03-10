@@ -92,4 +92,92 @@ if __name__ == "__main__":
         print(f"{key}: {value}")
     
     cleaned_df = clean_numeric_data(df, ['A', 'B'])
-    print("\nCleaned DataFrame shape:", cleaned_df.shape)
+    print("\nCleaned DataFrame shape:", cleaned_df.shape)import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        drop_duplicates (bool): Whether to remove duplicate rows. Default is True.
+        fill_missing (str or dict): Strategy to fill missing values. 
+            Options: 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+            If None, rows with missing values are dropped.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mode().iloc[0])
+        else:
+            raise ValueError("Invalid fill_missing strategy. Use 'mean', 'median', 'mode', or a dictionary.")
+    else:
+        cleaned_df = cleaned_df.dropna()
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, unique_columns=None):
+    """
+    Validate a DataFrame for required columns and unique constraints.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        unique_columns (list): List of column names that should have unique values.
+    
+    Returns:
+        dict: Dictionary with validation results.
+    """
+    validation_results = {
+        'is_valid': True,
+        'missing_columns': [],
+        'duplicate_values': {}
+    }
+    
+    if required_columns:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_results['missing_columns'] = missing
+            validation_results['is_valid'] = False
+    
+    if unique_columns:
+        for col in unique_columns:
+            if col in df.columns:
+                duplicates = df[col].duplicated().sum()
+                if duplicates > 0:
+                    validation_results['duplicate_values'][col] = duplicates
+                    validation_results['is_valid'] = False
+    
+    return validation_results
+
+if __name__ == "__main__":
+    sample_data = {
+        'id': [1, 2, 2, 3, 4],
+        'name': ['Alice', 'Bob', 'Bob', None, 'Eve'],
+        'age': [25, 30, 30, 35, None],
+        'score': [85, 90, 90, 95, 88]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    print("\nCleaned DataFrame (drop duplicates, fill missing with mean):")
+    cleaned = clean_dataset(df, fill_missing='mean')
+    print(cleaned)
+    
+    print("\nValidation Results:")
+    validation = validate_dataset(cleaned, required_columns=['id', 'name'], unique_columns=['id'])
+    print(validation)
