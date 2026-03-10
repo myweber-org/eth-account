@@ -185,4 +185,150 @@ if __name__ == "__main__":
     print("Rows removed:", cleaner.get_removed_count())
     print("Missing values after:", cleaned_data.isnull().sum().sum())
     print("Cleaned data summary:")
-    print(cleaned_data.describe())
+    print(cleaned_data.describe())import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, multiplier=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - multiplier * IQR
+    upper_bound = Q3 + multiplier * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    return filtered_data.copy()
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_indices = np.where(z_scores < threshold)[0]
+    filtered_data = data.iloc[filtered_indices].copy()
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling to range [0, 1].
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        normalized = pd.Series([0.5] * len(data), index=data.index)
+    else:
+        normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    result = data.copy()
+    result[f'{column}_normalized'] = normalized
+    return result
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = data[column].mean()
+    std_val = data[column].std()
+    
+    if std_val == 0:
+        standardized = pd.Series([0] * len(data), index=data.index)
+    else:
+        standardized = (data[column] - mean_val) / std_val
+    
+    result = data.copy()
+    result[f'{column}_standardized'] = standardized
+    return result
+
+def clean_dataset(data, numeric_columns, outlier_method='iqr', normalize_method='minmax'):
+    """
+    Main function to clean dataset by removing outliers and normalizing numeric columns.
+    """
+    cleaned_data = data.copy()
+    
+    for col in numeric_columns:
+        if col not in cleaned_data.columns:
+            print(f"Warning: Column '{col}' not found, skipping")
+            continue
+            
+        if outlier_method == 'iqr':
+            cleaned_data = remove_outliers_iqr(cleaned_data, col)
+        elif outlier_method == 'zscore':
+            cleaned_data = remove_outliers_zscore(cleaned_data, col)
+        else:
+            raise ValueError("outlier_method must be 'iqr' or 'zscore'")
+    
+    for col in numeric_columns:
+        if col not in cleaned_data.columns:
+            continue
+            
+        if normalize_method == 'minmax':
+            cleaned_data = normalize_minmax(cleaned_data, col)
+        elif normalize_method == 'zscore':
+            cleaned_data = normalize_zscore(cleaned_data, col)
+        else:
+            raise ValueError("normalize_method must be 'minmax' or 'zscore'")
+    
+    return cleaned_data
+
+def get_data_summary(data):
+    """
+    Generate summary statistics for the dataset.
+    """
+    summary = {
+        'original_rows': len(data),
+        'columns': list(data.columns),
+        'numeric_columns': list(data.select_dtypes(include=[np.number]).columns),
+        'categorical_columns': list(data.select_dtypes(include=['object', 'category']).columns),
+        'missing_values': data.isnull().sum().to_dict(),
+        'data_types': data.dtypes.to_dict()
+    }
+    
+    for col in data.select_dtypes(include=[np.number]).columns:
+        summary[f'{col}_stats'] = {
+            'mean': data[col].mean(),
+            'std': data[col].std(),
+            'min': data[col].min(),
+            'max': data[col].max(),
+            'median': data[col].median()
+        }
+    
+    return summary
+
+if __name__ == "__main__":
+    sample_data = pd.DataFrame({
+        'feature1': np.random.normal(100, 15, 1000),
+        'feature2': np.random.exponential(50, 1000),
+        'category': np.random.choice(['A', 'B', 'C'], 1000)
+    })
+    
+    print("Original data shape:", sample_data.shape)
+    summary = get_data_summary(sample_data)
+    print(f"Original rows: {summary['original_rows']}")
+    
+    cleaned = clean_dataset(
+        sample_data, 
+        numeric_columns=['feature1', 'feature2'],
+        outlier_method='iqr',
+        normalize_method='minmax'
+    )
+    
+    print("\nCleaned data shape:", cleaned.shape)
+    print("Available columns:", cleaned.columns.tolist())
+    print("\nFirst 5 rows of cleaned data:")
+    print(cleaned.head())
