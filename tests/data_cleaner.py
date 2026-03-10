@@ -3,106 +3,121 @@ import pandas as pd
 import numpy as np
 
 def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a specified column in a DataFrame using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in df.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
     Q1 = df[column].quantile(0.25)
     Q3 = df[column].quantile(0.75)
     IQR = Q3 - Q1
+    
     lower_bound = Q1 - 1.5 * IQR
     upper_bound = Q3 + 1.5 * IQR
+    
     filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
-    return filtered_df
+    
+    return filtered_df.reset_index(drop=True)
 
-def clean_dataset(input_file, output_file):
+def clean_numeric_data(df, columns=None):
+    """
+    Clean numeric data by removing outliers from specified columns.
+    If no columns specified, clean all numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    columns (list): List of column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if columns is None:
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        columns = numeric_cols
+    
+    cleaned_df = df.copy()
+    
+    for col in columns:
+        if col in cleaned_df.columns:
+            original_len = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+            removed_count = original_len - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{col}'")
+    
+    return cleaned_df
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    
+    Returns:
+    bool: True if validation passes
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if df.empty:
+        raise ValueError("DataFrame is empty")
+    
+    if required_columns:
+        missing_cols = [col for col in required_columns if col not in df.columns]
+        if missing_cols:
+            raise ValueError(f"Missing required columns: {missing_cols}")
+    
+    return True
+
+def process_data_file(file_path, output_path=None):
+    """
+    Main function to process a data file.
+    
+    Parameters:
+    file_path (str): Path to input data file
+    output_path (str): Path to save cleaned data
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
     try:
-        df = pd.read_csv(input_file)
-        print(f"Original dataset shape: {df.shape}")
+        df = pd.read_csv(file_path)
         
-        numeric_columns = df.select_dtypes(include=[np.number]).columns
+        validate_dataframe(df)
         
-        for column in numeric_columns:
-            df = remove_outliers_iqr(df, column)
+        cleaned_df = clean_numeric_data(df)
         
-        df.to_csv(output_file, index=False)
-        print(f"Cleaned dataset shape: {df.shape}")
-        print(f"Cleaned data saved to: {output_file}")
+        if output_path:
+            cleaned_df.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
         
-        return df
+        return cleaned_df
         
     except FileNotFoundError:
-        print(f"Error: File '{input_file}' not found.")
-        return None
+        print(f"Error: File not found at {file_path}")
+        raise
     except Exception as e:
-        print(f"Error during cleaning: {str(e)}")
-        return None
+        print(f"Error processing file: {str(e)}")
+        raise
 
 if __name__ == "__main__":
-    input_path = "raw_data.csv"
-    output_path = "cleaned_data.csv"
-    clean_dataset(input_path, output_path)
-import numpy as np
-import pandas as pd
-from scipy import stats
-
-class DataCleaner:
-    def __init__(self, df):
-        self.df = df.copy()
-        self.original_shape = df.shape
-        
-    def remove_outliers_iqr(self, columns=None, threshold=1.5):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        df_clean = self.df.copy()
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                Q1 = self.df[col].quantile(0.25)
-                Q3 = self.df[col].quantile(0.75)
-                IQR = Q3 - Q1
-                lower_bound = Q1 - threshold * IQR
-                upper_bound = Q3 + threshold * IQR
-                mask = (self.df[col] >= lower_bound) & (self.df[col] <= upper_bound)
-                df_clean = df_clean[mask]
-                
-        self.df = df_clean.reset_index(drop=True)
-        return self
-        
-    def normalize_minmax(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                min_val = self.df[col].min()
-                max_val = self.df[col].max()
-                if max_val > min_val:
-                    self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
-                    
-        return self
-        
-    def standardize_zscore(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                mean_val = self.df[col].mean()
-                std_val = self.df[col].std()
-                if std_val > 0:
-                    self.df[col] = (self.df[col] - mean_val) / std_val
-                    
-        return self
-        
-    def fill_missing_median(self, columns=None):
-        if columns is None:
-            columns = self.df.select_dtypes(include=[np.number]).columns
-            
-        for col in columns:
-            if col in self.df.columns and pd.api.types.is_numeric_dtype(self.df[col]):
-                self.df[col] = self.df[col].fillna(self.df[col].median())
-                
-        return self
-        
-    def get_cleaned_data(self):
-        return self.df
-        
-    def get_removed_count(self):
-        return self.original_shape[0] - self.df.shape[0]
+    sample_data = pd.DataFrame({
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100),
+        'category': np.random.choice(['A', 'B', 'C'], 100)
+    })
+    
+    sample_data.loc[95:99, 'value'] = [500, 600, -300, 700, 800]
+    
+    print("Original data shape:", sample_data.shape)
+    cleaned = clean_numeric_data(sample_data, ['value'])
+    print("Cleaned data shape:", cleaned.shape)
