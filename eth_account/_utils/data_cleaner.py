@@ -71,4 +71,57 @@ if __name__ == "__main__":
     print(cleaned)
     
     is_valid = validate_data(cleaned, required_columns=['A', 'B'])
-    print(f"\nData validation passed: {is_valid}")
+    print(f"\nData validation passed: {is_valid}")import re
+import pandas as pd
+from typing import Union, List, Optional
+
+def validate_email(email: str) -> bool:
+    """
+    Validate an email address format.
+    """
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+def remove_duplicates(data: List) -> List:
+    """
+    Remove duplicate items from a list while preserving order.
+    """
+    seen = set()
+    result = []
+    for item in data:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
+
+def normalize_string(text: str, case: str = 'lower') -> str:
+    """
+    Normalize string by stripping whitespace and adjusting case.
+    """
+    text = text.strip()
+    if case == 'lower':
+        return text.lower()
+    elif case == 'upper':
+        return text.upper()
+    else:
+        return text
+
+def clean_numeric(value: Union[str, int, float]) -> Optional[float]:
+    """
+    Attempt to convert a value to a float, removing common non-numeric characters.
+    """
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    cleaned = re.sub(r'[^\d.-]', '', value)
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+def validate_dataframe(df: pd.DataFrame, required_columns: List[str]) -> bool:
+    """
+    Check if a pandas DataFrame contains all required columns.
+    """
+    return all(col in df.columns for col in required_columns)
