@@ -744,3 +744,136 @@ if __name__ == "__main__":
     input_csv = "raw_data.csv"
     output_csv = "cleaned_data.csv"
     clean_data(input_csv, output_csv)
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, missing_strategy='mean', outlier_method='iqr', columns=None):
+    """
+    Clean dataset by handling missing values and outliers.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    missing_strategy (str): Strategy for missing values ('mean', 'median', 'mode', 'drop')
+    outlier_method (str): Method for outlier detection ('iqr', 'zscore')
+    columns (list): Specific columns to clean, None for all numeric columns
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_clean.select_dtypes(include=[np.number]).columns
+    else:
+        numeric_cols = [col for col in columns if col in df_clean.columns]
+    
+    for col in numeric_cols:
+        if missing_strategy == 'mean':
+            df_clean[col].fillna(df_clean[col].mean(), inplace=True)
+        elif missing_strategy == 'median':
+            df_clean[col].fillna(df_clean[col].median(), inplace=True)
+        elif missing_strategy == 'mode':
+            df_clean[col].fillna(df_clean[col].mode()[0], inplace=True)
+        elif missing_strategy == 'drop':
+            df_clean = df_clean.dropna(subset=[col])
+        
+        if outlier_method == 'iqr':
+            Q1 = df_clean[col].quantile(0.25)
+            Q3 = df_clean[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            df_clean[col] = np.where((df_clean[col] < lower_bound) | (df_clean[col] > upper_bound),
+                                    df_clean[col].median(), df_clean[col])
+        elif outlier_method == 'zscore':
+            mean_val = df_clean[col].mean()
+            std_val = df_clean[col].std()
+            z_scores = np.abs((df_clean[col] - mean_val) / std_val)
+            df_clean[col] = np.where(z_scores > 3, df_clean[col].median(), df_clean[col])
+    
+    return df_clean
+
+def remove_duplicates(df, subset=None, keep='first'):
+    """
+    Remove duplicate rows from DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    subset (list): Columns to consider for duplicates
+    keep (str): Which duplicates to keep ('first', 'last', False)
+    
+    Returns:
+    pd.DataFrame: DataFrame without duplicates
+    """
+    return df.drop_duplicates(subset=subset, keep=keep)
+
+def normalize_data(df, method='minmax', columns=None):
+    """
+    Normalize numeric columns in DataFrame.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    method (str): Normalization method ('minmax', 'standard')
+    columns (list): Columns to normalize, None for all numeric columns
+    
+    Returns:
+    pd.DataFrame: Normalized DataFrame
+    """
+    df_norm = df.copy()
+    
+    if columns is None:
+        numeric_cols = df_norm.select_dtypes(include=[np.number]).columns
+    else:
+        numeric_cols = [col for col in columns if col in df_norm.columns]
+    
+    for col in numeric_cols:
+        if method == 'minmax':
+            min_val = df_norm[col].min()
+            max_val = df_norm[col].max()
+            if max_val != min_val:
+                df_norm[col] = (df_norm[col] - min_val) / (max_val - min_val)
+        elif method == 'standard':
+            mean_val = df_norm[col].mean()
+            std_val = df_norm[col].std()
+            if std_val != 0:
+                df_norm[col] = (df_norm[col] - mean_val) / std_val
+    
+    return df_norm
+
+def validate_data(df, rules):
+    """
+    Validate DataFrame against custom rules.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    rules (dict): Dictionary of validation rules {column: [min, max, dtype]}
+    
+    Returns:
+    dict: Validation results with error counts
+    """
+    results = {'total_rows': len(df), 'errors': {}}
+    
+    for col, rule in rules.items():
+        if col not in df.columns:
+            results['errors'][col] = 'Column not found'
+            continue
+            
+        min_val, max_val, expected_dtype = rule
+        
+        dtype_errors = 0
+        if expected_dtype:
+            actual_dtype = str(df[col].dtype)
+            if expected_dtype not in actual_dtype:
+                dtype_errors = len(df[df[col].apply(lambda x: not isinstance(x, eval(expected_dtype)) if expected_dtype in ['int', 'float'] else True)])
+        
+        range_errors = 0
+        if min_val is not None and max_val is not None:
+            range_errors = len(df[(df[col] < min_val) | (df[col] > max_val)])
+        
+        if dtype_errors > 0 or range_errors > 0:
+            results['errors'][col] = {
+                'dtype_errors': dtype_errors,
+                'range_errors': range_errors
+            }
+    
+    return results
