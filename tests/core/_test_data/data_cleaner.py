@@ -3,49 +3,85 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
-def remove_outliers_iqr(data, column):
-    Q1 = data[column].quantile(0.25)
-    Q3 = data[column].quantile(0.75)
-    IQR = Q3 - Q1
-    lower_bound = Q1 - 1.5 * IQR
-    upper_bound = Q3 + 1.5 * IQR
-    return data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
-
-def remove_outliers_zscore(data, column, threshold=3):
-    z_scores = np.abs(stats.zscore(data[column]))
-    return data[z_scores < threshold]
-
-def normalize_minmax(data, column):
-    min_val = data[column].min()
-    max_val = data[column].max()
-    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
-    return data
-
-def standardize_data(data, column):
-    mean_val = data[column].mean()
-    std_val = data[column].std()
-    data[column + '_standardized'] = (data[column] - mean_val) / std_val
-    return data
-
-def clean_dataset(df, numeric_columns, method='iqr', normalize=False, standardize=False):
-    cleaned_df = df.copy()
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_columns = df.columns.tolist()
     
-    for col in numeric_columns:
-        if method == 'iqr':
-            cleaned_df = remove_outliers_iqr(cleaned_df, col)
-        elif method == 'zscore':
-            cleaned_df = remove_outliers_zscore(cleaned_df, col)
+    def remove_outliers_zscore(self, columns=None, threshold=3):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
         
-        if normalize:
-            cleaned_df = normalize_minmax(cleaned_df, col)
+        df_clean = self.df.copy()
+        for col in columns:
+            if col in df_clean.columns:
+                z_scores = np.abs(stats.zscore(df_clean[col].dropna()))
+                mask = z_scores < threshold
+                df_clean = df_clean[mask | df_clean[col].isna()]
         
-        if standardize:
-            cleaned_df = standardize_data(cleaned_df, col)
+        self.df = df_clean.reset_index(drop=True)
+        return self
     
+    def normalize_minmax(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                col_min = self.df[col].min()
+                col_max = self.df[col].max()
+                if col_max > col_min:
+                    self.df[col] = (self.df[col] - col_min) / (col_max - col_min)
+        
+        return self
+    
+    def fill_missing_median(self, columns=None):
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+        
+        for col in columns:
+            if col in self.df.columns:
+                median_val = self.df[col].median()
+                self.df[col] = self.df[col].fillna(median_val)
+        
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_summary(self):
+        summary = {
+            'original_shape': (len(self.df), len(self.original_columns)),
+            'cleaned_shape': self.df.shape,
+            'missing_values': self.df.isnull().sum().sum(),
+            'numeric_columns': self.df.select_dtypes(include=[np.number]).columns.tolist()
+        }
+        return summary
+
+def example_usage():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 100),
+        'feature_b': np.random.exponential(50, 100),
+        'feature_c': np.random.randint(1, 100, 100)
+    }
+    
+    df = pd.DataFrame(data)
+    df.iloc[5, 0] = np.nan
+    df.iloc[10, 1] = 1000
+    
+    cleaner = DataCleaner(df)
+    cleaned_df = (cleaner
+                 .remove_outliers_zscore()
+                 .fill_missing_median()
+                 .normalize_minmax()
+                 .get_cleaned_data())
+    
+    print("Data cleaning completed")
+    print(f"Original shape: {df.shape}")
+    print(f"Cleaned shape: {cleaned_df.shape}")
     return cleaned_df
 
-def get_summary_statistics(df):
-    summary = df.describe()
-    summary.loc['skewness'] = df.skew()
-    summary.loc['kurtosis'] = df.kurtosis()
-    return summary
+if __name__ == "__main__":
+    result = example_usage()
+    print(result.head())
