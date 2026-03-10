@@ -147,4 +147,86 @@ def clean_dataset(data, numeric_columns=None, outlier_factor=1.5, normalize_meth
     missing_info = detect_missing_patterns(cleaned_data)
     cleaning_report.update(missing_info)
     
-    return cleaned_data, cleaning_report
+    return cleaned_data, cleaning_reportimport pandas as pd
+import numpy as np
+from typing import Optional, Dict, List
+
+class DataCleaner:
+    def __init__(self, df: pd.DataFrame):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def handle_missing_values(self, strategy: str = 'mean', columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.columns
+            
+        for col in columns:
+            if col in self.df.columns:
+                if strategy == 'mean' and self.df[col].dtype in ['int64', 'float64']:
+                    self.df[col].fillna(self.df[col].mean(), inplace=True)
+                elif strategy == 'median' and self.df[col].dtype in ['int64', 'float64']:
+                    self.df[col].fillna(self.df[col].median(), inplace=True)
+                elif strategy == 'mode':
+                    self.df[col].fillna(self.df[col].mode()[0] if not self.df[col].mode().empty else 0, inplace=True)
+                elif strategy == 'drop':
+                    self.df.dropna(subset=[col], inplace=True)
+                else:
+                    self.df[col].fillna(0, inplace=True)
+        return self
+    
+    def convert_types(self, type_map: Dict[str, str]) -> 'DataCleaner':
+        for col, dtype in type_map.items():
+            if col in self.df.columns:
+                try:
+                    if dtype == 'datetime':
+                        self.df[col] = pd.to_datetime(self.df[col], errors='coerce')
+                    elif dtype == 'category':
+                        self.df[col] = self.df[col].astype('category')
+                    else:
+                        self.df[col] = self.df[col].astype(dtype)
+                except (ValueError, TypeError):
+                    print(f"Warning: Could not convert column {col} to {dtype}")
+        return self
+    
+    def remove_duplicates(self, subset: Optional[List[str]] = None) -> 'DataCleaner':
+        self.df.drop_duplicates(subset=subset, inplace=True, keep='first')
+        return self
+    
+    def normalize_numeric(self, columns: Optional[List[str]] = None) -> 'DataCleaner':
+        if columns is None:
+            columns = self.df.select_dtypes(include=[np.number]).columns
+            
+        for col in columns:
+            if col in self.df.columns and self.df[col].dtype in ['int64', 'float64']:
+                if self.df[col].std() != 0:
+                    self.df[col] = (self.df[col] - self.df[col].mean()) / self.df[col].std()
+        return self
+    
+    def get_cleaned_data(self) -> pd.DataFrame:
+        return self.df
+    
+    def get_summary(self) -> Dict:
+        return {
+            'original_shape': self.original_shape,
+            'cleaned_shape': self.df.shape,
+            'missing_values': self.df.isnull().sum().to_dict(),
+            'data_types': self.df.dtypes.astype(str).to_dict()
+        }
+
+def clean_csv_file(input_path: str, output_path: str, **kwargs) -> Dict:
+    df = pd.read_csv(input_path)
+    cleaner = DataCleaner(df)
+    
+    if 'missing_strategy' in kwargs:
+        cleaner.handle_missing_values(strategy=kwargs['missing_strategy'])
+    
+    if 'type_map' in kwargs:
+        cleaner.convert_types(kwargs['type_map'])
+    
+    if 'remove_dups' in kwargs and kwargs['remove_dups']:
+        cleaner.remove_duplicates()
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    cleaned_df.to_csv(output_path, index=False)
+    
+    return cleaner.get_summary()
