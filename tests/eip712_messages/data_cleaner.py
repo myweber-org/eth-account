@@ -92,4 +92,82 @@ def clean_dataset(file_path):
 if __name__ == "__main__":
     cleaned_data = clean_dataset('sample_data.csv')
     cleaned_data.to_csv('cleaned_data.csv', index=False)
-    print(f"Data cleaning complete. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")
+    print(f"Data cleaning complete. Original shape: {pd.read_csv('sample_data.csv').shape}, Cleaned shape: {cleaned_data.shape}")import pandas as pd
+import numpy as np
+
+def normalize_data(df, columns=None):
+    """
+    Normalize specified columns to range [0,1]
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    normalized_df = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            col_min = df[col].min()
+            col_max = df[col].max()
+            if col_max != col_min:
+                normalized_df[col] = (df[col] - col_min) / (col_max - col_min)
+            else:
+                normalized_df[col] = 0
+    return normalized_df
+
+def remove_outliers_iqr(df, columns=None, threshold=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    filtered_df = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            
+            mask = (df[col] >= lower_bound) & (df[col] <= upper_bound)
+            filtered_df = filtered_df[mask]
+    
+    return filtered_df.reset_index(drop=True)
+
+def clean_missing_values(df, strategy='mean', columns=None):
+    """
+    Handle missing values with specified strategy
+    """
+    if columns is None:
+        columns = df.select_dtypes(include=[np.number]).columns
+    
+    cleaned_df = df.copy()
+    for col in columns:
+        if col in df.columns and df[col].dtype in [np.float64, np.int64]:
+            if df[col].isnull().any():
+                if strategy == 'mean':
+                    fill_value = df[col].mean()
+                elif strategy == 'median':
+                    fill_value = df[col].median()
+                elif strategy == 'mode':
+                    fill_value = df[col].mode()[0]
+                elif strategy == 'zero':
+                    fill_value = 0
+                else:
+                    fill_value = df[col].mean()
+                
+                cleaned_df[col] = df[col].fillna(fill_value)
+    
+    return cleaned_df
+
+def process_dataframe(df, normalize_cols=None, outlier_cols=None, missing_strategy='mean'):
+    """
+    Complete data cleaning pipeline
+    """
+    df_processed = df.copy()
+    
+    df_processed = clean_missing_values(df_processed, strategy=missing_strategy)
+    df_processed = remove_outliers_iqr(df_processed, columns=outlier_cols)
+    df_processed = normalize_data(df_processed, columns=normalize_cols)
+    
+    return df_processed
