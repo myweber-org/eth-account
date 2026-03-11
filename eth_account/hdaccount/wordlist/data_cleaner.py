@@ -578,3 +578,158 @@ def clean_dataset(df, method='iqr', normalize=True):
     cleaner.fill_missing_mean()
     
     return cleaner.get_cleaned_data(), cleaner.get_summary()
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def detect_outliers_iqr(data, column, threshold=1.5):
+    """
+    Detect outliers using Interquartile Range method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to analyze
+        threshold: IQR multiplier (default 1.5)
+    
+    Returns:
+        Boolean mask of outliers
+    """
+    q1 = data[column].quantile(0.25)
+    q3 = data[column].quantile(0.75)
+    iqr = q3 - q1
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    return (data[column] < lower_bound) | (data[column] > upper_bound)
+
+def remove_outliers_zscore(data, column, threshold=3):
+    """
+    Remove outliers using Z-score method.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to process
+        threshold: Z-score threshold (default 3)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    z_scores = np.abs(stats.zscore(data[column].dropna()))
+    filtered_data = data[(z_scores < threshold) | (data[column].isna())]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Normalized Series
+    """
+    col_min = data[column].min()
+    col_max = data[column].max()
+    
+    if col_max == col_min:
+        return pd.Series([0.5] * len(data), index=data.index)
+    
+    return (data[column] - col_min) / (col_max - col_min)
+
+def normalize_zscore(data, column):
+    """
+    Normalize data using Z-score standardization.
+    
+    Args:
+        data: pandas DataFrame
+        column: column name to normalize
+    
+    Returns:
+        Standardized Series
+    """
+    col_mean = data[column].mean()
+    col_std = data[column].std()
+    
+    if col_std == 0:
+        return pd.Series([0] * len(data), index=data.index)
+    
+    return (data[column] - col_mean) / col_std
+
+def clean_missing_values(data, strategy='mean', columns=None):
+    """
+    Handle missing values in DataFrame.
+    
+    Args:
+        data: pandas DataFrame
+        strategy: imputation strategy ('mean', 'median', 'mode', 'drop')
+        columns: list of columns to process (None for all numeric columns)
+    
+    Returns:
+        DataFrame with handled missing values
+    """
+    if columns is None:
+        columns = data.select_dtypes(include=[np.number]).columns
+    
+    data_clean = data.copy()
+    
+    if strategy == 'drop':
+        return data_clean.dropna(subset=columns)
+    
+    for col in columns:
+        if strategy == 'mean':
+            fill_value = data_clean[col].mean()
+        elif strategy == 'median':
+            fill_value = data_clean[col].median()
+        elif strategy == 'mode':
+            fill_value = data_clean[col].mode()[0] if not data_clean[col].mode().empty else 0
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
+        
+        data_clean[col] = data_clean[col].fillna(fill_value)
+    
+    return data_clean
+
+def process_data_pipeline(data, config):
+    """
+    Execute data cleaning pipeline based on configuration.
+    
+    Args:
+        data: pandas DataFrame
+        config: dictionary with processing configuration
+    
+    Returns:
+        Processed DataFrame
+    """
+    processed_data = data.copy()
+    
+    # Handle missing values
+    if 'missing_values' in config:
+        missing_config = config['missing_values']
+        processed_data = clean_missing_values(
+            processed_data,
+            strategy=missing_config.get('strategy', 'mean'),
+            columns=missing_config.get('columns')
+        )
+    
+    # Remove outliers
+    if 'outlier_removal' in config:
+        outlier_config = config['outlier_removal']
+        for column in outlier_config.get('columns', []):
+            if outlier_config.get('method') == 'zscore':
+                processed_data = remove_outliers_zscore(
+                    processed_data,
+                    column,
+                    threshold=outlier_config.get('threshold', 3)
+                )
+    
+    # Normalize data
+    if 'normalization' in config:
+        norm_config = config['normalization']
+        for column in norm_config.get('columns', []):
+            if norm_config.get('method') == 'minmax':
+                processed_data[column] = normalize_minmax(processed_data, column)
+            elif norm_config.get('method') == 'zscore':
+                processed_data[column] = normalize_zscore(processed_data, column)
+    
+    return processed_data
