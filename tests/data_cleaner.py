@@ -408,3 +408,93 @@ if __name__ == "__main__":
     print("\nCleaned DataFrame shape:", cleaned_df.shape)
     print("\nCleaned statistics for column 'A':")
     print(calculate_statistics(cleaned_df, 'A'))
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.original_shape = df.shape
+        
+    def remove_outliers_iqr(self, column, multiplier=1.5):
+        q1 = self.df[column].quantile(0.25)
+        q3 = self.df[column].quantile(0.75)
+        iqr = q3 - q1
+        lower_bound = q1 - multiplier * iqr
+        upper_bound = q3 + multiplier * iqr
+        self.df = self.df[(self.df[column] >= lower_bound) & (self.df[column] <= upper_bound)]
+        return self
+    
+    def remove_outliers_zscore(self, column, threshold=3):
+        z_scores = np.abs(stats.zscore(self.df[column]))
+        self.df = self.df[z_scores < threshold]
+        return self
+    
+    def normalize_minmax(self, column):
+        min_val = self.df[column].min()
+        max_val = self.df[column].max()
+        self.df[column] = (self.df[column] - min_val) / (max_val - min_val)
+        return self
+    
+    def normalize_zscore(self, column):
+        mean = self.df[column].mean()
+        std = self.df[column].std()
+        self.df[column] = (self.df[column] - mean) / std
+        return self
+    
+    def fill_missing_mean(self, column):
+        self.df[column].fillna(self.df[column].mean(), inplace=True)
+        return self
+    
+    def fill_missing_median(self, column):
+        self.df[column].fillna(self.df[column].median(), inplace=True)
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df
+    
+    def get_removed_count(self):
+        return self.original_shape[0] - self.df.shape[0]
+    
+    def get_summary(self):
+        summary = {
+            'original_rows': self.original_shape[0],
+            'cleaned_rows': self.df.shape[0],
+            'rows_removed': self.get_removed_count(),
+            'columns': list(self.df.columns)
+        }
+        return summary
+
+def create_sample_data():
+    np.random.seed(42)
+    data = {
+        'feature_a': np.random.normal(100, 15, 1000),
+        'feature_b': np.random.exponential(50, 1000),
+        'feature_c': np.random.uniform(0, 1, 1000)
+    }
+    df = pd.DataFrame(data)
+    df.iloc[10:20, 0] = np.nan
+    df.iloc[50:60, 1] = np.nan
+    return df
+
+if __name__ == "__main__":
+    sample_df = create_sample_data()
+    cleaner = DataCleaner(sample_df)
+    
+    cleaner.remove_outliers_iqr('feature_a') \
+           .remove_outliers_zscore('feature_b') \
+           .fill_missing_mean('feature_a') \
+           .fill_missing_median('feature_b') \
+           .normalize_minmax('feature_c')
+    
+    cleaned_df = cleaner.get_cleaned_data()
+    summary = cleaner.get_summary()
+    
+    print(f"Data cleaning summary:")
+    print(f"Original rows: {summary['original_rows']}")
+    print(f"Cleaned rows: {summary['cleaned_rows']}")
+    print(f"Rows removed: {summary['rows_removed']}")
+    print(f"Available columns: {summary['columns']}")
+    print(f"\nCleaned data shape: {cleaned_df.shape}")
+    print(f"Cleaned data head:\n{cleaned_df.head()}")
