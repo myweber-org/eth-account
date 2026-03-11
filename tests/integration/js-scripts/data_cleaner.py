@@ -138,3 +138,36 @@ def validate_dataframe(data, required_columns=None):
             validation_result['messages'].append(f'Missing required columns: {missing}')
     
     return validation_result
+import pandas as pd
+
+def clean_dataset(df, subset=None, fill_method='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and handling missing values.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame to clean.
+    subset (list, optional): Column labels to consider for identifying duplicates.
+                             If None, all columns are used.
+    fill_method (str or dict, optional): Method to fill missing values.
+                                         Can be 'mean', 'median', 'mode', or a dictionary
+                                         specifying fill values per column.
+
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    # Remove duplicate rows
+    df_cleaned = df.drop_duplicates(subset=subset, keep='first')
+
+    # Handle missing values
+    if fill_method == 'mean':
+        df_cleaned = df_cleaned.fillna(df_cleaned.mean(numeric_only=True))
+    elif fill_method == 'median':
+        df_cleaned = df_cleaned.fillna(df_cleaned.median(numeric_only=True))
+    elif fill_method == 'mode':
+        df_cleaned = df_cleaned.fillna(df_cleaned.mode().iloc[0])
+    elif isinstance(fill_method, dict):
+        df_cleaned = df_cleaned.fillna(fill_method)
+    else:
+        raise ValueError("fill_method must be 'mean', 'median', 'mode', or a dictionary.")
+
+    return df_cleaned
