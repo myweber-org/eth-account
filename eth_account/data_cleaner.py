@@ -60,4 +60,72 @@ def validate_data(df, required_columns=None, min_rows=1):
         if missing_cols:
             return False, f"Missing required columns: {missing_cols}"
     
-    return True, "Data validation passed"
+    return True, "Data validation passed"import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean.
+    drop_duplicates (bool): If True, remove duplicate rows.
+    fill_missing (str or dict): Method to fill missing values. 
+                                Can be 'mean', 'median', 'mode', or a dictionary of column:value pairs.
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+                else:
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, unique_columns=None):
+    """
+    Validate a DataFrame for required columns and unique constraints.
+    
+    Parameters:
+    df (pd.DataFrame): DataFrame to validate.
+    required_columns (list): List of column names that must be present.
+    unique_columns (list): List of column names that should have unique values.
+    
+    Returns:
+    dict: Dictionary with validation results.
+    """
+    validation_result = {
+        'is_valid': True,
+        'missing_columns': [],
+        'duplicate_values': {}
+    }
+    
+    if required_columns is not None:
+        missing = [col for col in required_columns if col not in df.columns]
+        if missing:
+            validation_result['missing_columns'] = missing
+            validation_result['is_valid'] = False
+    
+    if unique_columns is not None:
+        for col in unique_columns:
+            if col in df.columns:
+                duplicates = df[df.duplicated(subset=[col], keep=False)]
+                if not duplicates.empty:
+                    validation_result['duplicate_values'][col] = duplicates[col].unique().tolist()
+                    validation_result['is_valid'] = False
+    
+    return validation_result
