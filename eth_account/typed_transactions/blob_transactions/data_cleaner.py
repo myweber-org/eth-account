@@ -320,3 +320,38 @@ def validate_dataframe(df, required_columns=None):
             return False, f"Missing required columns: {missing_columns}"
     
     return True, "DataFrame is valid"
+import pandas as pd
+
+def clean_dataset(df, drop_duplicates=True, fill_missing=None):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+
+    Parameters:
+    df (pd.DataFrame): The input DataFrame to clean.
+    drop_duplicates (bool): If True, remove duplicate rows.
+    fill_missing (str or dict): Method to fill missing values.
+        Options: 'mean', 'median', 'mode', or a dict of column:value pairs.
+
+    Returns:
+    pd.DataFrame: The cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+
+    if fill_missing is not None:
+        if isinstance(fill_missing, dict):
+            cleaned_df = cleaned_df.fillna(fill_missing)
+        elif fill_missing == 'mean':
+            cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+        elif fill_missing == 'median':
+            cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+        elif fill_missing == 'mode':
+            for col in cleaned_df.columns:
+                if cleaned_df[col].dtype == 'object':
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else None)
+                else:
+                    cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+
+    return cleaned_df
