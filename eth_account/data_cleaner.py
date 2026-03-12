@@ -352,3 +352,82 @@ if __name__ == "__main__":
         print(f"Error: Input file '{input_csv}' not found")
     except Exception as e:
         print(f"Error during processing: {str(e)}")
+import numpy as np
+
+def remove_outliers_iqr(data, column):
+    """
+    Remove outliers from a specified column using the IQR method.
+    
+    Parameters:
+    data (list or np.array): The dataset
+    column (int): Index of the column to clean
+    
+    Returns:
+    np.array: Data with outliers removed
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+    
+    col_data = data[:, column].astype(float)
+    
+    Q1 = np.percentile(col_data, 25)
+    Q3 = np.percentile(col_data, 75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    mask = (col_data >= lower_bound) & (col_data <= upper_bound)
+    
+    return data[mask]
+
+def calculate_statistics(data, column):
+    """
+    Calculate basic statistics for a column.
+    
+    Parameters:
+    data (np.array): The dataset
+    column (int): Index of the column
+    
+    Returns:
+    dict: Dictionary containing statistics
+    """
+    if not isinstance(data, np.ndarray):
+        data = np.array(data)
+    
+    col_data = data[:, column].astype(float)
+    
+    stats = {
+        'mean': np.mean(col_data),
+        'median': np.median(col_data),
+        'std': np.std(col_data),
+        'min': np.min(col_data),
+        'max': np.max(col_data),
+        'count': len(col_data)
+    }
+    
+    return stats
+
+if __name__ == "__main__":
+    sample_data = np.array([
+        [1, 10.5, 'A'],
+        [2, 12.3, 'B'],
+        [3, 9.8, 'A'],
+        [4, 100.2, 'C'],
+        [5, 11.1, 'B'],
+        [6, 9.5, 'A'],
+        [7, 150.7, 'C'],
+        [8, 10.9, 'B']
+    ])
+    
+    print("Original data:")
+    print(sample_data)
+    
+    cleaned_data = remove_outliers_iqr(sample_data, 1)
+    print("\nCleaned data (outliers removed from column 1):")
+    print(cleaned_data)
+    
+    stats = calculate_statistics(cleaned_data, 1)
+    print("\nStatistics for cleaned column 1:")
+    for key, value in stats.items():
+        print(f"{key}: {value:.2f}")
