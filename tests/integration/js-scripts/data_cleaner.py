@@ -102,3 +102,70 @@ def validate_data(data, required_columns=None, allow_nan=False):
             raise ValueError(f"Data contains {nan_count} NaN values")
     
     return True
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+class DataCleaner:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.numeric_columns = df.select_dtypes(include=[np.number]).columns
+        
+    def remove_outliers_zscore(self, threshold=3):
+        for col in self.numeric_columns:
+            z_scores = np.abs(stats.zscore(self.df[col].dropna()))
+            self.df = self.df[(z_scores < threshold) | (self.df[col].isna())]
+        return self
+    
+    def normalize_minmax(self):
+        for col in self.numeric_columns:
+            min_val = self.df[col].min()
+            max_val = self.df[col].max()
+            if max_val > min_val:
+                self.df[col] = (self.df[col] - min_val) / (max_val - min_val)
+        return self
+    
+    def fill_missing_median(self):
+        for col in self.numeric_columns:
+            self.df[col] = self.df[col].fillna(self.df[col].median())
+        return self
+    
+    def get_cleaned_data(self):
+        return self.df.copy()
+    
+    @staticmethod
+    def create_sample_data():
+        np.random.seed(42)
+        dates = pd.date_range('2023-01-01', periods=100, freq='D')
+        data = {
+            'date': dates,
+            'value_a': np.random.normal(100, 15, 100),
+            'value_b': np.random.exponential(50, 100),
+            'category': np.random.choice(['A', 'B', 'C'], 100)
+        }
+        df = pd.DataFrame(data)
+        df.loc[np.random.choice(100, 5), 'value_a'] = np.nan
+        df.loc[np.random.choice(100, 3), 'value_b'] = np.nan
+        df.loc[10:15, 'value_a'] = df['value_a'].max() * 10
+        return df
+
+def process_data_pipeline():
+    raw_data = DataCleaner.create_sample_data()
+    print(f"Original data shape: {raw_data.shape}")
+    
+    cleaner = DataCleaner(raw_data)
+    cleaned_data = (cleaner
+                   .remove_outliers_zscore()
+                   .fill_missing_median()
+                   .normalize_minmax()
+                   .get_cleaned_data())
+    
+    print(f"Cleaned data shape: {cleaned_data.shape}")
+    print(f"Missing values after cleaning: {cleaned_data.isnull().sum().sum()}")
+    
+    return cleaned_data
+
+if __name__ == "__main__":
+    result = process_data_pipeline()
+    print("\nFirst 5 rows of cleaned data:")
+    print(result.head())
