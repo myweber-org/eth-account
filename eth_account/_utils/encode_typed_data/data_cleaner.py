@@ -678,3 +678,33 @@ def get_data_summary(df):
         summary['numeric_stats'] = df[numeric_cols].describe().to_dict()
     
     return summary
+import pandas as pd
+
+def clean_dataset(df):
+    """
+    Clean a pandas DataFrame by removing duplicate rows and filling missing values
+    with the mean of each numeric column.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if not isinstance(df, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    # Create a copy to avoid modifying the original
+    cleaned_df = df.copy()
+    
+    # Remove duplicate rows
+    cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Fill missing values for numeric columns only
+    numeric_cols = cleaned_df.select_dtypes(include=['number']).columns
+    for col in numeric_cols:
+        if cleaned_df[col].isnull().any():
+            col_mean = cleaned_df[col].mean()
+            cleaned_df[col] = cleaned_df[col].fillna(col_mean)
+    
+    return cleaned_df
