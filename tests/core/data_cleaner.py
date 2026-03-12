@@ -757,3 +757,141 @@ def calculate_statistics(df):
             'median': df[col].median()
         }
     return stats
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(data, column, factor=1.5):
+    """
+    Remove outliers using IQR method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - factor * IQR
+    upper_bound = Q3 + factor * IQR
+    
+    filtered_data = data[(data[column] >= lower_bound) & (data[column] <= upper_bound)]
+    removed_count = len(data) - len(filtered_data)
+    
+    return filtered_data, removed_count
+
+def z_score_normalize(data, column):
+    """
+    Normalize data using z-score method
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean = data[column].mean()
+    std = data[column].std()
+    
+    if std == 0:
+        return data[column]
+    
+    normalized = (data[column] - mean) / std
+    return normalized
+
+def min_max_normalize(data, column, feature_range=(0, 1)):
+    """
+    Normalize data using min-max scaling
+    """
+    if column not in data.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = data[column].min()
+    max_val = data[column].max()
+    
+    if max_val == min_val:
+        return data[column]
+    
+    normalized = (data[column] - min_val) / (max_val - min_val)
+    
+    if feature_range != (0, 1):
+        new_min, new_max = feature_range
+        normalized = normalized * (new_max - new_min) + new_min
+    
+    return normalized
+
+def detect_missing_patterns(data, threshold=0.3):
+    """
+    Detect columns with high percentage of missing values
+    """
+    missing_percentage = data.isnull().sum() / len(data) * 100
+    high_missing_cols = missing_percentage[missing_percentage > threshold].index.tolist()
+    
+    return {
+        'missing_percentage': missing_percentage,
+        'high_missing_columns': high_missing_cols,
+        'total_missing': data.isnull().sum().sum()
+    }
+
+def clean_dataset(data, numeric_columns=None, outlier_factor=1.5, normalize_method='zscore'):
+    """
+    Main function to clean dataset with multiple steps
+    """
+    if numeric_columns is None:
+        numeric_columns = data.select_dtypes(include=[np.number]).columns.tolist()
+    
+    cleaned_data = data.copy()
+    stats_report = {}
+    
+    for col in numeric_columns:
+        if col not in cleaned_data.columns:
+            continue
+            
+        original_count = len(cleaned_data)
+        
+        cleaned_data, removed = remove_outliers_iqr(cleaned_data, col, outlier_factor)
+        stats_report[col] = {
+            'outliers_removed': removed,
+            'percentage_removed': (removed / original_count) * 100
+        }
+        
+        if normalize_method == 'zscore':
+            cleaned_data[f'{col}_normalized'] = z_score_normalize(cleaned_data, col)
+        elif normalize_method == 'minmax':
+            cleaned_data[f'{col}_normalized'] = min_max_normalize(cleaned_data, col)
+    
+    missing_info = detect_missing_patterns(cleaned_data)
+    stats_report['missing_info'] = missing_info
+    
+    return cleaned_data, stats_report
+
+def validate_data_types(data, expected_types):
+    """
+    Validate that columns have expected data types
+    """
+    validation_results = {}
+    
+    for col, expected_type in expected_types.items():
+        if col not in data.columns:
+            validation_results[col] = {'status': 'missing', 'actual': None}
+            continue
+            
+        actual_type = str(data[col].dtype)
+        
+        type_mapping = {
+            'int': ['int64', 'int32', 'int16', 'int8'],
+            'float': ['float64', 'float32', 'float16'],
+            'numeric': ['int64', 'int32', 'int16', 'int8', 'float64', 'float32', 'float16'],
+            'object': ['object'],
+            'datetime': ['datetime64[ns]']
+        }
+        
+        if expected_type in type_mapping:
+            status = actual_type in type_mapping[expected_type]
+        else:
+            status = actual_type == expected_type
+        
+        validation_results[col] = {
+            'status': 'valid' if status else 'invalid',
+            'expected': expected_type,
+            'actual': actual_type
+        }
+    
+    return validation_results
