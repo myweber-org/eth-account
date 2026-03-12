@@ -49,4 +49,45 @@ if __name__ == "__main__":
     print("Original dataset shape:", sample_data.shape)
     print("Cleaned dataset shape:", cleaned_data.shape)
     print("\nSummary statistics for cleaned data:")
-    print(get_summary_statistics(cleaned_data))
+    print(get_summary_statistics(cleaned_data))import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Cleans a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    original_shape = df.shape
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+        print(f"Removed {original_shape[0] - cleaned_df.shape[0]} duplicate rows.")
+
+    if fill_missing is not None:
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        if fill_missing == 'mean':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].mean())
+        elif fill_missing == 'median':
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(cleaned_df[numeric_cols].median())
+        elif fill_missing == 'mode':
+            for col in numeric_cols:
+                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mode()[0] if not cleaned_df[col].mode().empty else 0)
+        elif isinstance(fill_missing, (int, float)):
+            cleaned_df[numeric_cols] = cleaned_df[numeric_cols].fillna(fill_missing)
+        print(f"Filled missing values in numeric columns using method: {fill_missing}")
+
+    print(f"Original shape: {original_shape}, Cleaned shape: {cleaned_df.shape}")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, np.nan, 5],
+        'B': [5, np.nan, 5, 7, 8],
+        'C': ['x', 'y', 'x', 'y', 'z']
+    }
+    df = pd.DataFrame(sample_data)
+    print("Original DataFrame:")
+    print(df)
+    cleaned = clean_dataset(df, fill_missing=0)
+    print("\nCleaned DataFrame:")
+    print(cleaned)
