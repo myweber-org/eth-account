@@ -1114,3 +1114,106 @@ if __name__ == "__main__":
         print("Feature ranges after cleaning:")
         print(f"feature_a: [{cleaned_df['feature_a'].min():.3f}, {cleaned_df['feature_a'].max():.3f}]")
         print(f"feature_b: [{cleaned_df['feature_b'].min():.3f}, {cleaned_df['feature_b'].max():.3f}]")
+import pandas as pd
+
+def clean_dataset(df, columns_to_check=None, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        columns_to_check (list, optional): Specific columns to check for duplicates.
+            If None, checks all columns. Defaults to None.
+        fill_missing (str or value): Method to fill missing values.
+            Options: 'mean', 'median', 'mode', or a specific value. Defaults to 'mean'.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    original_shape = df.shape
+    
+    # Remove duplicates
+    df_cleaned = df.drop_duplicates(subset=columns_to_check, keep='first')
+    duplicates_removed = original_shape[0] - df_cleaned.shape[0]
+    
+    # Handle missing values
+    missing_before = df_cleaned.isnull().sum().sum()
+    
+    if fill_missing == 'mean':
+        df_cleaned = df_cleaned.fillna(df_cleaned.mean(numeric_only=True))
+    elif fill_missing == 'median':
+        df_cleaned = df_cleaned.fillna(df_cleaned.median(numeric_only=True))
+    elif fill_missing == 'mode':
+        df_cleaned = df_cleaned.fillna(df_cleaned.mode().iloc[0])
+    else:
+        df_cleaned = df_cleaned.fillna(fill_missing)
+    
+    missing_after = df_cleaned.isnull().sum().sum()
+    
+    # Print cleaning summary
+    print(f"Original dataset shape: {original_shape}")
+    print(f"Duplicates removed: {duplicates_removed}")
+    print(f"Missing values before cleaning: {missing_before}")
+    print(f"Missing values after cleaning: {missing_after}")
+    print(f"Cleaned dataset shape: {df_cleaned.shape}")
+    
+    return df_cleaned
+
+def validate_dataframe(df, required_columns=None, min_rows=1):
+    """
+    Validate that a DataFrame meets basic requirements.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list, optional): List of columns that must be present.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        bool: True if validation passes, False otherwise.
+    """
+    if df.empty:
+        print("Validation failed: DataFrame is empty")
+        return False
+    
+    if len(df) < min_rows:
+        print(f"Validation failed: DataFrame has fewer than {min_rows} rows")
+        return False
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            print(f"Validation failed: Missing required columns: {missing_columns}")
+            return False
+    
+    print("DataFrame validation passed")
+    return True
+
+# Example usage
+if __name__ == "__main__":
+    # Create sample data with duplicates and missing values
+    data = {
+        'id': [1, 2, 3, 2, 5, 6],
+        'name': ['Alice', 'Bob', 'Charlie', 'Bob', 'Eve', None],
+        'age': [25, 30, None, 30, 35, 40],
+        'score': [85.5, 92.0, 78.5, 92.0, None, 88.0]
+    }
+    
+    df = pd.DataFrame(data)
+    print("Original DataFrame:")
+    print(df)
+    print("\n" + "="*50 + "\n")
+    
+    # Clean the dataset
+    cleaned_df = clean_dataset(df, columns_to_check=['id', 'name'], fill_missing='mean')
+    
+    print("\n" + "="*50 + "\n")
+    print("Cleaned DataFrame:")
+    print(cleaned_df)
+    
+    # Validate the cleaned dataset
+    print("\n" + "="*50 + "\n")
+    validation_result = validate_dataframe(
+        cleaned_df, 
+        required_columns=['id', 'name', 'age', 'score'],
+        min_rows=3
+    )
