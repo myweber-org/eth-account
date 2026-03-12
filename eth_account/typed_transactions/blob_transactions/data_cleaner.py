@@ -269,3 +269,54 @@ def clean_dataset(data, columns_to_clean):
             }
     
     return cleaned_data, removal_stats
+import pandas as pd
+
+def clean_dataset(df, text_columns=None, drop_na=True):
+    """
+    Clean a pandas DataFrame by removing null values and standardizing text columns.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean
+        text_columns (list, optional): List of column names to standardize text
+        drop_na (bool): Whether to drop rows with null values
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame
+    """
+    df_clean = df.copy()
+    
+    if drop_na:
+        df_clean = df_clean.dropna()
+    
+    if text_columns:
+        for col in text_columns:
+            if col in df_clean.columns:
+                df_clean[col] = df_clean[col].astype(str).str.strip().str.lower()
+    
+    df_clean = df_clean.reset_index(drop=True)
+    
+    return df_clean
+
+def validate_dataframe(df, required_columns=None):
+    """
+    Validate DataFrame structure and required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate
+        required_columns (list, optional): List of required column names
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not isinstance(df, pd.DataFrame):
+        return False, "Input must be a pandas DataFrame"
+    
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "DataFrame is valid"
