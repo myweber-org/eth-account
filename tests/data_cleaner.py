@@ -168,3 +168,43 @@ def clean_dataset(df, remove_duplicates=True, handle_missing=True,
         cleaner.normalize_data(method='minmax')
         
     return cleaner.get_cleaned_data(), cleaner.get_cleaning_report()
+import json
+import re
+
+def clean_data(input_file, output_file, key_to_check='email'):
+    """
+    Reads a JSON file, filters out entries where the specified key
+    does not contain a valid email address, and writes the cleaned data
+    to a new JSON file.
+    """
+    try:
+        with open(input_file, 'r') as f:
+            data = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return
+    except json.JSONDecodeError:
+        print(f"Error: Input file '{input_file}' is not valid JSON.")
+        return
+
+    if not isinstance(data, list):
+        print("Error: JSON data is not a list of entries.")
+        return
+
+    email_pattern = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+    cleaned_data = []
+
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        value = entry.get(key_to_check)
+        if isinstance(value, str) and email_pattern.match(value):
+            cleaned_data.append(entry)
+
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(cleaned_data, f, indent=2)
+        print(f"Successfully cleaned data. Valid entries: {len(cleaned_data)}")
+        print(f"Output written to: {output_file}")
+    except IOError as e:
+        print(f"Error writing to output file: {e}")
