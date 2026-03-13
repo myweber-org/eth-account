@@ -366,4 +366,49 @@ if __name__ == "__main__":
     print("\nCleaned dataset:")
     print(cleaned)
     print("\nCleaned validation results:")
-    print(validate_dataset(cleaned))
+    print(validate_dataset(cleaned))import pandas as pd
+import numpy as np
+
+def clean_csv_data(file_path, output_path=None):
+    """
+    Load a CSV file, handle missing values, and save cleaned data.
+    """
+    try:
+        df = pd.read_csv(file_path)
+        print(f"Original data shape: {df.shape}")
+        
+        # Drop columns with more than 50% missing values
+        threshold = len(df) * 0.5
+        df_cleaned = df.dropna(axis=1, thresh=threshold)
+        
+        # Fill missing numeric values with median
+        numeric_cols = df_cleaned.select_dtypes(include=[np.number]).columns
+        df_cleaned[numeric_cols] = df_cleaned[numeric_cols].fillna(df_cleaned[numeric_cols].median())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df_cleaned.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df_cleaned[col].isnull().any():
+                df_cleaned[col] = df_cleaned[col].fillna(df_cleaned[col].mode()[0])
+        
+        print(f"Cleaned data shape: {df_cleaned.shape}")
+        print(f"Missing values after cleaning:\n{df_cleaned.isnull().sum()}")
+        
+        if output_path:
+            df_cleaned.to_csv(output_path, index=False)
+            print(f"Cleaned data saved to: {output_path}")
+        
+        return df_cleaned
+    
+    except FileNotFoundError:
+        print(f"Error: File not found at {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {e}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_file = "raw_data.csv"
+    output_file = "cleaned_data.csv"
+    cleaned_df = clean_csv_data(input_file, output_file)
