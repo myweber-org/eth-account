@@ -352,3 +352,38 @@ if __name__ == "__main__":
     
     print("\nSummary statistics:")
     print(filtered_data[['income', 'income_normalized', 'score', 'score_standardized']].describe())
+import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    cleaned_df = df.copy()
+    for col in numeric_columns:
+        if col in cleaned_df.columns:
+            cleaned_df = remove_outliers_iqr(cleaned_df, col)
+    cleaned_df = cleaned_df.dropna()
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    return cleaned_df
+
+if __name__ == "__main__":
+    data = {
+        'A': np.random.randn(100),
+        'B': np.random.randn(100) * 2 + 5,
+        'C': np.random.randn(100) * 0.5 - 2
+    }
+    sample_df = pd.DataFrame(data)
+    sample_df.loc[10, 'A'] = 100
+    sample_df.loc[20, 'B'] = -50
+    
+    print("Original dataset shape:", sample_df.shape)
+    cleaned = clean_dataset(sample_df, ['A', 'B', 'C'])
+    print("Cleaned dataset shape:", cleaned.shape)
+    print("Outliers removed:", sample_df.shape[0] - cleaned.shape[0])
