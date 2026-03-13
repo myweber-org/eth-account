@@ -116,3 +116,73 @@ def main():
 
 if __name__ == '__main__':
     main()
+import os
+import re
+import unicodedata
+
+def clean_filename(filename):
+    """
+    Normalize and clean a filename by removing or replacing invalid characters,
+    normalizing unicode, and trimming extra spaces.
+    """
+    # Normalize unicode characters (e.g., convert accented characters to ASCII)
+    filename = unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
+    
+    # Replace spaces with underscores
+    filename = filename.replace(' ', '_')
+    
+    # Remove any characters that are not alphanumeric, underscore, dash, or dot
+    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
+    
+    # Remove leading/trailing underscores, dashes, or dots
+    filename = filename.strip('_-.')
+    
+    # Convert to lowercase (optional, can be removed if case should be preserved)
+    filename = filename.lower()
+    
+    # Limit length (optional, e.g., max 255 characters typical for filesystems)
+    max_length = 255
+    if len(filename) > max_length:
+        name, ext = os.path.splitext(filename)
+        # Truncate name part, keep extension
+        filename = name[:max_length - len(ext)] + ext
+    
+    return filename
+
+def clean_filenames_in_directory(directory_path):
+    """
+    Iterate through all files in the given directory and rename them
+    using the clean_filename function.
+    """
+    if not os.path.isdir(directory_path):
+        print(f"Error: {directory_path} is not a valid directory.")
+        return
+    
+    for filename in os.listdir(directory_path):
+        old_path = os.path.join(directory_path, filename)
+        
+        # Skip directories
+        if os.path.isdir(old_path):
+            continue
+        
+        new_filename = clean_filename(filename)
+        new_path = os.path.join(directory_path, new_filename)
+        
+        # Only rename if the filename actually changed
+        if old_path != new_path:
+            try:
+                os.rename(old_path, new_path)
+                print(f"Renamed: {filename} -> {new_filename}")
+            except OSError as e:
+                print(f"Error renaming {filename}: {e}")
+
+if __name__ == "__main__":
+    # Example usage: clean filenames in the current directory
+    import sys
+    
+    if len(sys.argv) > 1:
+        target_directory = sys.argv[1]
+    else:
+        target_directory = "."
+    
+    clean_filenames_in_directory(target_directory)
