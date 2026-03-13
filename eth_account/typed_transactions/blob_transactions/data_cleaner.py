@@ -409,4 +409,86 @@ if __name__ == "__main__":
     input_file = sys.argv[1]
     output_file = sys.argv[2] if len(sys.argv) > 2 else None
     
-    remove_duplicates(input_file, output_file)
+    remove_duplicates(input_file, output_file)import pandas as pd
+import numpy as np
+
+def remove_outliers_iqr(df, column):
+    """
+    Remove outliers from a DataFrame column using the IQR method.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    Q1 = df[column].quantile(0.25)
+    Q3 = df[column].quantile(0.75)
+    IQR = Q3 - Q1
+    
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    
+    filtered_df = df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+    return filtered_df
+
+def clean_dataset(df, numeric_columns):
+    """
+    Clean dataset by removing outliers from multiple numeric columns.
+    
+    Parameters:
+    df (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names to clean
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    cleaned_df = df.copy()
+    
+    for column in numeric_columns:
+        if column in cleaned_df.columns:
+            original_len = len(cleaned_df)
+            cleaned_df = remove_outliers_iqr(cleaned_df, column)
+            removed_count = original_len - len(cleaned_df)
+            print(f"Removed {removed_count} outliers from column '{column}'")
+    
+    return cleaned_df
+
+def save_cleaned_data(df, input_path, output_suffix='_cleaned'):
+    """
+    Save cleaned DataFrame to a new CSV file.
+    
+    Parameters:
+    df (pd.DataFrame): Cleaned DataFrame
+    input_path (str): Original file path
+    output_suffix (str): Suffix to add to output filename
+    """
+    if input_path.endswith('.csv'):
+        output_path = input_path.replace('.csv', f'{output_suffix}.csv')
+        df.to_csv(output_path, index=False)
+        print(f"Cleaned data saved to: {output_path}")
+    else:
+        print("Error: Input file must be a CSV file")
+
+if __name__ == "__main__":
+    # Example usage
+    data = {
+        'id': range(1, 101),
+        'value': np.random.normal(100, 15, 100),
+        'temperature': np.random.normal(25, 5, 100)
+    }
+    
+    # Add some outliers
+    data['value'][95:] = [500, 600, 700, 800, 900]
+    data['temperature'][90:95] = [-10, 100, 150, 200, -50]
+    
+    df = pd.DataFrame(data)
+    print(f"Original dataset shape: {df.shape}")
+    
+    # Clean the dataset
+    numeric_cols = ['value', 'temperature']
+    cleaned_df = clean_dataset(df, numeric_cols)
+    
+    print(f"Cleaned dataset shape: {cleaned_df.shape}")
+    print(f"Removed {len(df) - len(cleaned_df)} total outliers")
