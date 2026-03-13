@@ -141,3 +141,43 @@ def remove_duplicates_preserve_order(sequence):
             seen.add(item)
             result.append(item)
     return result
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+def detect_outliers_iqr(data, column):
+    Q1 = data[column].quantile(0.25)
+    Q3 = data[column].quantile(0.75)
+    IQR = Q3 - Q1
+    lower_bound = Q1 - 1.5 * IQR
+    upper_bound = Q3 + 1.5 * IQR
+    outliers = data[(data[column] < lower_bound) | (data[column] > upper_bound)]
+    return outliers
+
+def remove_outliers_zscore(data, column, threshold=3):
+    z_scores = np.abs(stats.zscore(data[column]))
+    filtered_data = data[z_scores < threshold]
+    return filtered_data
+
+def normalize_minmax(data, column):
+    min_val = data[column].min()
+    max_val = data[column].max()
+    data[column + '_normalized'] = (data[column] - min_val) / (max_val - min_val)
+    return data
+
+def clean_dataset(file_path):
+    df = pd.read_csv(file_path)
+    numeric_columns = df.select_dtypes(include=[np.number]).columns
+    
+    for col in numeric_columns:
+        outliers = detect_outliers_iqr(df, col)
+        if not outliers.empty:
+            df = remove_outliers_zscore(df, col)
+        df = normalize_minmax(df, col)
+    
+    return df
+
+if __name__ == "__main__":
+    cleaned_data = clean_dataset('sample_data.csv')
+    cleaned_data.to_csv('cleaned_data.csv', index=False)
+    print("Data cleaning completed. Saved to cleaned_data.csv")
