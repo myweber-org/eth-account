@@ -1350,3 +1350,65 @@ def validate_dataframe(data, required_columns=None, min_rows=1):
             raise ValueError(f"Missing required columns: {missing_cols}")
     
     return True
+import pandas as pd
+
+def clean_dataset(df, remove_duplicates=True, fill_method=None):
+    """
+    Clean a pandas DataFrame by handling missing values and optionally removing duplicates.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to clean.
+        remove_duplicates (bool): If True, remove duplicate rows.
+        fill_method (str or None): Method to fill missing values. 
+                                   Options: 'ffill', 'bfill', 'mean', 'median', or None to drop.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    cleaned_df = df.copy()
+    
+    # Handle missing values
+    if fill_method is None:
+        cleaned_df = cleaned_df.dropna()
+    elif fill_method in ['ffill', 'bfill']:
+        cleaned_df = cleaned_df.fillna(method=fill_method)
+    elif fill_method == 'mean':
+        cleaned_df = cleaned_df.fillna(cleaned_df.mean(numeric_only=True))
+    elif fill_method == 'median':
+        cleaned_df = cleaned_df.fillna(cleaned_df.median(numeric_only=True))
+    else:
+        raise ValueError(f"Unsupported fill_method: {fill_method}")
+    
+    # Remove duplicates if requested
+    if remove_duplicates:
+        cleaned_df = cleaned_df.drop_duplicates()
+    
+    # Reset index after cleaning operations
+    cleaned_df = cleaned_df.reset_index(drop=True)
+    
+    return cleaned_df
+
+def validate_dataset(df, required_columns=None, min_rows=1):
+    """
+    Validate dataset structure and content.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+        required_columns (list): List of column names that must be present.
+        min_rows (int): Minimum number of rows required.
+    
+    Returns:
+        tuple: (is_valid, message)
+    """
+    if df.empty:
+        return False, "DataFrame is empty"
+    
+    if len(df) < min_rows:
+        return False, f"DataFrame has fewer than {min_rows} rows"
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            return False, f"Missing required columns: {missing_columns}"
+    
+    return True, "Dataset is valid"
