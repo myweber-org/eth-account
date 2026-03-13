@@ -561,3 +561,118 @@ def clean_data(input_file, output_file):
 if __name__ == "__main__":
     # Example usage
     clean_data("raw_data.csv", "cleaned_data.csv")
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers from a DataFrame column using IQR method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to process
+    threshold (float): IQR multiplier for outlier detection
+    
+    Returns:
+    pd.DataFrame: DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df.copy()
+
+def normalize_column(dataframe, column, method='zscore'):
+    """
+    Normalize a column using specified method.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    column (str): Column name to normalize
+    method (str): Normalization method ('zscore', 'minmax', 'robust')
+    
+    Returns:
+    pd.DataFrame: DataFrame with normalized column
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    df_copy = dataframe.copy()
+    
+    if method == 'zscore':
+        df_copy[f'{column}_normalized'] = stats.zscore(df_copy[column])
+    
+    elif method == 'minmax':
+        col_min = df_copy[column].min()
+        col_max = df_copy[column].max()
+        df_copy[f'{column}_normalized'] = (df_copy[column] - col_min) / (col_max - col_min)
+    
+    elif method == 'robust':
+        median = df_copy[column].median()
+        iqr = df_copy[column].quantile(0.75) - df_copy[column].quantile(0.25)
+        df_copy[f'{column}_normalized'] = (df_copy[column] - median) / iqr
+    
+    else:
+        raise ValueError("Method must be 'zscore', 'minmax', or 'robust'")
+    
+    return df_copy
+
+def clean_dataset(dataframe, numeric_columns, outlier_threshold=1.5, normalize_method='zscore'):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Parameters:
+    dataframe (pd.DataFrame): Input DataFrame
+    numeric_columns (list): List of numeric column names to process
+    outlier_threshold (float): IQR threshold for outlier removal
+    normalize_method (str): Normalization method to apply
+    
+    Returns:
+    pd.DataFrame: Cleaned DataFrame
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    df_clean = dataframe.copy()
+    
+    for column in numeric_columns:
+        if column in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, column, outlier_threshold)
+            df_clean = normalize_column(df_clean, column, normalize_method)
+    
+    return df_clean
+
+def validate_dataframe(dataframe, required_columns=None, min_rows=1):
+    """
+    Validate DataFrame structure and content.
+    
+    Parameters:
+    dataframe (pd.DataFrame): DataFrame to validate
+    required_columns (list): List of required column names
+    min_rows (int): Minimum number of rows required
+    
+    Returns:
+    bool: True if validation passes, raises exception otherwise
+    """
+    if not isinstance(dataframe, pd.DataFrame):
+        raise TypeError("Input must be a pandas DataFrame")
+    
+    if len(dataframe) < min_rows:
+        raise ValueError(f"DataFrame must have at least {min_rows} rows")
+    
+    if required_columns:
+        missing_columns = [col for col in required_columns if col not in dataframe.columns]
+        if missing_columns:
+            raise ValueError(f"Missing required columns: {missing_columns}")
+    
+    return True
