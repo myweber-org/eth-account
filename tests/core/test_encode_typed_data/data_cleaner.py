@@ -420,4 +420,82 @@ if __name__ == "__main__":
     print(f"Valid: {validation['is_valid']}")
     print(f"Errors: {validation['errors']}")
     print(f"Warnings: {validation['warnings']}")
-    print(f"Summary: {validation['summary']}")
+    print(f"Summary: {validation['summary']}")import pandas as pd
+
+def clean_dataframe(df):
+    """
+    Remove null values and duplicate rows from a pandas DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input DataFrame to be cleaned.
+    
+    Returns:
+        pd.DataFrame: Cleaned DataFrame.
+    """
+    # Remove rows with any null values
+    df_cleaned = df.dropna()
+    
+    # Remove duplicate rows
+    df_cleaned = df_cleaned.drop_duplicates()
+    
+    # Reset index after cleaning
+    df_cleaned = df_cleaned.reset_index(drop=True)
+    
+    return df_cleaned
+
+def validate_dataframe(df):
+    """
+    Validate DataFrame by checking for required columns.
+    
+    Args:
+        df (pd.DataFrame): DataFrame to validate.
+    
+    Returns:
+        bool: True if DataFrame is valid, False otherwise.
+    """
+    required_columns = ['id', 'timestamp', 'value']
+    
+    for col in required_columns:
+        if col not in df.columns:
+            print(f"Missing required column: {col}")
+            return False
+    
+    return True
+
+def process_data_file(file_path):
+    """
+    Process a data file by reading, cleaning, and validating it.
+    
+    Args:
+        file_path (str): Path to the data file.
+    
+    Returns:
+        pd.DataFrame: Processed DataFrame or None if processing fails.
+    """
+    try:
+        # Read data file
+        df = pd.read_csv(file_path)
+        
+        # Validate data structure
+        if not validate_dataframe(df):
+            return None
+        
+        # Clean the data
+        df_cleaned = clean_dataframe(df)
+        
+        # Log processing results
+        print(f"Original rows: {len(df)}")
+        print(f"Cleaned rows: {len(df_cleaned)}")
+        print(f"Rows removed: {len(df) - len(df_cleaned)}")
+        
+        return df_cleaned
+        
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+    except pd.errors.EmptyDataError:
+        print(f"File is empty: {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error processing file: {e}")
+        return None
