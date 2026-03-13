@@ -387,3 +387,142 @@ if __name__ == "__main__":
     cleaned = clean_dataset(sample_df, ['A', 'B', 'C'])
     print("Cleaned dataset shape:", cleaned.shape)
     print("Outliers removed:", sample_df.shape[0] - cleaned.shape[0])
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+def remove_outliers_iqr(dataframe, column, threshold=1.5):
+    """
+    Remove outliers using the Interquartile Range method.
+    
+    Args:
+        dataframe: pandas DataFrame containing the data
+        column: column name to process
+        threshold: multiplier for IQR (default 1.5)
+    
+    Returns:
+        DataFrame with outliers removed
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    q1 = dataframe[column].quantile(0.25)
+    q3 = dataframe[column].quantile(0.75)
+    iqr = q3 - q1
+    
+    lower_bound = q1 - threshold * iqr
+    upper_bound = q3 + threshold * iqr
+    
+    filtered_df = dataframe[(dataframe[column] >= lower_bound) & 
+                           (dataframe[column] <= upper_bound)]
+    
+    return filtered_df
+
+def zscore_normalize(dataframe, column):
+    """
+    Normalize data using Z-score normalization.
+    
+    Args:
+        dataframe: pandas DataFrame containing the data
+        column: column name to normalize
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    mean_val = dataframe[column].mean()
+    std_val = dataframe[column].std()
+    
+    if std_val == 0:
+        return dataframe[column] - mean_val
+    
+    normalized = (dataframe[column] - mean_val) / std_val
+    return normalized
+
+def minmax_normalize(dataframe, column, feature_range=(0, 1)):
+    """
+    Normalize data using Min-Max scaling.
+    
+    Args:
+        dataframe: pandas DataFrame containing the data
+        column: column name to normalize
+        feature_range: tuple of (min, max) for output range
+    
+    Returns:
+        Series with normalized values
+    """
+    if column not in dataframe.columns:
+        raise ValueError(f"Column '{column}' not found in DataFrame")
+    
+    min_val = dataframe[column].min()
+    max_val = dataframe[column].max()
+    
+    if min_val == max_val:
+        return pd.Series([feature_range[0]] * len(dataframe), index=dataframe.index)
+    
+    normalized = (dataframe[column] - min_val) / (max_val - min_val)
+    normalized = normalized * (feature_range[1] - feature_range[0]) + feature_range[0]
+    
+    return normalized
+
+def detect_missing_patterns(dataframe, threshold=0.3):
+    """
+    Detect columns with high percentage of missing values.
+    
+    Args:
+        dataframe: pandas DataFrame to analyze
+        threshold: percentage threshold for flagging (default 0.3)
+    
+    Returns:
+        Dictionary with missing value statistics
+    """
+    total_rows = len(dataframe)
+    missing_stats = {}
+    
+    for col in dataframe.columns:
+        missing_count = dataframe[col].isnull().sum()
+        missing_percentage = missing_count / total_rows
+        
+        missing_stats[col] = {
+            'missing_count': missing_count,
+            'missing_percentage': missing_percentage,
+            'needs_attention': missing_percentage > threshold
+        }
+    
+    return missing_stats
+
+def clean_dataset(dataframe, numeric_columns=None, outlier_threshold=1.5):
+    """
+    Comprehensive data cleaning pipeline.
+    
+    Args:
+        dataframe: pandas DataFrame to clean
+        numeric_columns: list of numeric columns to process (defaults to all numeric)
+        outlier_threshold: IQR threshold for outlier removal
+    
+    Returns:
+        Cleaned DataFrame
+    """
+    df_clean = dataframe.copy()
+    
+    if numeric_columns is None:
+        numeric_columns = df_clean.select_dtypes(include=[np.number]).columns.tolist()
+    
+    for col in numeric_columns:
+        if col in df_clean.columns:
+            df_clean = remove_outliers_iqr(df_clean, col, outlier_threshold)
+    
+    missing_stats = detect_missing_patterns(df_clean)
+    
+    for col, stats in missing_stats.items():
+        if stats['needs_attention']:
+            df_clean = df_clean.drop(columns=[col])
+        elif stats['missing_count'] > 0:
+            if col in numeric_columns:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].median())
+            else:
+                df_clean[col] = df_clean[col].fillna(df_clean[col].mode()[0])
+    
+    return df_clean
