@@ -253,3 +253,11 @@ if __name__ == "__main__":
     print("\nCleaned dataset shape:", cleaned_data.shape)
     print("\nCleaned statistics:")
     print(summary_statistics(cleaned_data, ['feature1', 'feature2', 'feature3']))
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
