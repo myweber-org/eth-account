@@ -137,4 +137,50 @@ if __name__ == "__main__":
     
     no_outliers = remove_outliers(cleaned, 'value', method='iqr')
     print("\nDataFrame after outlier removal:")
-    print(no_outliers)
+    print(no_outliers)import pandas as pd
+import numpy as np
+
+def clean_data(input_file, output_file):
+    """
+    Load a CSV file, perform basic cleaning operations,
+    and save the cleaned data to a new file.
+    """
+    try:
+        df = pd.read_csv(input_file)
+        
+        # Remove duplicate rows
+        df = df.drop_duplicates()
+        
+        # Fill missing numeric values with column mean
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+        
+        # Fill missing categorical values with mode
+        categorical_cols = df.select_dtypes(include=['object']).columns
+        for col in categorical_cols:
+            if df[col].isnull().any():
+                df[col] = df[col].fillna(df[col].mode()[0])
+        
+        # Remove rows where critical columns are still null
+        critical_cols = ['id', 'timestamp']
+        existing_critical = [col for col in critical_cols if col in df.columns]
+        if existing_critical:
+            df = df.dropna(subset=existing_critical)
+        
+        # Save cleaned data
+        df.to_csv(output_file, index=False)
+        print(f"Data cleaned successfully. Saved to {output_file}")
+        return df
+        
+    except FileNotFoundError:
+        print(f"Error: Input file '{input_file}' not found.")
+        return None
+    except Exception as e:
+        print(f"Error during data cleaning: {str(e)}")
+        return None
+
+if __name__ == "__main__":
+    # Example usage
+    input_csv = "raw_data.csv"
+    output_csv = "cleaned_data.csv"
+    cleaned_df = clean_data(input_csv, output_csv)
