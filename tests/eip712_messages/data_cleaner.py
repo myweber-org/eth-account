@@ -1367,3 +1367,11 @@ if __name__ == "__main__":
         print(f"  Removed outliers: {data['removed_outliers']}")
         print(f"  New mean: {data['statistics']['mean']:.2f}")
         print(f"  New std: {data['statistics']['std']:.2f}")
+def remove_duplicates(sequence):
+    seen = set()
+    result = []
+    for item in sequence:
+        if item not in seen:
+            seen.add(item)
+            result.append(item)
+    return result
