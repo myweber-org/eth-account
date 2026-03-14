@@ -70,3 +70,52 @@ if __name__ == "__main__":
     
     is_valid, message = validate_dataframe(cleaned, required_columns=['A', 'B', 'C'])
     print(f"\nValidation: {message}")
+import pandas as pd
+import numpy as np
+
+def clean_dataset(df, drop_duplicates=True, fill_missing='mean'):
+    """
+    Clean a pandas DataFrame by removing duplicates and handling missing values.
+    """
+    cleaned_df = df.copy()
+
+    if drop_duplicates:
+        initial_rows = cleaned_df.shape[0]
+        cleaned_df = cleaned_df.drop_duplicates()
+        removed = initial_rows - cleaned_df.shape[0]
+        print(f"Removed {removed} duplicate rows.")
+
+    if cleaned_df.isnull().sum().any():
+        print("Handling missing values...")
+        numeric_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+        categorical_cols = cleaned_df.select_dtypes(exclude=[np.number]).columns
+
+        if fill_missing == 'mean':
+            for col in numeric_cols:
+                if cleaned_df[col].isnull().any():
+                    cleaned_df[col].fillna(cleaned_df[col].mean(), inplace=True)
+        elif fill_missing == 'median':
+            for col in numeric_cols:
+                if cleaned_df[col].isnull().any():
+                    cleaned_df[col].fillna(cleaned_df[col].median(), inplace=True)
+        elif fill_missing == 'mode':
+            for col in numeric_cols:
+                if cleaned_df[col].isnull().any():
+                    cleaned_df[col].fillna(cleaned_df[col].mode()[0], inplace=True)
+
+        for col in categorical_cols:
+            if cleaned_df[col].isnull().any():
+                cleaned_df[col].fillna('Unknown', inplace=True)
+
+    print(f"Cleaning complete. Final shape: {cleaned_df.shape}")
+    return cleaned_df
+
+if __name__ == "__main__":
+    sample_data = {
+        'A': [1, 2, 2, 4, np.nan],
+        'B': [5, 6, 6, np.nan, 9],
+        'C': ['x', 'y', 'y', 'z', None]
+    }
+    df = pd.DataFrame(sample_data)
+    result = clean_dataset(df, fill_missing='median')
+    print(result)
